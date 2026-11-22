@@ -1,4 +1,4 @@
-# APEX Circuit
+# Race Game
 
 WASD ile sürülen, tek oyunculu bir 3D yarış kariyeri prototipi. Beş sürücü üç farklı pistte yarışır. Her etap şampiyona puanı ve para kazandırır. İlk iki yarışı bitirmek yeni takımların kilidini açar. Takımların performans ve ödül avantajları vardır. Kazancınla garajda motoru, lastikleri ve frenleri geliştirebilirsin.
 
