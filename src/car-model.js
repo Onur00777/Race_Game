@@ -2,9 +2,8 @@ import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { DecalGeometry } from 'three/addons/geometries/DecalGeometry.js';
 import { sponsors } from './setup.js';
+import { axles, wheelRadius, wheelTrack } from './tires.js';
 
-const wheelRadius = 0.365;
-const axles = [-1.29, 1.34];
 const box = new T.BoxGeometry(1, 1, 1);
 const rubber = new T.MeshStandardMaterial({ color: '#141515', roughness: 0.86 });
 const carbon = new T.MeshStandardMaterial({ color: '#191d23', roughness: 0.62, metalness: 0.36 });
@@ -340,7 +339,7 @@ function addWheels(root) {
   for (const side of [-1, 1]) {
     for (const axle of axles) {
       const holder = new T.Group();
-      holder.position.set(side * 0.828, wheelRadius, axle);
+      holder.position.set(side * wheelTrack, wheelRadius, axle);
       root.add(holder);
       const wheel = new T.Group();
       holder.add(wheel);
@@ -522,9 +521,9 @@ export function updateCarModel(model, car, dt, braking, fire = 0) {
     flame.visible = fire > 0;
     if (flame.visible) flame.scale.setScalar(fire * (index ? 0.84 : 1));
   }
-  for (const { holder, wheel, steering } of model.wheels) {
+  for (const [index, { holder, wheel, steering }] of model.wheels.entries()) {
     if (steering) holder.rotation.y = -car.steer * 0.30;
-    wheel.rotation.x -= car.speed * dt / wheelRadius;
+    wheel.rotation.x -= (car.wheels?.[index].rolling ?? car.speed) * dt / wheelRadius;
   }
   deformBody(model, car.frontDamage, car.rearDamage);
 }

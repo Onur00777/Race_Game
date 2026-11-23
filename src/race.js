@@ -5,6 +5,7 @@ import { vehicleStats } from './setup.js';
 import { difficultyId } from './difficulty.js';
 import { advanceVehicle, angleBetween, clamp } from './vehicle-physics.js';
 import { createRaceIntel, wakeFactor } from './race-ai.js';
+import { createTires, updateTires } from './tires.js';
 
 const wrap = (value, period) => ((value % period) + period) % period;
 export const raceStep = 1 / 120;
@@ -85,7 +86,8 @@ export function createTrack(event) {
   return { event, length, spacing, railOffset, samples, at, project };
 }
 
-const bodyState = () => ({ speed: 0, lateral: 0, spin: 0, steer: 0, damage: 0, frontDamage: 0, rearDamage: 0 });
+const bodyState = () => ({ speed: 0, lateral: 0, spin: 0, steer: 0, damage: 0, frontDamage: 0, rearDamage: 0,
+  wheels: createTires(), tireSlip: 0 });
 
 export function createRace(track, team, upgrades, setup, appearance, options = {}) {
   const finish = track.length * track.event.laps;
@@ -101,7 +103,8 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
       ...track.at(station, offset), ...bodyState(), finishTime: null };
   });
   const cars = [player, ...opponents];
-  const race = { track, player, opponents, cars, difficulty: difficultyId(options.difficulty), previousPoses: cars.map(visualPose),
+  const race = { track, player, opponents, cars, difficulty: difficultyId(options.difficulty),
+    runId: options.runId ?? (globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)), previousPoses: cars.map(visualPose),
     elapsed: 0, countdown: 3, order: null, impact: null, throttle: false, backfire: null, engineLevel: upgrades.engine };
   const surfaceGrip = track.event.surfaceGrip;
   const playerHandling = { ...vehicleStats(team, upgrades, setup), surfaceGrip };
@@ -118,7 +121,7 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
     const nearby = cars.filter(other => other !== car && Math.abs(relativeStation(other.station, car.station)) < 5.5);
     const offset = [0, -4.2, 4.2].find(lane => nearby.every(other => Math.abs(other.offset - lane) > 2.5)) ?? 0;
     Object.assign(car, track.at(car.station, offset), { speed: 0, lateral: 0, spin: 0, steer: 0, yawRate: 0,
-      offset, onRoad: true, stuck: 0, aiOffset: offset });
+      offset, onRoad: true, stuck: 0, aiOffset: offset, wheels: createTires(), tireSlip: 0 });
     race.previousPoses[cars.indexOf(car)] = visualPose(car);
   }
 
@@ -140,7 +143,7 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
     }
   }
 
-  function trackProgress(car, dt) {
+  function trackProgress(car, controls, handling, dt) {
     let projection = track.project(car.x, car.z);
     if (projection.distance > track.railOffset + 8) {
       rejoin(car);
@@ -151,6 +154,7 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
     if (car.x !== x || car.z !== z) projection = track.project(car.x, car.z);
     car.offset = projection.offset;
     car.onRoad = projection.distance <= track.event.width / 2 + 0.6;
+    updateTires(car, controls, handling, projection, track.event.width / 2, dt);
     const delta = relativeStation(projection.station, car.station);
     const previous = car.station;
     // Reject projection jumps between different sections of a hairpin.
@@ -198,11 +202,11 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
       race.backfire = { time: race.elapsed, intensity: 0.58 + upgrades.engine * 0.18 };
     }
     race.throttle = throttle;
-    const active = race.cars.filter(car => car.finishTime == null || car.speed > 1);
-    const rivalControls = opponents.map(car => raceIntel.controls(car, cars, race.elapsed, dt));
-    advanceVehicle(player, { ...input, draft: wakeFactor(track, player, cars, relativeStation) }, playerHandling, dt, true);
-    opponents.forEach((car, index) => {
-      if (car.finishTime == null || car.speed > 1) advanceVehicle(car, rivalControls[index], raceIntel.handling, dt);
+    const active = cars.filter(car => car.finishTime == null || car.speed > 1);
+    const controls = active.map(car => car === player ? { ...input, draft: wakeFactor(track, player, cars, relativeStation) } :
+      raceIntel.controls(car, cars, race.elapsed, dt));
+    active.forEach((car, index) => {
+      advanceVehicle(car, controls[index], car === player ? playerHandling : raceIntel.handling, dt, car === player);
     });
     for (let i = 0; i < active.length; i++) {
       for (let j = i + 1; j < active.length; j++) {
@@ -211,7 +215,7 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
         reportImpact(resolveVehicleContact(a, b), a, b);
       }
     }
-    for (const car of active) trackProgress(car, dt);
+    active.forEach((car, index) => trackProgress(car, controls[index], car === player ? playerHandling : raceIntel.handling, dt));
     if (player.finishTime != null) {
       race.elapsed = player.finishTime;
       classify();

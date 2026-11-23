@@ -12,7 +12,7 @@ export function advanceVehicle(car, controls, handling, dt, canReverse = false) 
   const { topSpeed, acceleration, braking, surfaceGrip, grip, turn, brakeStability, load } = handling;
   const power = 1 - car.damage * 0.0028;
   const maximum = topSpeed * (1 - car.damage * 0.002) + draft * 2.4;
-  const effectiveBrake = braking * surfaceGrip;
+  const effectiveBrake = braking * surfaceGrip * (1 - (car.tireSlip ?? 0) * 0.11);
   if (gas) {
     const force = car.speed < 0 ? effectiveBrake : acceleration * power * (1.0 + draft * 0.097) *
       Math.max(0, 1 - Math.max(0, car.speed) / (maximum + 8));
@@ -34,7 +34,8 @@ export function advanceVehicle(car, controls, handling, dt, canReverse = false) 
   car.spin *= Math.exp(-(car.onRoad ? 4.3 : 2.65) * dt);
   car.lateral -= car.speed * Math.sin(rotation) * (handbrake ? 1.08 : 0.52);
   const aeroGrip = load * 0.021 * (speed / 42) ** 2;
-  const damping = (grip + aeroGrip + brake * brakeStability) * (1 - car.damage * 0.0019) * surfaceGrip;
+  const damping = (grip + aeroGrip + brake * brakeStability) * (1 - car.damage * 0.0019) *
+    (1 - (car.tireSlip ?? 0) * 0.12) * surfaceGrip;
   car.lateral *= Math.exp(-(handbrake ? 1.55 : damping) * (car.onRoad ? 1 : 0.56) * dt);
   const motion = velocity(car);
   car.x += motion.x * dt;

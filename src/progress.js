@@ -10,6 +10,7 @@ export function raceCheckpoint(career, race, loadout, alternateCamera) {
   return {
     version: 3,
     event: race.track.event.id,
+    runId: race.runId,
     legacy: race.track.event.legacy === true,
     season: career.season,
     round: career.results.length,
@@ -52,7 +53,7 @@ export function restoreRace(career, track) {
   if (track.event.id !== event.id || track.event.laps !== event.laps) return null;
   const loadout = normalizeLoadout(save.loadout);
   const race = createRace(track, teamById(loadout.team), loadout.upgrades, loadout.setup, loadout.appearance,
-    { difficulty: eventDifficulty(career) });
+    { difficulty: eventDifficulty(career), runId: typeof save.runId === 'string' ? save.runId : undefined });
   if (!Number.isFinite(save.elapsed) || save.elapsed < 0 ||
       !Number.isFinite(save.countdown) || save.countdown < 0 || save.countdown > 3 ||
       !Array.isArray(save.cars) || save.cars.length !== race.cars.length) return null;
