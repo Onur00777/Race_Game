@@ -92,6 +92,7 @@ const garagePreview = byId('garage-preview');
 const updateWallet = createWallet(byId('wallet'), garageMoney);
 const keys = new Set();
 const drivingKeys = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space']);
+const skidSaveKey = 'apex-circuit-skid-marks-v1';
 const screens = ['calendar', 'garage', 'teams'];
 const orbit = { ...defaultOrbit };
 let storage;
@@ -123,6 +124,7 @@ const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const impactZones = { frontDamage: 'zoneFront', rearDamage: 'zoneRear', leftDamage: 'zoneLeft', rightDamage: 'zoneRight' };
 let lastMenuDraw = -Infinity;
 let lastCheckpoint = -Infinity;
+let lastSkidSave = -Infinity;
 let pendingTuning = false;
 let previousGarageTab;
 let statTimer;
@@ -367,6 +369,8 @@ function startRace(restart = false) {
   const continued = !restart && restored?.race;
   useTrack(next, continued || createRace(next, teamById(activeLoadout.team), activeLoadout.upgrades, activeLoadout.setup,
     activeLoadout.appearance, { difficulty: eventDifficulty(career), condition: career.condition }));
+  if (continued) restoreSkids();
+  else clearSkidSave();
   byId('circuit-home').append(circuit);
   circuit.setAttribute('aria-label', t('track'));
   mode = 'race';
@@ -374,6 +378,7 @@ function startRace(restart = false) {
   keys.clear();
   accumulator = 0;
   lastHudUpdate = lastCheckpoint = -Infinity;
+  lastSkidSave = (previousFrame ?? 0) + 1000;
   lastHudHit = null;
   hudFlash?.cancel();
   byId('menu').hidden = byId('garage').hidden = byId('topbar').hidden = true;
@@ -437,11 +442,31 @@ function saveActiveRace(quiet = false) {
   return persist(quiet);
 }
 
+function saveSkids() {
+  if (mode !== 'race' || !storage) return;
+  const data = view.captureSkids(race.runId);
+  if (!data) return;
+  try { storage.setItem(skidSaveKey, `${race.runId} ${data}`); } catch { /* Keep the race checkpoint playable. */ }
+}
+
+function restoreSkids() {
+  try {
+    const saved = storage?.getItem(skidSaveKey);
+    const prefix = race.runId + ' ';
+    if (saved?.startsWith(prefix)) view.restoreSkids(race.runId, saved.slice(prefix.length));
+  } catch { /* Skids are optional when storage is unavailable. */ }
+}
+
+function clearSkidSave() {
+  try { storage?.removeItem(skidSaveKey); } catch { /* Storage may be unavailable. */ }
+}
+
 function pauseRace() {
   if (mode !== 'race' || paused) return;
   keys.clear();
   paused = true;
   const saved = saveActiveRace(true);
+  if (saved) saveSkids();
   updateHud();
   renderPause(saved);
   overlay.showModal();
@@ -488,7 +513,7 @@ function finishRace() {
   paused = false;
   keys.clear();
   updateHud();
-  persist();
+  if (persist()) clearSkidSave();
   const result = career.results.at(-1);
   const condition = integrity(result.condition);
   const unlocked = !result.retired && teams.find(team => team.unlock === career.completed);
@@ -599,7 +624,10 @@ app.addEventListener('click', event => {
       race.retire();
       finishRace();
       break;
-    case 'save-exit': saveActiveRace(); showMenu('calendar'); break;
+    case 'save-exit':
+      if (saveActiveRace()) saveSkids();
+      showMenu('calendar');
+      break;
     case 'calendar': showMenu('calendar'); break;
     case 'garage': showMenu('garage'); break;
     case 'service': openService(); break;
@@ -776,7 +804,7 @@ document.addEventListener('visibilitychange', () => {
   else if (pendingTuning) persist(true);
 });
 window.addEventListener('pagehide', () => {
-  if (mode === 'race') saveActiveRace(true);
+  if (mode === 'race' && saveActiveRace(true)) saveSkids();
   else if (pendingTuning) persist(true);
 });
 overlay.addEventListener('cancel', event => {
@@ -818,6 +846,10 @@ function frame(now) {
     const fraction = mode === 'race' && !paused ? accumulator / raceStep : 1;
     view.draw(race, mode, dt, braking, alternateCamera, paused, fraction, career.racingLine !== false);
     if (mode === 'menu') lastMenuDraw = now;
+    if (mode === 'race' && !paused && now - lastSkidSave > 10000) {
+      saveSkids();
+      lastSkidSave = now;
+    }
   }
 }
 

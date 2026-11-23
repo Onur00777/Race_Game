@@ -421,5 +421,9 @@ export function createView(canvas, quality) {
     pipeline.render(scene, camera, dt, race.track.event.weather === 'night' ? 1.18 : 1);
   }
 
-  return { setTrack, draw, drawGarage, snap, setQuality };
+  return {
+    setTrack, draw, drawGarage, snap, setQuality,
+    captureSkids: runId => skidMarks.capture(runId),
+    restoreSkids: (runId, data) => skidMarks.restore(runId, data),
+  };
 }

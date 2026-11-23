@@ -1,6 +1,8 @@
 import * as T from 'three';
 
 const roadHeight = 0.015; // Above the asphalt and baked rubber, below the racing guide.
+const bytesPerMark = 12;
+const coordinateScale = 40; // Quantize world-space endpoints to 2.5 cm for race checkpoints.
 
 export function createSkidMarks(capacity = 32768) {
   const geometry = new T.BufferGeometry();
@@ -63,7 +65,11 @@ export function createSkidMarks(capacity = 32768) {
   let count = 0;
   let dirty = false;
 
-  function stamp(a, b, nx, nz) {
+  function stamp(a, b) {
+    const dx = b.x - a.x, dz = b.z - a.z;
+    const distance = Math.hypot(dx, dz);
+    if (distance < 0.30 || distance > 7.6) return;
+    const nx = -dz / distance, nz = dx / distance;
     const vertex = cursor * 4;
     positions.setXYZ(vertex, a.x - nx * a.width, roadHeight, a.z - nz * a.width);
     positions.setXYZ(vertex + 1, a.x + nx * a.width, roadHeight, a.z + nz * a.width);
@@ -89,19 +95,32 @@ export function createSkidMarks(capacity = 32768) {
     const dz = contact.z - last.z;
     const distance = Math.hypot(dx, dz);
     if (distance < 0.34) return last;
-    if (distance < 7.5) stamp(last, contact, -dz / distance, dx / distance);
+    stamp(last, contact);
     return contact;
+  }
+
+  function reset(runId) {
+    run = runId;
+    contacts.clear();
+    cursor = count = 0;
+    positions.clearUpdateRanges();
+    opacity.clearUpdateRanges();
+    geometry.setDrawRange(0, 0);
+    dirty = false;
+  }
+
+  function commitGeometry() {
+    if (dirty) {
+      geometry.setDrawRange(0, count * 6);
+      positions.needsUpdate = opacity.needsUpdate = true;
+      dirty = false;
+    }
   }
 
   function update(race, moving, visible) {
     mesh.visible = visible;
     if (!visible) return;
-    if (run !== race.runId) {
-      run = race.runId;
-      contacts.clear();
-      cursor = count = 0;
-      geometry.setDrawRange(0, 0);
-    }
+    if (run !== race.runId) reset(race.runId);
     if (!moving) return;
     for (const car of race.cars) {
       let points = contacts.get(car.id);
@@ -111,12 +130,48 @@ export function createSkidMarks(capacity = 32768) {
       }
       for (const [index, wheel] of car.wheels.entries()) points[index] = sample(wheel, points[index]);
     }
-    if (dirty) {
-      geometry.setDrawRange(0, count * 6);
-      positions.needsUpdate = opacity.needsUpdate = true;
-      dirty = false;
-    }
+    commitGeometry();
   }
 
-  return { mesh, update };
+  function capture(runId) {
+    if (run !== runId || !count) return null;
+    const bytes = new Uint8Array(count * bytesPerMark);
+    const packed = new DataView(bytes.buffer);
+    for (let i = 0; i < count; i++) {
+      const vertex = ((cursor - count + i + capacity) % capacity) * 4;
+      const offset = i * bytesPerMark;
+      for (let end = 0; end < 2; end++) {
+        const v = vertex + end * 2;
+        const ax = positions.getX(v), az = positions.getZ(v);
+        const bx = positions.getX(v + 1), bz = positions.getZ(v + 1);
+        packed.setInt16(offset + end * 6, Math.round((ax + bx) * 0.5 * coordinateScale), true);
+        packed.setInt16(offset + end * 6 + 2, Math.round((az + bz) * 0.5 * coordinateScale), true);
+        packed.setUint8(offset + end * 6 + 4, Math.round(Math.hypot(ax - bx, az - bz) * 500));
+        packed.setUint8(offset + end * 6 + 5, Math.round(opacity.getX(v) * 255));
+      }
+    }
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += 8192) binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+    return btoa(binary);
+  }
+
+  function restore(runId, data) {
+    if (run === runId || typeof data !== 'string' || data.length > capacity * bytesPerMark * 4 / 3) return;
+    let binary;
+    try { binary = atob(data); } catch { return; }
+    if (binary.length % bytesPerMark || binary.length > capacity * bytesPerMark) return;
+    const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
+    const packed = new DataView(bytes.buffer);
+    const endpoint = offset => ({
+      x: packed.getInt16(offset, true) / coordinateScale,
+      z: packed.getInt16(offset + 2, true) / coordinateScale,
+      width: packed.getUint8(offset + 4) / 1000,
+      alpha: packed.getUint8(offset + 5) / 255,
+    });
+    reset(runId);
+    for (let offset = 0; offset < bytes.length; offset += bytesPerMark) stamp(endpoint(offset), endpoint(offset + 6));
+    commitGeometry();
+  }
+
+  return { mesh, update, capture, restore };
 }

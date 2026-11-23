@@ -53,3 +53,29 @@ test('rubber marks remain while paused and recycling bounds the pool without cro
   marks.update({ ...race, runId: 'new' }, false, true);
   assert.equal(marks.mesh.geometry.drawRange.count, 0);
 });
+
+test('skid checkpoints reconstruct the newest pooled marks after a reload', () => {
+  const marks = createSkidMarks(3);
+  const wheel = { x: -6.2, z: 4.6, onRoad: true, slip: 0.77, speed: 22 };
+  const race = { runId: 'saved', cars: [{ id: 'rival', wheels: [wheel] }] };
+  for (let i = 0; i < 6; i++) {
+    marks.update(race, true, true);
+    wheel.x += 0.62;
+    wheel.z += 0.37;
+  }
+  const packed = marks.capture(race.runId);
+  assert.equal(packed.length, 48);
+  assert.equal(marks.capture('other'), null);
+  const restored = createSkidMarks(3);
+  restored.restore('saved', 'broken');
+  assert.equal(restored.mesh.geometry.drawRange.count, 0);
+  restored.restore('saved', packed);
+  restored.update(race, false, true);
+  assert.equal(restored.mesh.geometry.drawRange.count, 18);
+  const source = marks.mesh.geometry.attributes.position;
+  const result = restored.mesh.geometry.attributes.position;
+  for (let i = 0; i < 12; i++) {
+    const prior = (i + 8) % 12;
+    assert(Math.hypot(source.getX(prior) - result.getX(i), source.getZ(prior) - result.getZ(i)) < 0.025);
+  }
+});
