@@ -1,5 +1,5 @@
 import { buyUpgrade, changeTeam, currentEvent, currentTeam, events, finishEvent, gameName, loadCareer, maxUpgrade, money, price, saveCareer, standings, teams, upgrades } from './career.js';
-import { createRace, createTrack } from './race.js';
+import { createRace, createTrack, raceStep } from './race.js';
 import { createView } from './scene.js';
 import './style.css';
 
@@ -419,10 +419,9 @@ function frame(now) {
       steering: Number(keys.has('KeyD') || keys.has('ArrowRight')) - Number(keys.has('KeyA') || keys.has('ArrowLeft')),
     };
     accumulator += dt;
-    const step = 1 / 120;
-    while (accumulator >= step && !race.order) {
-      race.update(step, input);
-      accumulator -= step;
+    while (accumulator >= raceStep && !race.order) {
+      race.update(raceStep, input);
+      accumulator -= raceStep;
     }
     if (race.order) finishRace();
     if (lastHudUpdate < 0 || now - lastHudUpdate > 44 || mode === 'result') {
@@ -433,7 +432,8 @@ function frame(now) {
   }
   if (mode === 'result') updateAudio();
   if (mode !== 'menu' || lastHudUpdate < 0 || lastRaceElapsed !== race.elapsed || now - lastHudUpdate >= 100) {
-    view.draw(race, mode, dt, braking, alternateCamera, paused);
+    const fraction = mode === 'race' && !paused ? accumulator / raceStep : 1;
+    view.draw(race, mode, dt, braking, alternateCamera, paused, fraction);
     if (mode === 'menu') {
       lastHudUpdate = now;
       lastRaceElapsed = race.elapsed;

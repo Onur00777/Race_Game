@@ -245,7 +245,8 @@ export function updateCarModel(model, car, dt, braking) {
   model.root.position.set(car.x, 0, car.z);
   model.root.rotation.y = car.yaw;
   model.paint.color.set(car.color);
-  model.shell.rotation.z = car.steer * Math.min(Math.abs(car.speed) / 620, 0.049);
+  const roll = car.steer * Math.min(Math.abs(car.speed) / 1050, 0.026);
+  model.shell.rotation.z += (roll - model.shell.rotation.z) * (1 - Math.exp(-9 * dt));
   for (const light of model.lights) light.material = braking ? brakeLight : tailLight;
   for (const { holder, wheel, steering } of model.wheels) {
     if (steering) holder.rotation.y = -car.steer * 0.30;

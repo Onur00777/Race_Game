@@ -4,6 +4,7 @@ import { gameName } from './career.js';
 import { addTerrain, addTrees, lightTrack, loadTrackAssets } from './environment.js';
 import { createCarModel, sharedCarResources, updateCarModel } from './car-model.js';
 import { createRaceEffects } from './race-effects.js';
+import { renderPose } from './race.js';
 
 const standard = (color, roughness = 0.78, metalness = 0) => new T.MeshStandardMaterial({ color, roughness, metalness });
 const boxGeometry = new T.BoxGeometry(1, 1, 1);
@@ -308,12 +309,12 @@ export function createView(canvas) {
     cameraReady = false;
   }
 
-  function draw(race, mode, dt, braking, alternateCamera, paused) {
+  function draw(race, mode, dt, braking, alternateCamera, paused, fraction = 1) {
     if (width !== canvas.clientWidth || height !== canvas.clientHeight) {
       width = canvas.clientWidth;
       height = canvas.clientHeight;
       if (width < 1 || height < 1) return;
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.65));
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.35));
       renderer.setSize(width, height, false);
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
@@ -327,21 +328,22 @@ export function createView(canvas) {
     if (race.impact && race.impact !== lastImpact && mode === 'race') {
       lastImpact = race.impact;
       effects.hit(lastImpact);
-      if (!reduceMotion.matches) {
-        shake = Math.min(0.43, lastImpact.impulse * 0.015);
+      if (!reduceMotion.matches && lastImpact.impulse > 4.2 && shake < 0.035) {
+        shake = Math.min(0.18, lastImpact.impulse * 0.006);
         shakePhase = 0;
       }
     }
     effects.update(dt, mode === 'race' && !paused ? race.player : null, canvas.height);
-    for (let i = 0; i < race.cars.length; i++) {
-      const car = race.cars[i];
+    const cars = race.cars.map((car, index) => renderPose(car, race.previousPoses[index], fraction));
+    for (let i = 0; i < cars.length; i++) {
+      const car = cars[i];
       const model = models[i];
       model.root.visible = mode !== 'menu' || i === 0;
       const isBraking = i === 0 ? braking : (model.lastSpeed ?? car.speed) - car.speed > dt * 4;
       updateCarModel(model, car, dt, isBraking);
       model.lastSpeed = car.speed;
     }
-    const { x, z, yaw } = race.player;
+    const { x, z, yaw } = cars[0];
     updateLight(x, z);
     const fx = Math.sin(yaw);
     const fz = Math.cos(yaw);

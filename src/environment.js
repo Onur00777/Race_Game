@@ -65,7 +65,7 @@ export function lightTrack(scene, event, assets) {
   scene.add(sun, sun.target, new T.HemisphereLight('#cadcf4', '#615940', 0.52));
 
   return (x, z) => {
-    sun.target.position.set(Math.round(x * 2) / 2, 0, Math.round(z * 2) / 2);
+    sun.target.position.set(x, 0, z);
     sun.position.copy(sun.target.position).addScaledVector(direction, 66);
   };
 }
