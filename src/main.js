@@ -8,6 +8,7 @@ import { decalSlots, normalizeSetup, sliders } from './setup.js';
 import { driverForm, garageMoney, garagePanel, garageStats, garageTabs, setupValue } from './garage.js';
 import { escapeHtml, getLanguage, setLanguage, t, translatedField, upper } from './i18n.js';
 import { createAudio, updateAudio } from './audio.js';
+import { animateAmount, createWallet } from './wallet.js';
 import './style.css';
 
 const app = document.querySelector('#app');
@@ -22,7 +23,7 @@ app.innerHTML = `
         <button type="button" data-tab="garage" data-text="garage"></button>
         <button type="button" data-tab="teams" data-text="teams"></button>
       </nav>
-      <div class="top-end" id="top-end"><span id="balance" class="balance"></span>
+      <div class="top-end" id="top-end"><div id="wallet" class="wallet" role="status"><span class="wallet-icon" aria-hidden="true"></span><span id="balance" class="balance" aria-hidden="true"></span></div>
         <button type="button" data-action="sound" class="sound" aria-pressed="false"></button>
         <button type="button" data-action="profile" class="sound" data-text="profile"></button></div>
     </header>
@@ -80,6 +81,7 @@ const overlay = byId('overlay');
 const map = byId('map');
 const mapContext = map.getContext('2d');
 const garagePreview = byId('garage-preview');
+const updateWallet = createWallet(byId('wallet'), garageMoney);
 const keys = new Set();
 const drivingKeys = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space']);
 const screens = ['calendar', 'garage', 'teams'];
@@ -167,8 +169,8 @@ function enableAudio() {
 }
 
 function updateHeader() {
-  byId('balance').textContent = garageMoney(career.cash);
   byId('career-nav').hidden = byId('top-end').hidden = !career.profile;
+  updateWallet(career.cash);
   for (const button of byId('career-nav').querySelectorAll('[data-tab]')) {
     if (button.dataset.tab === screen) button.setAttribute('aria-current', 'page');
     else button.removeAttribute('aria-current');
@@ -429,7 +431,7 @@ function finishRace() {
     <div class="hero-meta"><span></span> ${translatedField(track.event)}</div>
     <h2>${t('raceResult', result.place)}</h2>
     <div class="result-grid">
-      <div><small>${upper(t('prize'))}</small><b>${garageMoney(result.prize)}</b></div>
+      <div class="result-payout"><small>${upper(t('prize'))}</small><b id="result-prize" aria-label="${garageMoney(result.prize)}">${garageMoney(0)}</b></div>
       <div><small>${upper(t('seasonPoints'))}</small><b>+${result.points}</b></div>
       <div><small>${upper(t('totalTime'))}</small><b>${formatTime(result.time)}</b></div>
       <div><small>${upper(t('bestLap'))}</small><b>${formatTime(result.bestLap)}</b></div>
@@ -442,6 +444,8 @@ function finishRace() {
     </div>
   `;
   overlay.showModal();
+  const amount = byId('result-prize');
+  animateAmount(value => { if (amount.isConnected) amount.textContent = garageMoney(value); }, 0, result.prize, 720);
   playAudio();
 }
 
