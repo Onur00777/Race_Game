@@ -8,6 +8,7 @@ import { renderPose } from './race.js';
 import { createStudio } from './studio.js';
 import { createRenderPipeline, fitShadowResolution, qualityMode } from './render-pipeline.js';
 import { createRacingLineView } from './racing-line-view.js';
+import { addTrackDetails } from './track-details.js';
 
 const standard = (color, roughness = 0.78, metalness = 0) => new T.MeshStandardMaterial({ color, roughness, metalness });
 const boxGeometry = new T.BoxGeometry(1, 1, 1);
@@ -68,6 +69,11 @@ function addGuardrails(scene, track, material) {
   const spacing = 3.3;
   const count = Math.ceil(track.length / spacing);
   const posts = new T.InstancedMesh(boxGeometry, material, count * 2);
+  const reflectors = new T.InstancedMesh(boxGeometry, new T.MeshBasicMaterial({ color: '#ffffff' }), Math.ceil(count / 5) * 2);
+  const marker = new T.Object3D();
+  const tint = new T.Color();
+  let reflector = 0;
+  marker.scale.set(0.08, 0.064, 0.18);
   const post = new T.Object3D();
   post.scale.set(0.14, 0.89, 0.15);
   for (const [sideIndex, side] of [-1, 1].entries()) {
@@ -97,10 +103,18 @@ function addGuardrails(scene, track, material) {
       post.rotation.y = point.yaw;
       post.updateMatrix();
       posts.setMatrixAt(sideIndex * count + i, post.matrix);
+      if (i % 5 === 0) {
+        const face = track.at(i * track.length / count, offset - side * 0.032);
+        marker.position.set(face.x, 0.603, face.z);
+        marker.rotation.y = face.yaw;
+        marker.updateMatrix();
+        reflectors.setMatrixAt(reflector, marker.matrix);
+        reflectors.setColorAt(reflector++, tint.set(side > 0 ? '#e5b979' : '#dde6f7'));
+      }
     }
   }
   posts.castShadow = true;
-  scene.add(posts);
+  scene.add(posts, reflectors);
 }
 
 function addGrandstand(scene, track, metal) {
@@ -178,26 +192,11 @@ function addTrack(scene, track, assets, label) {
   const gravelWidth = track.railOffset - 0.65;
   addSurface(strip(track, -gravelWidth, gravelWidth, -0.015, runoff));
   addSurface(strip(track, -half, half, 0, asphalt));
-  const curbs = [[], []];
   for (const sign of [-1, 1]) {
     const edge = (half - 0.32) * sign;
     addSurface(strip(track, edge - 0.065, edge + 0.065, 0.006, paint));
-    const curb = half * sign;
-    const segments = track.samples.length;
-    for (let i = 10; i < segments - 9; i += 2) {
-      const start = track.at(i * track.spacing).yaw;
-      const end = track.at((i + 8) * track.spacing).yaw;
-      if (Math.abs(Math.sin(end - start)) < 0.22) continue;
-      const inner = curb - sign * 0.22;
-      const outer = curb + sign * 0.46;
-      curbs[(i / 2) % 2].push(strip(track, Math.min(inner, outer), Math.max(inner, outer), 0.018, paint, i, 2).geometry);
-    }
   }
-  curbs.forEach((group, index) => {
-    if (!group.length) return;
-    addSurface(new T.Mesh(mergeGeometries(group), index ? paint : red));
-    group.forEach(geometry => geometry.dispose());
-  });
+  addTrackDetails(scene, track);
 
   const gantry = new T.Group();
   const gate = track.at(0);
@@ -292,7 +291,9 @@ export function createView(canvas, quality) {
         for (const material of materials) {
           if (!material) continue;
           resources.add(material);
-          if (material.map) resources.add(material.map);
+          for (const texture of [material.map, material.alphaMap, material.normalMap, material.roughnessMap]) {
+            if (texture) resources.add(texture);
+          }
         }
       });
       for (const item of resources) if (!shared.has(item)) item.dispose();
