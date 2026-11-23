@@ -1,7 +1,7 @@
 import { acceptSponsor, buyUpgrade, changeTeam, currentEvent, currentTeam, events, finishEvent, gameName,
   loadCareer, normalizeLoadout, saveCareer, saveProfile, standings, teamById, teams, toggleDecal } from './career.js';
 import { createRace, createTrack, raceStep } from './race.js';
-import { eventForResume, hasSavedRace, raceCheckpoint, restoreRace } from './progress.js';
+import { eventDifficulty, eventForResume, hasSavedRace, raceCheckpoint, restoreRace } from './progress.js';
 import { decalSlots, normalizeSetup, sliders } from './setup.js';
 import { defaultOrbit, driverForm, garageAngles, garageMoney, garagePanel, garageStats, garageTabs, previewPart, setupValue } from './garage.js';
 import { escapeHtml, getLanguage, setLanguage, t, translatedField, upper } from './i18n.js';
@@ -10,6 +10,8 @@ import { animateAmount, createWallet } from './wallet.js';
 import { graphicsModes, qualityMode } from './graphics-settings.js';
 import { circuitMap, drawBriefingMap } from './circuit-map.js';
 import { legacyEvents } from './events.js';
+import { difficultyId, purseFor } from './difficulty.js';
+import { difficultyBadge, difficultyControls, payoutBreakdown } from './race-ui.js';
 import './style.css';
 
 const app = document.querySelector('#app');
@@ -282,12 +284,15 @@ function updateMenu() {
   const briefing = byId('briefing');
   briefing.hidden = !event || screen !== 'calendar';
   if (!briefing.hidden) {
-    const pool = event.prizes.reduce((sum, award) => sum + award, 0);
+    const difficulty = eventDifficulty(career);
+    const purse = purseFor(event.prizes, difficulty);
+    const pool = purse.reduce((sum, award) => sum + award, 0);
     briefing.innerHTML = `<h2>${t('briefing')}</h2>
       <div class="briefing-outline"><canvas width="232" height="200" aria-label="${t('minimap')}"></canvas>
       <div class="briefing-conditions"><strong>${t(event.format)}</strong><span>${t('laps', event.laps)}</span><span>${t(event.weather)}</span><span>${event.time}</span></div></div>
       <div class="briefing-prizes"><div><small>${t('prizePool')}</small><b>${garageMoney(pool)}</b></div>
-      <div><small>${t('winnerPayout')}</small><b>${garageMoney(event.prizes[0])}</b></div></div>`;
+      <div><small>${t('winnerPayout')}</small><b>${garageMoney(purse[0])}</b></div></div>
+      ${difficultyControls(difficulty, saved)}`;
     drawBriefingMap(briefing.querySelector('canvas'), trackFor(event));
   }
   const entries = screen === 'teams' ? teams.map(candidate => {
@@ -348,7 +353,8 @@ function startRace() {
   if (hasSavedRace(career) && !restored) notify(t('invalidRace'));
   activeLoadout = restored?.loadout ?? normalizeLoadout(career);
   alternateCamera = restored?.alternateCamera ?? false;
-  useTrack(next, restored?.race ?? createRace(next, teamById(activeLoadout.team), activeLoadout.upgrades, activeLoadout.setup, activeLoadout.appearance));
+  useTrack(next, restored?.race ?? createRace(next, teamById(activeLoadout.team), activeLoadout.upgrades, activeLoadout.setup,
+    activeLoadout.appearance, { difficulty: eventDifficulty(career) }));
   byId('circuit-home').append(circuit);
   circuit.setAttribute('aria-label', t('track'));
   mode = 'race';
@@ -446,14 +452,14 @@ function resumeRace() {
 }
 
 function finishRace() {
-  career = finishEvent(career, race.order, race.player.finishTime, race.player.bestLap, activeLoadout, track.event);
+  career = finishEvent(career, race.order, race.player.finishTime, race.player.bestLap, activeLoadout, track.event, { difficulty: race.difficulty });
   mode = 'result';
   keys.clear();
   persist();
   const result = career.results.at(-1);
   const unlocked = teams.find(team => team.unlock === career.completed);
   overlay.innerHTML = `
-    <div class="hero-meta"><span></span> ${translatedField(track.event)}</div>
+    <div class="result-heading"><div class="hero-meta"><span></span> ${translatedField(track.event)}</div>${difficultyBadge(result.difficulty)}</div>
     <h2>${t('raceResult', result.place)}</h2>
     <div class="result-grid">
       <div class="result-payout"><small>${upper(t('prize'))}</small><b id="result-prize" aria-label="${garageMoney(result.prize)}">${garageMoney(0)}</b></div>
@@ -461,7 +467,7 @@ function finishRace() {
       <div><small>${upper(t('totalTime'))}</small><b>${formatTime(result.time)}</b></div>
       <div><small>${upper(t('bestLap'))}</small><b>${formatTime(result.bestLap)}</b></div>
     </div>
-    ${result.bonus ? `<p>${t('sponsorBonus', garageMoney(result.bonus))}</p>` : ''}
+    ${payoutBreakdown(result)}
     ${unlocked ? `<p>${t('teamUnlocked', unlocked.name)}</p>` : ''}
     <div class="dialog-actions">
       <button type="button" class="primary" data-action="calendar">${t('backCalendar')}</button>
@@ -593,6 +599,12 @@ app.addEventListener('input', event => {
 
 app.addEventListener('change', event => {
   const field = event.target;
+  if (field.hasAttribute('data-difficulty') && !hasSavedRace(career)) {
+    career = { ...career, difficulty: difficultyId(field.value) };
+    persist();
+    updateMenu();
+    byId('briefing').querySelector('[data-difficulty]:checked')?.focus({ preventScroll: true });
+  }
   if (field.hasAttribute('data-racing-line')) setRacingLine(field.checked);
   if (field.hasAttribute('data-graphics')) {
     career = { ...career, graphics: qualityMode(field.value) };
