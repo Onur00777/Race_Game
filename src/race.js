@@ -9,7 +9,7 @@ const approach = (value, target, amount) => value + clamp(target - value, -amoun
 const angleBetween = (a, b) => wrap(b - a + Math.PI, 2 * Math.PI) - Math.PI;
 export const raceStep = 1 / 120;
 
-const visualPose = ({ x, z, yaw, speed, steer }) => ({ x, z, yaw, speed, steer });
+const visualPose = ({ x, z, yaw, speed, steer, station }) => ({ x, z, yaw, speed, steer, station });
 
 export function renderPose(car, previous, fraction) {
   if (!previous) return car;
@@ -20,6 +20,7 @@ export function renderPose(car, previous, fraction) {
     yaw: previous.yaw + angleBetween(previous.yaw, car.yaw) * fraction,
     speed: previous.speed + (car.speed - previous.speed) * fraction,
     steer: previous.steer + (car.steer - previous.steer) * fraction,
+    station: previous.station + (car.station - previous.station) * fraction,
   };
 }
 

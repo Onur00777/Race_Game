@@ -62,7 +62,7 @@ export function restoreRace(career, track) {
       if (!Number.isFinite(state.offset) || !(state.finishTime === null || Number.isFinite(state.finishTime))) return null;
       Object.assign(car, { offset: state.offset, finishTime: state.finishTime });
     }
-    race.previousPoses[i] = { x: car.x, z: car.z, yaw: car.yaw, speed: car.speed, steer: car.steer };
+    race.previousPoses[i] = { x: car.x, z: car.z, yaw: car.yaw, speed: car.speed, steer: car.steer, station: car.station };
   }
   race.elapsed = save.elapsed;
   race.countdown = save.countdown;

@@ -7,6 +7,7 @@ import { createRaceEffects } from './race-effects.js';
 import { renderPose } from './race.js';
 import { createStudio } from './studio.js';
 import { createRenderPipeline, fitShadowResolution, qualityMode } from './render-pipeline.js';
+import { createRacingLineView } from './racing-line-view.js';
 
 const standard = (color, roughness = 0.78, metalness = 0) => new T.MeshStandardMaterial({ color, roughness, metalness });
 const boxGeometry = new T.BoxGeometry(1, 1, 1);
@@ -277,6 +278,7 @@ export function createView(canvas, quality) {
   let width = 0;
   let height = 0;
   let studio;
+  let racingLine;
 
   function setTrack(track, cars, label = track.event.name) {
     if (scene) {
@@ -302,6 +304,8 @@ export function createView(canvas, quality) {
     addTrack(scene, track, assets, label);
     addTrees(scene, track);
     effects = createRaceEffects(scene);
+    racingLine = createRacingLineView();
+    scene.add(racingLine.mesh);
     models = cars.map(car => {
       const model = createCarModel(car.color);
       scene.add(model.root);
@@ -341,7 +345,7 @@ export function createView(canvas, quality) {
     width = height = 0;
   }
 
-  function draw(race, mode, dt, braking, alternateCamera, paused, fraction = 1) {
+  function draw(race, mode, dt, braking, alternateCamera, paused, fraction = 1, guide = false) {
     if (!resize()) return;
     if (drawnRace !== race) {
       drawnRace = race;
@@ -359,6 +363,7 @@ export function createView(canvas, quality) {
     }
     effects.update(dt, mode === 'race' && !paused ? race.player : null, canvas.height);
     const cars = race.cars.map((car, index) => renderPose(car, race.previousPoses[index], fraction));
+    racingLine.update(race, cars[0], mode === 'race' && guide);
     const burstAge = mode === 'race' && !paused && race.backfire ? race.elapsed - race.backfire.time : Infinity;
     const fire = burstAge < 0.15 ? race.backfire.intensity * (1 - burstAge / 0.15) * (0.90 + 0.2 * Math.sin(burstAge * 120)) : 0;
     for (let i = 0; i < cars.length; i++) {

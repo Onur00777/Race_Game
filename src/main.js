@@ -69,7 +69,7 @@ app.innerHTML = `
       <div id="countdown" class="countdown" aria-live="polite"></div>
       <div class="race-bottom">
         <canvas id="map" width="180" height="156" data-label="minimap"></canvas>
-        <div class="drive-help"><span id="road-warning" role="status"></span><div id="drive-help"></div></div>
+        <div class="drive-help"><span id="road-warning" role="status"></span><div id="drive-help"></div><div class="line-indicator" id="line-indicator"><kbd>L</kbd> <span id="line-state"></span></div></div>
         <div class="speed">
           <strong id="speed"></strong><small data-text="kmh"></small><span><i id="speed-bar"></i></span>
           <div class="condition"><small data-text="body"></small><meter id="body-condition" min="0" max="100" low="42" high="77" optimum="100" data-label="bodyCondition" value="100"></meter><b id="condition-percent">100%</b></div>
@@ -149,6 +149,21 @@ function refreshLanguage() {
   for (const node of app.querySelectorAll('[data-label]')) node.setAttribute('aria-label', t(node.dataset.label));
   byId('drive-help').innerHTML = `WASD ${t('drive')} <i>·</i> SPACE ${t('handbrake')} <i>·</i> R ${t('resetCar')} <i>·</i> C ${t('camera')}`;
   updateSoundButton();
+  showLinePreference();
+}
+
+function showLinePreference() {
+  const enabled = career.racingLine !== false;
+  byId('line-indicator').dataset.enabled = String(enabled);
+  byId('line-state').textContent = t(enabled ? 'lineOn' : 'lineOff');
+  const checkbox = overlay.querySelector('[data-racing-line]');
+  if (checkbox) checkbox.checked = enabled;
+}
+
+function setRacingLine(enabled) {
+  career = { ...career, racingLine: enabled };
+  showLinePreference();
+  if (!saveActiveRace(true)) persist();
 }
 
 function updateSoundButton() {
@@ -408,6 +423,7 @@ function renderPause(saved) {
   overlay.innerHTML = `<h2>${t('paused')}</h2><p>${t(saved ? 'pauseSaved' : 'pauseUnsaved')}</p>
     <label class="pause-setting"><span>${t('graphics')}</span><select data-graphics>${Object.keys(graphicsModes).map(mode =>
       `<option value="${mode}" ${mode === qualityMode(career.graphics) ? 'selected' : ''}>${t(mode)}</option>`).join('')}</select></label>
+    <label class="pause-setting"><span>${t('racingLine')} <kbd>L</kbd></span><input type="checkbox" data-racing-line ${career.racingLine !== false ? 'checked' : ''}></label>
     <div class="dialog-actions">
       <button type="button" class="primary" data-action="resume">${t('resumeRace')}</button>
       <button type="button" class="secondary" data-action="save-exit">${t(saved ? 'saveExit' : 'backCalendar')}</button>
@@ -579,6 +595,7 @@ app.addEventListener('input', event => {
 
 app.addEventListener('change', event => {
   const field = event.target;
+  if (field.hasAttribute('data-racing-line')) setRacingLine(field.checked);
   if (field.hasAttribute('data-graphics')) {
     career = { ...career, graphics: qualityMode(field.value) };
     view?.setQuality(career.graphics);
@@ -647,6 +664,11 @@ garagePreview.addEventListener('wheel', event => {
 }, { passive: false });
 
 window.addEventListener('keydown', event => {
+  if (mode === 'race' && event.code === 'KeyL' && !event.target.closest?.('select,input,textarea')) {
+    event.preventDefault();
+    if (!event.repeat) setRacingLine(career.racingLine === false);
+    return;
+  }
   if (mode === 'race' && event.code === 'Escape') {
     event.preventDefault();
     if (!event.repeat) {
@@ -719,7 +741,7 @@ function frame(now) {
   }
   if (mode !== 'menu' || now - lastMenuDraw >= 100) {
     const fraction = mode === 'race' && !paused ? accumulator / raceStep : 1;
-    view.draw(race, mode, dt, braking, alternateCamera, paused, fraction);
+    view.draw(race, mode, dt, braking, alternateCamera, paused, fraction, career.racingLine !== false);
     if (mode === 'menu') lastMenuDraw = now;
   }
 }

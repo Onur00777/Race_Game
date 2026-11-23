@@ -128,6 +128,8 @@ kbd { padding: 2px 4px; border: 1px solid #fff4; border-radius: 3px; font: 630 .
 .race-bottom { align-items: end; }
 #map { width: clamp(92px, 14vw, 180px); height: auto; filter: drop-shadow(0 2px 5px #0009); }
 .drive-help { text-align: center; color: #ede5da; font-size: .78rem; text-shadow: 0 2px 5px #000; }
+.line-indicator { display: inline-flex; align-items: center; gap: 5px; margin-top: 7px; color: #e0d5c7; font-size: .71rem; }
+.line-indicator[data-enabled="true"] { color: #a4ffc3; }
 #road-warning { display: inline-block; margin-bottom: 11px; color: var(--orange); font: 750 1.02rem var(--display); text-transform: uppercase; }
 .speed { justify-self: end; text-align: right; min-width: 112px; }
 .speed strong { display: inline-block; font: italic 850 clamp(38px, 6.7vw, 82px)/.89 var(--display); letter-spacing: -.09em; margin-right: .1em; }
@@ -150,6 +152,7 @@ dialog p { margin: 12px 0; color: #d7c9bb; }
 .dialog-link { margin-top: 16px; background: none; border: 0; padding: 4px 0; color: #eab094; font-size: .84rem; text-decoration: underline; text-underline-offset: 3px; }
 .pause-setting { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 0; color: #eadacb; font-size: .86rem; }
 .pause-setting select { min-width: 9em; max-width: 55%; padding: 6px 9px; border: 1px solid #fce1cc40; border-radius: 4px; color: inherit; background: #111719; }
+.pause-setting input { accent-color: var(--orange); }
 .result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
 .result-grid div { padding: 8px 11px; border: 1px solid var(--line); border-radius: 3px; }
 .result-grid small { display: block; color: #c9bbaa; font: 650 .72rem var(--display); letter-spacing: .08em; }
