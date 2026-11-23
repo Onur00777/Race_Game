@@ -25,10 +25,11 @@ Terminalde görünen yerel adresi aç. Dağıtıma hazır dosyaları oluşturmak
 
 Kariyer otomatik olarak aynı tarayıcıda kaydedilir. Yeni sezonda takvim ve puanlar sıfırlanır. Kazanç, takım erişimi ve yükseltmeler korunur.
 
-## Sonraki adımlar
+## Görsel varlıklar
 
-1. Bir arabanın ve Sedir Pisti'nin görsel kalitesini yükselt. Ayrıntılı araç modeli, asfalt ve çevre malzemeleri, pist kenarı objeleri ve çeşitlemeli motor sesi ekle.
-2. Sürüşü diferansiyel, lastik kayması, vites oranları ve oyun kumandasıyla derinleştir. Tur zamanı ve hayalet araçla ayarların etkisini ölçülebilir kıl.
-3. Kariyeri sıralama turları, takım hedefleri ve sezonlar arası sözleşmelerle genişlet.
+Kloppenheim 06 panoraması ve HDR ışık haritası, Asphalt Track, Leafy Grass ve Gravel Floor 02 dokuları Poly Haven'dan alındı, tarayıcı için boyutları küçültüldü ve CC0 kapsamında dağıtılıyor. [Poly Haven lisansı](https://polyhaven.com/license)
 
-İlk sürümde araç ve pistler kodla üretilir. Sürüş modeli arcade ağırlıklıdır.
+- [Kloppenheim 06](https://polyhaven.com/a/kloppenheim_06)
+- [Asphalt Track](https://polyhaven.com/a/asphalt_track)
+- [Leafy Grass](https://polyhaven.com/a/leafy_grass)
+- [Gravel Floor 02](https://polyhaven.com/a/gravel_floor_02)
