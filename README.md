@@ -67,4 +67,4 @@ Panoramalar, HDR haritaları ve zemin dokuları Poly Haven'dan alındı, tarayı
 - [Leafy Grass](https://polyhaven.com/a/leafy_grass)
 - [Gravel Floor 02](https://polyhaven.com/a/gravel_floor_02)
 
-Rajdhani ve Plus Jakarta Sans yerel WOFF2 dosyaları olarak sunulur. SIL Open Font License metinleri `public/fonts/` klasöründedir.
+Rajdhani ve Plus Jakarta Sans yerel WOFF2 dosyaları olarak sunulur. KC Telemetry, Rajdhani Bold’dan türetilmiş eş genişlikli bir rakam setidir. SIL Open Font License metinleri `public/fonts/` klasöründedir.
