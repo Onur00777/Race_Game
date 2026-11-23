@@ -1,5 +1,7 @@
 import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { DecalGeometry } from 'three/addons/geometries/DecalGeometry.js';
+import { sponsors } from './setup.js';
 
 const wheelRadius = 0.365;
 const axles = [-1.29, 1.34];
@@ -118,7 +120,7 @@ const roofShape = loft([
 const wingShape = loft([
   [-2.04, 0.99, 1.01, 1.02, 1.037], [-1.97, 1.01, 0.993, 1.018, 1.046],
   [-1.84, 1.01, 0.975, 1.022, 1.052], [-1.71, 1.0, 0.975, 1.01, 1.033], [-1.66, 0.96, 0.99, 0.999, 1.012],
-]);
+]).translate(0, -1.0, 1.84);
 
 function panel(points) {
   const shape = new T.Shape();
@@ -147,6 +149,82 @@ export const sharedCarResources = new Set([box, rubber, carbon, inset, aluminum,
   glass, headlight, tailLight, brakeLight, lensHousing, tire, rimLip, brakeDisc, center, tailPipe, intake, shadowPlane, shadowMaterial,
   bodyShape, cabinShape, roofShape, wingShape, diffuserPanel, grillPanel, tailHousing, tailStrip, headStrip, spokes]);
 
+const defaultAppearance = { wing: 'touring', wingColor: '#21272d', wingAngle: 3, frontCamber: -1, rearCamber: -1, decals: [] };
+const projector = new T.Mesh(bodyShape, carbon);
+const decalMounts = [
+  ['hood', [0, 0.66, 1.46], [-Math.PI / 2, 0, 0], [0.77, 0.32, 0.32]],
+  ['doors', [0.89, 0.46, 0.02], [0, Math.PI / 2, 0], [0.76, 0.23, 0.33]],
+  ['doors', [-0.89, 0.46, 0.02], [0, -Math.PI / 2, 0], [0.76, 0.23, 0.33]],
+  ['rear', [0.37, 0.46, -2.13], [0, Math.PI, 0], [0.43, 0.12, 0.13]],
+].map(([slot, center, rotation, size]) => {
+  const geometry = new DecalGeometry(projector, new T.Vector3(...center), new T.Euler(...rotation), new T.Vector3(...size));
+  sharedCarResources.add(geometry);
+  return { slot, geometry };
+});
+
+const logos = new Map();
+function sponsorMaterial(id) {
+  if (logos.has(id)) return logos.get(id);
+  const sponsor = sponsors.find(item => item.id === id);
+  if (!sponsor) return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = 384;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#12171d';
+  ctx.beginPath();
+  ctx.moveTo(32, 9); ctx.lineTo(380, 9); ctx.lineTo(352, 118); ctx.lineTo(4, 118);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = sponsor.color;
+  ctx.fillRect(38, 19, 273, 5);
+  ctx.font = 'italic 800 61px Bahnschrift, Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(sponsor.brand, 188, 68, 302);
+  const map = new T.CanvasTexture(canvas);
+  map.colorSpace = T.SRGBColorSpace;
+  map.anisotropy = 4;
+  const material = new T.MeshBasicMaterial({ map, transparent: true, depthWrite: false,
+    polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
+  logos.set(id, material);
+  sharedCarResources.add(material);
+  sharedCarResources.add(map);
+  return material;
+}
+
+function addWing(shell) {
+  const paint = new T.MeshPhysicalMaterial({ color: defaultAppearance.wingColor, roughness: 0.34, metalness: 0.32, clearcoat: 0.62 });
+  const options = {};
+  for (const [id, height, width, depth] of [
+    ['stock', 0.745, 0.83, 0.50], ['touring', 0.98, 0.92, 0.88], ['swan', 1.13, 1.0, 1.12], ['twin', 1.20, 1.04, 1.03],
+  ]) {
+    const frame = new T.Group();
+    frame.position.set(0, height, -1.84);
+    shell.add(frame);
+    const blade = new T.Group();
+    frame.add(blade);
+    const material = id === 'stock' ? carbon : paint;
+    mount(blade, wingShape, material).scale.set(width, id === 'stock' ? 0.6 : 1, depth);
+    if (id === 'twin') mount(blade, wingShape, paint, 0, 0.14, 0.05).scale.set(0.98, 0.75, 0.66);
+    if (id !== 'stock') {
+      for (const side of [-1, 1]) {
+        block(blade, material, 0.031, id === 'twin' ? 0.26 : 0.12, depth * 0.40, side * width, id === 'twin' ? 0.08 : 0.012, 0);
+        const base = 0.72 - height;
+        if (id === 'swan') {
+          const bend = new T.CatmullRomCurve3([[side * 0.55, base, 0.15], [side * 0.55, 0.10, 0.14],
+            [side * 0.55, 0.13, -0.055], [side * 0.55, 0.019, -0.11]].map(point => new T.Vector3(...point)));
+          mount(frame, new T.TubeGeometry(bend, 10, 0.024, 6, false), carbon);
+        } else {
+          block(frame, carbon, 0.076, -base, 0.13, side * 0.59, base * 0.48, 0.028).rotation.x = -0.14;
+        }
+      }
+    }
+    options[id] = { frame, blade };
+  }
+  return { options, paint };
+}
+
 function addWheels(root) {
   const wheels = [];
   for (const side of [-1, 1]) {
@@ -162,7 +240,7 @@ function addWheels(root) {
       mount(wheel, center, aluminum, side * 0.141);
       mount(holder, brakeDisc, rotor, side * 0.089);
       block(holder, caliper, 0.035, 0.103, 0.088, side * 0.109, 0.057, -0.158).rotation.x = 0.34;
-      wheels.push({ holder, wheel, steering: axle > 0 });
+      wheels.push({ holder, wheel, side, steering: axle > 0 });
     }
   }
   return wheels;
@@ -180,7 +258,13 @@ export function createCarModel(color) {
   const body = mount(shell, bodyShape.clone(), paint);
   mount(shell, cabinShape, glass);
   mount(shell, roofShape, paint);
-  mount(shell, wingShape, carbon);
+  const wing = addWing(shell);
+  const decals = decalMounts.map(({ slot, geometry }) => {
+    const mesh = mount(shell, geometry, inset);
+    mesh.visible = false;
+    mesh.renderOrder = 2;
+    return { slot, mesh };
+  });
   const rear = new T.Group();
   const nose = new T.Group();
   shell.add(rear, nose);
@@ -190,8 +274,6 @@ export function createCarModel(color) {
   const lights = [];
   for (const side of [-1, 1]) {
     block(shell, carbon, 0.092, 0.083, 1.49, side * 0.883, 0.215, -0.02);
-    block(shell, carbon, 0.075, 0.30, 0.12, side * 0.615, 0.883, -1.827).rotation.x = -0.16;
-    block(shell, carbon, 0.027, 0.103, 0.358, side * 0.994, 1.024, -1.847).rotation.x = -0.13;
     block(shell, carbon, 0.194, 0.033, 0.059, side * 0.727, 0.808, 0.364);
     block(shell, paint, 0.172, 0.073, 0.122, side * 0.833, 0.842, 0.365).rotation.y = side * 0.12;
     block(shell, mirror, 0.128, 0.044, 0.005, side * 0.834, 0.844, 0.302);
@@ -216,7 +298,26 @@ export function createCarModel(color) {
   root.traverse(object => {
     if (object.isMesh && object !== shadow) object.castShadow = object.receiveShadow = true;
   });
-  return { root, shell, paint, body, rear, nose, wheels, lights, frontDamage: 0, rearDamage: 0 };
+  for (const { mesh } of decals) mesh.castShadow = mesh.receiveShadow = false;
+  return { root, shell, paint, body, rear, nose, wheels, lights, wing, decals, frontDamage: 0, rearDamage: 0 };
+}
+
+function applyAppearance(model, appearance) {
+  if (model.appearance === appearance) return;
+  model.appearance = appearance;
+  model.wing.paint.color.set(appearance.wingColor);
+  for (const [id, { frame, blade }] of Object.entries(model.wing.options)) {
+    frame.visible = appearance.wing === id;
+    blade.rotation.x = T.MathUtils.degToRad(appearance.wingAngle);
+  }
+  const logo = sponsorMaterial(appearance.sponsor);
+  for (const { slot, mesh } of model.decals) {
+    mesh.visible = Boolean(logo && appearance.decals.includes(slot));
+    if (logo) mesh.material = logo;
+  }
+  for (const { holder, side, steering } of model.wheels) {
+    holder.rotation.z = -side * T.MathUtils.degToRad(steering ? appearance.frontCamber : appearance.rearCamber);
+  }
 }
 
 function deformBody(model, front, rear) {
@@ -242,6 +343,7 @@ function deformBody(model, front, rear) {
 }
 
 export function updateCarModel(model, car, dt, braking) {
+  applyAppearance(model, car.appearance ?? defaultAppearance);
   model.root.position.set(car.x, 0, car.z);
   model.root.rotation.y = car.yaw;
   model.paint.color.set(car.color);

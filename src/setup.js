@@ -75,6 +75,6 @@ export function vehicleStats(team, parts, input) {
 export function carAppearance(loadout) {
   const { setup, upgrades, sponsor, decals } = loadout;
   const wing = activeWing(setup, upgrades.aero);
-  return { wing: wing?.id ?? 'stock', wingColor: setup.wingColor, frontCamber: setup.frontCamber,
-    rearCamber: setup.rearCamber, sponsor, decals };
+  return { wing: wing?.id ?? 'stock', wingColor: setup.wingColor, wingAngle: setup.downforce,
+    frontCamber: setup.frontCamber, rearCamber: setup.rearCamber, sponsor, decals };
 }
