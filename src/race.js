@@ -101,7 +101,7 @@ export function createRace(track, team, upgrades, setup, appearance) {
   });
   const cars = [player, ...opponents];
   const race = { track, player, opponents, cars, previousPoses: cars.map(visualPose),
-    elapsed: 0, countdown: 3, order: null, impact: null };
+    elapsed: 0, countdown: 3, order: null, impact: null, throttle: false, backfire: null, engineLevel: upgrades.engine };
   const { topSpeed, acceleration, braking, grip, turn: turnResponse, brakeStability, load } = vehicleStats(team, upgrades, setup);
 
   function relativeStation(station, reference) {
@@ -188,6 +188,12 @@ export function createRace(track, team, upgrades, setup, appearance) {
     race.previousPoses = cars.map(visualPose);
     race.elapsed += dt;
     const { gas, brake, handbrake, steering } = input;
+    const throttle = gas && !brake;
+    if (race.throttle && !throttle && upgrades.engine > 0 && player.speed > 13 &&
+        race.elapsed - (race.backfire?.time ?? -Infinity) > 0.32) {
+      race.backfire = { time: race.elapsed, intensity: 0.58 + upgrades.engine * 0.18 };
+    }
+    race.throttle = throttle;
     const newHeading = Number(gas) - Number(brake);
     const power = 1 - player.damage * 0.0028;
     const damagedTopSpeed = topSpeed * (1 - player.damage * 0.002);

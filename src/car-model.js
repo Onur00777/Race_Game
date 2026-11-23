@@ -146,6 +146,11 @@ const splitterShape = panel([[-0.97, -0.13], [-0.89, -0.35], [-0.70, -0.43], [0.
 const sidewall = new T.RingGeometry(0.263, 0.345, 64);
 const rotorFace = new T.RingGeometry(0.077, 0.195, 48);
 const exhaustTube = new T.CylinderGeometry(0.064, 0.056, 0.13, 18, 1, true).rotateX(Math.PI / 2);
+const flameShape = new T.ConeGeometry(0.070, 0.40, 12, 1, true).rotateX(-Math.PI / 2).translate(0, 0, -0.20);
+const flameMaterial = new T.MeshBasicMaterial({ color: new T.Color(6, 1.15, 0.055), transparent: true, opacity: 0.6,
+  blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide });
+const flameCore = new T.MeshBasicMaterial({ color: new T.Color(2.7, 3.1, 4.5), transparent: true, opacity: 0.69,
+  blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide });
 const spokeParts = [];
 for (let i = 0; i < 7; i++) {
   const angle = i * 2 * Math.PI / 7;
@@ -157,7 +162,7 @@ spokeParts.forEach(part => part.dispose());
 export const sharedCarResources = new Set([box, rubber, carbon, inset, aluminum, rotor, caliper, mirror,
   glass, headlight, tailLight, brakeLight, lensHousing, tire, rimLip, brakeDisc, center, tailPipe, intake, shadowPlane, shadowMaterial,
   bodyShape, cabinShape, roofShape, wingShape, diffuserPanel, grillPanel, tailHousing, tailStrip, headStrip, spokes,
-  splitterShape, sidewall, rotorFace, exhaustTube]);
+  splitterShape, sidewall, rotorFace, exhaustTube, flameShape, flameMaterial, flameCore]);
 
 const stockParts = { tires: 0, brakes: 0, aero: 0, engine: 0 };
 const defaultAppearance = { wing: 'touring', wingColor: '#21272d', wingAngle: 3, frontCamber: -1, rearCamber: -1, decals: [], parts: stockParts };
@@ -384,6 +389,7 @@ export function createCarModel(color) {
   block(splitter, carbon, 1.43, 0.036, 0.051, 0, -0.015, 0.36);
   const lights = [];
   const exhausts = [];
+  const flames = [];
   const skirts = [];
   for (const side of [-1, 1]) {
     skirts.push(block(shell, composite, 0.115, 0.072, 1.54, side * 0.884, 0.213, -0.02));
@@ -399,6 +405,13 @@ export function createCarModel(color) {
     mount(exhaust, tailPipe, aluminum);
     mount(exhaust, intake, inset, 0, 0, 0.014).rotation.y = Math.PI;
     exhausts.push(exhaust);
+    const flame = new T.Group();
+    flame.position.z = -0.016;
+    exhaust.add(flame);
+    mount(flame, flameShape, flameMaterial);
+    mount(flame, flameShape, flameCore).scale.set(0.62, 0.65, 0.48);
+    flame.visible = false;
+    flames.push(flame);
     const tail = new T.Group();
     tail.position.set(side * 0.167, 0.521, -2.139);
     tail.scale.x = -side;
@@ -424,8 +437,9 @@ export function createCarModel(color) {
   });
   for (const { mesh } of decals) mesh.castShadow = mesh.receiveShadow = false;
   for (const { print, face } of wheels) print.castShadow = face.castShadow = false;
+  for (const flame of flames) flame.traverse(object => { object.castShadow = object.receiveShadow = false; });
   return { root, shell, paint, body, rear, nose, wheels, lights, wing, decals, splitter, diffuser, fins, skirts, exhausts,
-    frontDamage: 0, rearDamage: 0 };
+    flames, frontDamage: 0, rearDamage: 0 };
 }
 
 function applyAppearance(model, appearance) {
@@ -485,7 +499,7 @@ function deformBody(model, front, rear) {
   model.rear.position.set(0, -rear * 0.072, rear * 0.22);
 }
 
-export function updateCarModel(model, car, dt, braking) {
+export function updateCarModel(model, car, dt, braking, fire = 0) {
   applyAppearance(model, car.appearance ?? defaultAppearance);
   model.root.position.set(car.x, 0, car.z);
   model.root.rotation.y = car.yaw;
@@ -493,6 +507,10 @@ export function updateCarModel(model, car, dt, braking) {
   const roll = car.steer * Math.min(Math.abs(car.speed) / 1050, 0.026);
   model.shell.rotation.z += (roll - model.shell.rotation.z) * (1 - Math.exp(-9 * dt));
   for (const light of model.lights) light.material = braking ? brakeLight : tailLight;
+  for (const [index, flame] of model.flames.entries()) {
+    flame.visible = fire > 0;
+    if (flame.visible) flame.scale.setScalar(fire * (index ? 0.84 : 1));
+  }
   for (const { holder, wheel, steering } of model.wheels) {
     if (steering) holder.rotation.y = -car.steer * 0.30;
     wheel.rotation.x -= car.speed * dt / wheelRadius;

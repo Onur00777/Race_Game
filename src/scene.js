@@ -359,12 +359,14 @@ export function createView(canvas, quality) {
     }
     effects.update(dt, mode === 'race' && !paused ? race.player : null, canvas.height);
     const cars = race.cars.map((car, index) => renderPose(car, race.previousPoses[index], fraction));
+    const burstAge = mode === 'race' && !paused && race.backfire ? race.elapsed - race.backfire.time : Infinity;
+    const fire = burstAge < 0.15 ? race.backfire.intensity * (1 - burstAge / 0.15) * (0.90 + 0.2 * Math.sin(burstAge * 120)) : 0;
     for (let i = 0; i < cars.length; i++) {
       const car = cars[i];
       const model = models[i];
       model.root.visible = mode !== 'menu' || i === 0;
       const isBraking = i === 0 ? braking : (model.lastSpeed ?? car.speed) - car.speed > dt * 4;
-      updateCarModel(model, car, dt, isBraking);
+      updateCarModel(model, car, dt, isBraking, i === 0 ? fire : 0);
       model.lastSpeed = car.speed;
     }
     const { x, z, yaw } = cars[0];
