@@ -10,6 +10,7 @@ import { createRenderPipeline, fitShadowResolution } from './render-pipeline.js'
 import { qualityMode } from './graphics-settings.js';
 import { createRacingLineView } from './racing-line-view.js';
 import { addTrackDetails } from './track-details.js';
+import { createSkidMarks } from './skid-marks.js';
 
 const standard = (color, roughness = 0.78, metalness = 0) => new T.MeshStandardMaterial({ color, roughness, metalness });
 const boxGeometry = new T.BoxGeometry(1, 1, 1);
@@ -279,6 +280,7 @@ export function createView(canvas, quality) {
   let height = 0;
   let studio;
   let racingLine;
+  let skidMarks;
 
   function setTrack(track, cars, label = track.event.name) {
     if (scene) {
@@ -307,7 +309,8 @@ export function createView(canvas, quality) {
     addTrees(scene, track);
     effects = createRaceEffects(scene);
     racingLine = createRacingLineView();
-    scene.add(racingLine.mesh);
+    skidMarks = createSkidMarks();
+    scene.add(racingLine.mesh, skidMarks.mesh);
     models = cars.map(car => {
       const model = createCarModel(car.color);
       scene.add(model.root);
@@ -364,6 +367,7 @@ export function createView(canvas, quality) {
       }
     }
     effects.update(dt, mode === 'race' && !paused ? race.player : null, canvas.height);
+    skidMarks.update(race, mode === 'race' && !paused, mode === 'race' || mode === 'result');
     const cars = race.cars.map((car, index) => renderPose(car, race.previousPoses[index], fraction));
     racingLine.update(race, cars[0], mode === 'race' && guide);
     const burstAge = mode === 'race' && !paused && race.backfire ? race.elapsed - race.backfire.time : Infinity;
