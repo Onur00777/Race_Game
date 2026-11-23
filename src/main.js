@@ -5,7 +5,7 @@ import { hasSavedRace, raceCheckpoint, restoreRace } from './progress.js';
 import { createView } from './scene.js';
 import { defaultOrbit, garageAngles } from './studio.js';
 import { decalSlots, normalizeSetup, sliders } from './setup.js';
-import { driverForm, garageMoney, garagePanel, garageStats, garageTabs, setupValue } from './garage.js';
+import { driverForm, garageMoney, garagePanel, garageStats, garageTabs, previewPart, setupValue } from './garage.js';
 import { escapeHtml, getLanguage, setLanguage, t, translatedField, upper } from './i18n.js';
 import { createAudio, updateAudio } from './audio.js';
 import { animateAmount, createWallet } from './wallet.js';
@@ -114,6 +114,7 @@ let lastMenuDraw = -Infinity;
 let lastCheckpoint = -Infinity;
 let pendingTuning = false;
 let previousGarageTab;
+let statTimer;
 
 function formatTime(seconds) {
   if (!Number.isFinite(seconds)) return '—';
@@ -282,7 +283,13 @@ function updateGaragePreview() {
   const loadout = normalizeLoadout(career);
   garageCar = { x: 0, z: 0, yaw: 0, speed: 0, steer: 0, frontDamage: 0, rearDamage: 0,
     color: currentTeam(career).color, appearance: loadout.appearance };
-  byId('garage-stats').innerHTML = garageStats(career);
+  showStats(career);
+}
+
+function showStats(before, after, applied = false) {
+  clearTimeout(statTimer);
+  byId('garage-stats').innerHTML = garageStats(before, after, applied);
+  if (applied) statTimer = setTimeout(() => showStats(career), 1750);
 }
 
 function updateGarage() {
@@ -477,13 +484,15 @@ app.addEventListener('click', event => {
     updateGarage();
   }
   if (dataset.buy) {
+    const before = career;
     career = buyUpgrade(career, dataset.buy);
     if (dataset.buy === 'aero' && career.upgrades.aero === 1) career = { ...career, garageTab: 'aero' };
     persist();
     updateGarage();
-    if (dataset.buy === 'aero') aimGarage('rear');
+    aimGarage(['aero', 'engine'].includes(dataset.buy) ? 'rear' : 'side');
     const samePart = byId('garage-panel').querySelector(`[data-buy="${dataset.buy}"]:not(:disabled)`);
     (samePart ?? byId('garage').querySelector('nav [aria-current]'))?.focus();
+    if (before !== career) showStats(before, career, true);
   }
   if (dataset.team) {
     career = changeTeam(career, dataset.team);
@@ -545,6 +554,21 @@ app.addEventListener('click', event => {
       break;
   }
 });
+
+const workbench = byId('garage-panel');
+function previewPartRow(event) {
+  const row = event.target.closest('[data-part]');
+  if (!row || row.contains(event.relatedTarget)) return;
+  showStats(career, previewPart(career, row.dataset.part));
+}
+function clearPartRow(event) {
+  const row = event.target.closest('[data-part]');
+  if (row && !row.contains(event.relatedTarget)) showStats(career);
+}
+workbench.addEventListener('pointerover', previewPartRow);
+workbench.addEventListener('pointerout', clearPartRow);
+workbench.addEventListener('focusin', previewPartRow);
+workbench.addEventListener('focusout', clearPartRow);
 
 app.addEventListener('input', event => {
   const field = event.target;

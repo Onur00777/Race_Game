@@ -186,12 +186,23 @@ dialog p { margin: 12px 0; color: #d7c9bb; }
 .studio-controls button { border: 1px solid #ffffff26; background: #ffffff08; border-radius: 4px; padding: 5px 9px; font-size: .75rem; font-weight: 650; }
 .studio-controls button:hover { border-color: var(--orange); }
 .studio-controls p { margin: 0; font-size: .72rem; color: #c3b8ac; text-align: center; }
-.garage-stats { display: grid; grid-template-columns: 1fr 1fr 1.12fr; }
+.garage-stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .garage-stats > div { display: grid; gap: 3px; padding: 12px 14px; min-width: 0; }
 .garage-stats > div + div { border-left: 1px solid var(--line); }
 .garage-stats small { font-size: .72rem; color: var(--muted); }
 .garage-stats b { font: 730 clamp(18px, 2.3vw, 29px)/1 var(--display); }
 .garage-stats b span { font-size: .56em; font-weight: 650; color: #ecc0a5; }
+.garage-stats b { position: relative; white-space: nowrap; }
+.garage-stats small { min-height: 2.75em; line-height: 1.25; align-content: end; }
+.stat-delta { display: block; font: 700 .78rem/1 var(--display); margin-top: 4px; }
+.stat-delta.gain { color: #83edaf; }
+.stat-delta.loss { color: #ffb47e; }
+.stat-bar { position: relative; height: 4px; margin-top: 4px; background: #14191be0; border-radius: 6px; }
+.stat-bar span, .stat-forecast { position: absolute; height: 100%; border-radius: inherit; }
+.stat-bar span { background: #82909f9e; left: 0; }
+.stat-forecast { left: var(--left); width: var(--length); box-shadow: 0 0 8px currentColor; }
+.stat-forecast.gain { color: #79e8a8; background: currentColor; }
+.stat-forecast.loss { color: #ffae6b; background: currentColor; }
 .garage-tabs { display: grid; grid-template-columns: 1fr 1fr 1.28fr 1.48fr; gap: 4px; min-height: 57px; padding: 0 7px; border-bottom: 1px solid var(--line); }
 .garage-tabs button { font-size: clamp(.70rem, 1.05vw, .88rem); text-wrap: balance; line-height: 1.15; }
 .garage-panel { max-height: calc(var(--preview-height) + 35px); overflow-y: auto; scrollbar-gutter: stable; padding: 16px 14px 20px; }
@@ -272,6 +283,8 @@ button, input, output, select, meter { font-variant-numeric: tabular-nums; }
   .garage-layout { --preview-height: clamp(290px, 50vh, 430px); grid-template-columns: 1fr; }
   .garage-panel { max-height: none; }
   .garage-stats > div { padding: 10px 7px; }
+  .garage-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .garage-stats > div:nth-child(n + 4) { border-top: 1px solid var(--line); }
   .garage-tabs button { font-size: .76rem; }
 }
 

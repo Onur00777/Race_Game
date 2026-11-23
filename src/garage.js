@@ -28,7 +28,7 @@ const panels = {
     const level = career.upgrades[part.id];
     const cost = price(part, level);
     const max = level >= maxUpgrade;
-    return `<article class="work-row">
+    return `<article class="work-row" data-part="${part.id}">
       <div><small>${t('upgradeLevel', level, maxUpgrade)}</small><h3>${translatedField(part)}</h3><p>${translatedField(part, 'effect')}</p></div>
       <button type="button" class="secondary" data-buy="${part.id}" aria-label="${max ? t('maxLevel') : t('partPrice', translatedField(part), garageMoney(cost))}" ${disabled(max || cost > career.cash)}>${max ? t('maxLevel') : garageMoney(cost)}</button>
     </article>`;
@@ -76,13 +76,50 @@ export function garagePanel(career) {
   return `<h3 class="work-title">${t(garageTabs[id])}</h3>${panels[id](career)}`;
 }
 
-export function garageStats(career) {
+function telemetry(career) {
   const stats = vehicleStats(currentTeam(career), career.upgrades, career.setup);
   const limit = stats.topSpeed + 8;
-  const zeroToHundred = -limit / stats.acceleration * Math.log(1 - (100 / 3.6) / limit);
-  return `<div><small>${t('topSpeed')}</small><b>${setupValue(Math.round(stats.topSpeed * 3.6), '')} <span>${t('kmh')}</span></b></div>
-    <div><small>${t('acceleration')}</small><b>${setupValue(zeroToHundred, '')} <span>s</span></b></div>
-    <div><small>${t('downforce')}</small><b>${setupValue(stats.load, '')} <span>kg</span></b></div>`;
+  return {
+    topSpeed: stats.topSpeed * 3.6,
+    acceleration: -limit / stats.acceleration * Math.log(1 - (100 / 3.6) / limit),
+    downforce: stats.load,
+    stopping: (100 / 3.6) ** 2 / (2 * stats.braking),
+    grip: stats.grip,
+  };
+}
+
+export function previewPart(career, id) {
+  if (!upgrades.some(upgrade => upgrade.id === id) || career.upgrades[id] >= maxUpgrade) return null;
+  return { ...career, upgrades: { ...career.upgrades, [id]: career.upgrades[id] + 1 } };
+}
+
+export function garageStats(career, preview, applied = false) {
+  const baseline = telemetry(career);
+  const next = preview && telemetry(preview);
+  const metrics = [
+    ['topSpeed', t('kmh'), 100, 260, false, 0],
+    ['acceleration', 's', 1.8, 4.7, true, 2],
+    ['downforce', 'kg', 0, 120, false, 1],
+    ['stopping', 'm', 8, 23, true, 1],
+    ['grip', '', 5, 15, false, 1],
+  ];
+  return metrics.map(([id, unit, min, max, reverse, precision]) => {
+    const score = number => {
+      const ratio = Math.max(0, Math.min(1, (number - min) / (max - min)));
+      return (reverse ? 1 - ratio : ratio) * 100;
+    };
+    const compare = next?.[id] ?? baseline[id];
+    const difference = Number((compare - baseline[id]).toFixed(precision));
+    const label = new Intl.NumberFormat(getLanguage(), { maximumFractionDigits: precision });
+    const positive = reverse ? difference < 0 : difference > 0;
+    const from = score(baseline[id]);
+    const to = score(compare);
+    const delta = difference ? `<em class="stat-delta ${positive ? 'gain' : 'loss'}">${difference > 0 ? '+' : '−'}${label.format(Math.abs(difference))}</em>` : '';
+    const segment = difference ? `<i class="stat-forecast ${positive ? 'gain' : 'loss'}" style="--left:${Math.min(from, to)}%;--length:${Math.max(1.6, Math.abs(to - from))}%"></i>` : '';
+    return `<div data-stat="${id}"><small>${t(id)}</small>
+      <b>${label.format(applied ? compare : baseline[id])} <span>${unit}</span>${delta}</b>
+      <div class="stat-bar" aria-hidden="true"><span style="width:${from}%"></span>${segment}</div></div>`;
+  }).join('');
 }
 
 export function driverForm(career, draft) {

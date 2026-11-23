@@ -111,6 +111,8 @@ const messages = {
   topSpeed: ['Tahmini son hız', 'Estimated top speed'],
   acceleration: ['0–100 km/sa', '0–100 km/h'],
   downforce: ['150 km/sa’da yere basma', 'Downforce at 150 km/h'],
+  stopping: ['100–0 fren mesafesi', '100–0 braking distance'],
+  grip: ['Yol tutuşu', 'Grip'],
 };
 
 let language = 'tr';
