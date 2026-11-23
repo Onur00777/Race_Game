@@ -280,8 +280,13 @@ button, input, output, select, meter { font-variant-numeric: tabular-nums; }
 }
 
 @media (max-width: 715px) {
-  .topbar { grid-template-columns: 1fr 1fr; gap: 0 10px; padding: 12px 16px 0; }
-  .top-end { grid-column: 2; grid-row: 1; gap: 10px; }
+  .topbar { grid-template-columns: minmax(0, 1fr) auto; gap: 0 8px; padding: 12px 16px 0; }
+  .top-end { grid-column: 2; grid-row: 1; gap: 6px; }
+  .top-end button { padding: 5px 7px; font-size: .72rem; }
+  .wallet { min-width: 65px; min-height: 31px; gap: 5px; padding: 4px 7px; }
+  .wallet-icon { width: 12px; height: 12px; }
+  .wallet-icon::before { width: 8px; height: 8px; }
+  .balance { font-size: 17px; }
   nav { grid-column: 1 / -1; gap: 23px; height: 43px; }
   .menu { padding: 0 16px 18px; }
   .menu-top { grid-template-columns: 1fr; gap: 0; }
@@ -322,6 +327,11 @@ button, input, output, select, meter { font-variant-numeric: tabular-nums; }
   .wallet-icon { width: 11px; height: 11px; }
   .wallet-icon::before { width: 7px; height: 7px; }
   .balance { font-size: 15px; }
+}
+
+@media (max-width: 360px) {
+  .brand { font-size: 15px; gap: 4px; }
+  .mark { width: 14px; height: 13px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
