@@ -99,6 +99,60 @@ function addGuardrails(scene, track, material) {
   scene.add(posts);
 }
 
+function addGrandstand(scene, track, metal) {
+  const pose = track.at(30, track.railOffset + 4.7);
+  const stand = new T.Group();
+  stand.position.set(pose.x, 0, pose.z);
+  stand.rotation.y = pose.yaw + Math.PI / 2;
+  scene.add(stand);
+
+  const concrete = standard('#76716a');
+  const steel = standard('#454b4b', 0.66, 0.40);
+  const nosing = standard('#b3a17c', 0.86);
+  const sections = [-10, 0, 10];
+  const rows = 6;
+  const columns = 16;
+  const seatParts = [
+    new T.BoxGeometry(0.44, 0.065, 0.36).translate(0, 0.12, 0.018),
+    new T.BoxGeometry(0.44, 0.29, 0.05).rotateX(-0.11).translate(0, 0.245, -0.145),
+    new T.BoxGeometry(0.056, 0.13, 0.17).translate(0, 0.059, 0),
+  ];
+  const seats = new T.InstancedMesh(mergeGeometries(seatParts), standard('#ffffff', 0.72), rows * columns * sections.length);
+  seatParts.forEach(part => part.dispose());
+  const transform = new T.Matrix4();
+  const color = new T.Color();
+  const plastic = ['#854139', '#a3463b', '#b85547', '#9c9488', '#aba295'];
+  let i = 0;
+  for (let row = 0; row < rows; row++) {
+    const height = 0.32 + row * 0.44;
+    const z = -0.58 - row * 0.94;
+    box(stand, concrete, 29, height, 1.03, 0, height / 2, z).receiveShadow = true;
+    for (const x of [-14.33, -5, 5, 14.33]) {
+      box(stand, nosing, 0.83, 0.026, 0.052, x, height + 0.016, z + 0.47).receiveShadow = true;
+    }
+    for (const [section, center] of sections.entries()) {
+      for (let column = 0; column < columns; column++) {
+        transform.makeTranslation(center + (column - (columns - 1) / 2) * 0.51, height - 0.006, z);
+        seats.setMatrixAt(i, transform);
+        seats.setColorAt(i++, color.set(plastic[(column * 29 + row * 13 + section * 17) % plastic.length]));
+      }
+    }
+  }
+  seats.receiveShadow = true;
+  stand.add(seats);
+
+  const roof = box(stand, metal, 31, 0.14, 8.0, 0, 4.93, -2.85);
+  roof.castShadow = true;
+  roof.rotation.x = -0.11;
+  box(stand, steel, 30.8, 0.25, 0.16, 0, 4.46, 1.13).castShadow = true;
+  box(stand, steel, 30.1, 0.23, 0.18, 0, 5.13, -6.1).castShadow = true;
+  for (const x of [-14.25, -5, 5, 14.25]) {
+    box(stand, steel, 0.20, 5, 0.19, x, 2.5, -6.13).castShadow = true;
+    box(stand, steel, 0.16, 0.27, 7.43, x, 4.72, -2.58).rotation.x = -0.10;
+    box(stand, steel, 0.10, 0.13, 2.45, x, 4.15, -5.20).rotation.x = -0.46;
+  }
+}
+
 function addTrack(scene, track, assets) {
   const half = track.event.width / 2;
   const asphalt = new T.MeshStandardMaterial({
@@ -191,20 +245,7 @@ function addTrack(scene, track, assets) {
   }
 
   addGuardrails(scene, track, metal);
-
-  const stand = new T.Group();
-  const standPose = track.at(30, track.railOffset + 4.7);
-  stand.position.set(standPose.x, 0, standPose.z);
-  stand.rotation.y = standPose.yaw + Math.PI / 2;
-  scene.add(stand);
-  for (let step = 0; step < 6; step++) {
-    box(stand, dark, 29, 0.5 + step * 0.49, 1.2, 0, (0.5 + step * 0.49) / 2, -step).receiveShadow = true;
-    box(stand, step % 2 ? red : paint, 28.6, 0.16, 0.38, 0, 0.66 + step * 0.49, -step - 0.12).receiveShadow = true;
-  }
-  const roof = box(stand, metal, 31, 0.17, 8.2, 0, 4.9, -3);
-  roof.castShadow = true;
-  roof.rotation.x = -0.12;
-  for (const x of [-14, -5, 5, 14]) box(stand, metal, 0.2, 4.8, 0.2, x, 2.4, -6.2);
+  addGrandstand(scene, track, metal);
 }
 
 export function createView(canvas) {
