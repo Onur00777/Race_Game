@@ -94,8 +94,8 @@ export function createRace(track, team, upgrades, setup, appearance) {
   };
   const opponents = rivals.map((rival, index) => {
     const station = -2 - Math.floor(index / 2) * 8;
-    const lane = index % 2 ? 2.5 : -2.5;
-    const offset = lane + Math.sin(station * 0.028) * 0.85;
+    const lane = [-4.35, 4.35, -1.46, 1.46][index];
+    const offset = (index % 2 ? 2.5 : -2.5) + Math.sin(station * 0.028) * 0.85;
     return { ...rival, pace: rival.pace * track.event.rivalPace[index], station, lane, offset,
       ...track.at(station, offset), ...bodyState(), finishTime: null };
   });
@@ -139,7 +139,7 @@ export function createRace(track, team, upgrades, setup, appearance) {
     if (Math.abs(advance) < 4 && car.finishTime === null) car.station = Math.min(finish - 0.001, car.station + advance);
   }
 
-  function moveOpponent(car, dt, elapsed) {
+  function moveOpponent(car, dt, elapsed, watchTraffic = false) {
     if (car.finishTime !== null) {
       car.speed = Math.max(0, car.speed - dt * 6.5);
       car.station += car.speed * dt;
@@ -151,13 +151,23 @@ export function createRace(track, team, upgrades, setup, appearance) {
     const ahead = clamp(car.speed * 0.48, 9, 23);
     const bend = Math.abs(angleBetween(direction.yaw, track.at(car.station + ahead).yaw));
     const surfaceLimit = Math.abs(car.offset) > track.event.width / 2 + 0.6 ? 15 : 47;
-    const target = car.pace * (1 - car.damage * 0.0015) * Math.min(surfaceLimit, 43 / (1 + bend * 1.7));
+    let target = car.pace * (1 - car.damage * 0.0015) * Math.min(surfaceLimit, 43 / (1 + bend * 1.7));
+    let lane = car.lane;
+    if (watchTraffic) {
+      for (const other of opponents) {
+        if (other === car || Math.abs(other.offset - car.offset) > 2.35) continue;
+        const gap = relativeStation(other.station, car.station);
+        if (gap <= 0 || gap > 9) continue;
+        target = Math.min(target, Math.max(4, other.speed + (gap - 5.5) * 1.5));
+        lane = clamp(other.offset < lane ? lane + 1.7 : lane - 1.7, -5.2, 5.2);
+      }
+    }
     car.speed = approach(car.speed, target, (car.speed < target ? 9.5 : 21) * dt);
     const motion = velocity(car);
     const previous = car.station;
     const forwardSpeed = motion.x * direction.dx + motion.z * direction.dz;
     car.station = Math.min(finish, car.station + forwardSpeed * dt);
-    const desired = car.lane + Math.sin(car.station * 0.028) * 0.85;
+    const desired = lane + Math.sin(car.station * 0.028) * 0.85;
     car.offset += (-motion.x * direction.dz + motion.z * direction.dx + (desired - car.offset) * 2.1) * dt;
     const pose = track.at(car.station, car.offset);
     const deviation = angleBetween(direction.yaw, car.yaw) * Math.exp(-4 * dt) + car.spin * dt;
@@ -205,7 +215,7 @@ export function createRace(track, team, upgrades, setup, appearance) {
     player.x += motion.x * dt;
     player.z += motion.z * dt;
 
-    for (const car of opponents) moveOpponent(car, dt, race.elapsed);
+    for (const car of opponents) moveOpponent(car, dt, race.elapsed, true);
     const active = race.cars.filter(car => car.finishTime == null || car.speed > 1);
     for (let i = 0; i < active.length; i++) {
       for (let j = i + 1; j < active.length; j++) {

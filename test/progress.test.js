@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { acceptSponsor, buyUpgrade, currentEvent, currentTeam, finishEvent, loadCareer, newCareer, normalizeLoadout, saveCareer, saveProfile, toggleDecal } from '../src/career.js';
+import { acceptSponsor, buyUpgrade, currentEvent, currentTeam, events, finishEvent, loadCareer, newCareer, normalizeLoadout, saveCareer, saveProfile, toggleDecal } from '../src/career.js';
 import { raceCheckpoint, restoreRace } from '../src/progress.js';
 import { createRace, createTrack, raceStep, renderPose } from '../src/race.js';
 import { vehicleStats } from '../src/setup.js';
@@ -73,4 +73,27 @@ test('regular steering keeps the rear settled while the handbrake permits more s
   };
   const normalSlip = testTurn(false);
   assert(normalSlip < 2.6 && testTurn(true) > normalSlip * 2);
+});
+
+test('opponents clear the Bay Curves hairpin instead of blocking the second lap', () => {
+  const career = newCareer();
+  const track = createTrack(events[1]);
+  const race = createRace(track, currentTeam(career), career.upgrades, career.setup);
+  const angle = n => Math.atan2(Math.sin(n), Math.cos(n));
+  for (let tick = 0; tick < 90 * 120 && !race.order; tick++) {
+    const car = race.player;
+    const look = 6 + Math.abs(car.speed) * 0.55;
+    const target = track.at(car.station + look, Math.sin(car.station * 0.011) * 1.4);
+    const desired = Math.atan2(target.x - car.x, target.z - car.z);
+    const bend = Math.abs(angle(track.at(car.station).yaw - track.at(car.station + look * 1.45).yaw));
+    const speed = 33 / (1 + bend * 1.55);
+    race.update(raceStep, {
+      gas: car.speed < speed,
+      brake: car.speed > speed + 3,
+      steering: Math.max(-1, Math.min(1, angle(car.yaw - desired) * 4)),
+      handbrake: false,
+    });
+  }
+  assert.equal(race.player.lap, 2);
+  assert.equal(race.order?.length, 5);
 });
