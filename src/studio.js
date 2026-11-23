@@ -10,7 +10,7 @@ export function createStudio(assets, shadowSize) {
   scene.background = new T.Color('#11171d');
   scene.fog = new T.Fog('#11171d', 9, 23);
   scene.environmentIntensity = 0.52;
-  assets.reflections.then(texture => { if (texture) scene.environment = texture; });
+  assets.panorama('sky').reflections.then(texture => { if (texture) scene.environment = texture; });
   const stageMaterial = new T.MeshStandardMaterial({ color: '#323943', roughness: 0.65, metalness: 0.24 });
   const floorMaterial = new T.MeshStandardMaterial({ color: '#202730', roughness: 0.8 });
   const floor = new T.Mesh(new T.PlaneGeometry(72, 72), floorMaterial);

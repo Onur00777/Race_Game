@@ -62,6 +62,16 @@ nav button[aria-current]::after { content: ""; position: absolute; inset: auto 0
 .sound:hover { background: #30302c; }
 
 .menu { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; padding: 0 clamp(24px, 5.3vw, 86px) clamp(22px, 3.4vh, 42px); }
+.menu-top { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(245px, 296px); align-items: stretch; gap: 16px; }
+.race-briefing { align-self: start; margin-top: clamp(22px, 5vh, 55px); padding: 13px 15px; backdrop-filter: blur(10px); }
+.race-briefing h2 { margin-bottom: 4px; }
+.briefing-outline { display: grid; grid-template-columns: .95fr 1fr; align-items: center; min-height: 103px; gap: 7px; }
+.briefing-outline canvas { width: 100%; height: auto; align-self: center; }
+.briefing-conditions { display: grid; gap: 2px; color: #cbd3de; font: 620 .86rem/1.23 var(--display); }
+.briefing-conditions strong { color: var(--ink); font-size: 1.09rem; }
+.briefing-prizes { display: grid; grid-template-columns: 1.05fr 1fr; padding-top: 7px; gap: 7px; border-top: 1px solid #dbeeff29; }
+.briefing-prizes small { color: #b7bcc3; font-size: .68rem; display: block; }
+.briefing-prizes b { color: #ffe1a0; font: 700 1.27rem/1.12 var(--display); }
 .hero { flex: 1; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; min-height: 380px; padding: clamp(22px, 6vh, 68px) 0 34px; }
 .hero-meta { display: flex; gap: 9px; align-items: center; font: 670 .77rem/1.3 var(--display); letter-spacing: .14em; color: #e5c9ad; text-transform: uppercase; }
 .hero-meta > span { width: 15px; height: 3px; transform: skewX(-22deg); background: var(--orange); }
@@ -268,6 +278,9 @@ button, input, output, select, meter { font-variant-numeric: tabular-nums; }
   .top-end { grid-column: 2; grid-row: 1; gap: 10px; }
   nav { grid-column: 1 / -1; gap: 23px; height: 43px; }
   .menu { padding: 0 16px 18px; }
+  .menu-top { grid-template-columns: 1fr; gap: 0; }
+  .race-briefing { margin: 0 0 14px; }
+  .briefing-outline { grid-template-columns: 100px 1fr; }
   .hero { min-height: 420px; justify-content: flex-end; }
   .hero h1 { font-size: clamp(54px, 13vw, 76px); max-width: 8ch; }
   .hero p { margin-bottom: 18px; }

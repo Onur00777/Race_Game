@@ -1,7 +1,7 @@
 import { acceptSponsor, buyUpgrade, changeTeam, currentEvent, currentTeam, events, finishEvent, gameName,
   loadCareer, normalizeLoadout, saveCareer, saveProfile, standings, teamById, teams, toggleDecal } from './career.js';
 import { createRace, createTrack, raceStep } from './race.js';
-import { hasSavedRace, raceCheckpoint, restoreRace } from './progress.js';
+import { eventForResume, hasSavedRace, raceCheckpoint, restoreRace } from './progress.js';
 import { createView } from './scene.js';
 import { defaultOrbit, garageAngles } from './studio.js';
 import { decalSlots, normalizeSetup, sliders } from './setup.js';
@@ -10,6 +10,8 @@ import { escapeHtml, getLanguage, setLanguage, t, translatedField, upper } from 
 import { createAudio, updateAudio } from './audio.js';
 import { animateAmount, createWallet } from './wallet.js';
 import { graphicsModes, qualityMode } from './render-pipeline.js';
+import { circuitMap, drawBriefingMap } from './circuit-map.js';
+import { legacyEvents } from './events.js';
 import './style.css';
 
 const app = document.querySelector('#app');
@@ -30,7 +32,10 @@ app.innerHTML = `
     </header>
     <section id="profile-screen" class="driver-screen" hidden></section>
     <section id="menu" class="menu" hidden>
-      <div class="hero" id="hero"></div>
+      <div class="menu-top">
+        <div class="hero" id="hero"></div>
+        <aside id="briefing" class="panel race-briefing" hidden></aside>
+      </div>
       <div class="paddock">
         <section id="panel" class="panel"></section>
         <section id="championship" class="panel championship" data-label="league"></section>
@@ -195,7 +200,7 @@ function useTrack(next, nextRace) {
 
 function previewTrack() {
   if (!view) return;
-  const next = trackFor(currentEvent(career) ?? events.at(-1));
+  const next = trackFor(eventForResume(career) ?? events.at(-1));
   const loadout = normalizeLoadout(career);
   const team = screen === 'profile' && !career.profile && draft ? teamById(draft.team) ?? currentTeam(career) : currentTeam(career);
   useTrack(next, createRace(next, team, loadout.upgrades, loadout.setup, loadout.appearance));
@@ -248,7 +253,7 @@ function raceButton(saved) {
 }
 
 function updateMenu() {
-  const event = currentEvent(career);
+  const event = eventForResume(career);
   const team = currentTeam(career);
   const saved = hasSavedRace(career);
   const championship = standings(career);
@@ -261,14 +266,27 @@ function updateMenu() {
     ${saved ? `<p class="saved-lap">${t('savedLap', Math.min((career.activeRace.cars?.[0]?.lap ?? 0) + 1, event.laps), event.laps, formatTime(career.activeRace.elapsed))}</p>` :
     `<div class="controls"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> <span>${t('drive')}</span><kbd>SPACE</kbd> <span>${t('handbrake')}</span></div>`}
   `;
+  const briefing = byId('briefing');
+  briefing.hidden = !event || screen !== 'calendar';
+  if (!briefing.hidden) {
+    const pool = event.prizes.reduce((sum, award) => sum + award, 0);
+    briefing.innerHTML = `<h2>${t('briefing')}</h2>
+      <div class="briefing-outline"><canvas width="232" height="200" aria-label="${t('minimap')}"></canvas>
+      <div class="briefing-conditions"><strong>${t(event.format)}</strong><span>${t('laps', event.laps)}</span><span>${t(event.weather)}</span><span>${event.time}</span></div></div>
+      <div class="briefing-prizes"><div><small>${t('prizePool')}</small><b>${garageMoney(pool)}</b></div>
+      <div><small>${t('winnerPayout')}</small><b>${garageMoney(event.prizes[0])}</b></div></div>`;
+    drawBriefingMap(briefing.querySelector('canvas'), trackFor(event));
+  }
   const entries = screen === 'teams' ? teams.map(candidate => {
     const active = candidate.id === team.id;
     const locked = candidate.unlock > career.completed;
     return `<div class="entry ${active ? 'current' : ''}"><span class="team-marker" style="--team:${candidate.color}"></span><div><strong>${candidate.name}</strong><small>${translatedField(candidate, 'perk')}</small></div><button type="button" class="secondary" data-team="${candidate.id}" ${active || locked ? 'disabled' : ''}>${t(active ? 'activeTeam' : locked ? 'requiresRaces' : 'join', candidate.unlock)}</button></div>`;
   }) : events.map((item, index) => {
     const result = career.results[index];
-    const status = result ? t('placeLine', result.place, result.points) : item === event ? t(saved ? 'savedRace' : 'upcoming') : t('waiting');
-    return `<div class="entry ${item === event ? 'current' : ''}"><span class="date">${translatedField(item, 'date')}</span><div><strong>${translatedField(item)}</strong><small>${t('laps', item.laps)}${result ? ` <i>·</i> ${garageMoney(result.prize)}` : ''}</small></div><span class="entry-status">${status}</span></div>`;
+    const active = item.id === event?.id;
+    const laps = result ? result.laps ?? legacyEvents[index]?.laps ?? item.laps : active ? event.laps : item.laps;
+    const status = result ? t('placeLine', result.place, result.points) : active ? t(saved ? 'savedRace' : 'upcoming') : t('waiting');
+    return `<div class="entry ${active ? 'current' : ''}"><span class="date">${translatedField(item, 'date')}</span><div><strong>${translatedField(item)}</strong><small>${t('laps', laps)} <i>·</i> ${result ? garageMoney(result.prize) : t(item.format)}</small></div><span class="entry-status">${status}</span></div>`;
   });
   byId('panel').innerHTML = `<h2>${t(screen === 'teams' ? 'teams' : 'schedule')}</h2><div class="entries">${entries.join('')}</div>`;
   byId('championship').innerHTML = `<h2>${t('league')}</h2><ol>${championship.map((driver, index) => `
@@ -309,25 +327,8 @@ function updateGarage() {
   updateGaragePreview();
 }
 
-function buildMap() {
-  const xs = track.samples.map(point => point.x);
-  const zs = track.samples.map(point => point.z);
-  const minX = Math.min(...xs);
-  const minZ = Math.min(...zs);
-  const spanX = Math.max(...xs) - minX;
-  const spanZ = Math.max(...zs) - minZ;
-  const scale = Math.min((map.width - 28) / spanX, (map.height - 28) / spanZ);
-  const xOffset = (map.width - spanX * scale) / 2;
-  const zOffset = (map.height - spanZ * scale) / 2;
-  const point = ({ x, z }) => [xOffset + (x - minX) * scale, zOffset + (z - minZ) * scale];
-  const path = new Path2D();
-  track.samples.forEach((sample, index) => index ? path.lineTo(...point(sample)) : path.moveTo(...point(sample)));
-  path.closePath();
-  mapShape = { path, point };
-}
-
 function startRace() {
-  const event = currentEvent(career);
+  const event = eventForResume(career);
   if (!view || !event || mode !== 'menu' || !career.profile) return;
   const next = trackFor(event);
   const restored = restoreRace(career, next);
@@ -347,7 +348,7 @@ function startRace() {
   document.body.classList.remove('in-garage');
   document.body.classList.add('driving');
   byId('race-title').textContent = translatedField(event);
-  buildMap();
+  mapShape = circuitMap(track, map.width, map.height);
   updateHud();
   saveActiveRace();
   enableAudio();
@@ -431,7 +432,7 @@ function resumeRace() {
 }
 
 function finishRace() {
-  career = finishEvent(career, race.order, race.player.finishTime, race.player.bestLap, activeLoadout);
+  career = finishEvent(career, race.order, race.player.finishTime, race.player.bestLap, activeLoadout, track.event);
   mode = 'result';
   keys.clear();
   persist();

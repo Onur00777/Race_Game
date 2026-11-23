@@ -23,19 +23,25 @@ export function loadTrackAssets(renderer) {
     return texture;
   }
 
-  const sky = loader.loadAsync(directory + 'sky.webp').then(texture => {
-    texture.colorSpace = T.SRGBColorSpace;
-    texture.mapping = T.EquirectangularReflectionMapping;
-    return texture;
-  }).catch(() => null);
-
-  const reflections = new HDRLoader().loadAsync(directory + 'sky.hdr').then(texture => {
-    texture.mapping = T.EquirectangularReflectionMapping;
-    return texture;
-  }).catch(() => null);
+  const panoramas = new Map();
+  function panorama(name) {
+    if (!panoramas.has(name)) {
+      const sky = loader.loadAsync(directory + name + '.webp').then(texture => {
+        texture.colorSpace = T.SRGBColorSpace;
+        texture.mapping = T.EquirectangularReflectionMapping;
+        return texture;
+      }).catch(() => null);
+      const reflections = new HDRLoader().loadAsync(directory + name + '.hdr').then(texture => {
+        texture.mapping = T.EquirectangularReflectionMapping;
+        return texture;
+      }).catch(() => null);
+      panoramas.set(name, { sky, reflections });
+    }
+    return panoramas.get(name);
+  }
 
   return {
-    sky, reflections, shared,
+    panorama, shared,
     asphalt: surface('asphalt'),
     asphaltNormal: surface('asphalt-normal', false),
     asphaltRoughness: surface('asphalt-rough', false),
@@ -44,17 +50,63 @@ export function loadTrackAssets(renderer) {
   };
 }
 
-export function lightTrack(scene, event, assets) {
-  scene.background = new T.Color(event.sky[0]);
-  scene.fog = new T.FogExp2(event.sky[1], 0.0037);
+const lighting = {
+  sunset: { sky: 'sky', colors: ['#617287', '#a7a394'], fog: 0.0037, source: '#ffd193', sun: 1.95, elevation: 0.42, fill: 0.52, reflections: 0.71 },
+  night: { sky: 'night', colors: ['#102035', '#1c2c43'], fog: 0.0047, source: '#a2bfff', sun: 0.37, elevation: 0.48, fill: 0.39, reflections: 0.76 },
+  cloud: { sky: 'cloud', colors: ['#a0abb2', '#9fa8aa'], fog: 0.0055, source: '#eef7ff', sun: 0.76, elevation: 0.9, fill: 0.62, reflections: 0.93 },
+  noon: { sky: 'noon', colors: ['#799cc7', '#b2bcbe'], fog: 0.0028, source: '#fff3d9', sun: 2.48, elevation: 1.9, fill: 0.56, reflections: 0.70 },
+};
+
+export function circuitLamps(track) {
+  const night = track.event.weather === 'night';
+  const count = Math.ceil(track.length / (night ? 32 : 43));
+  return Array.from({ length: count }, (_, index) => {
+    const station = index * track.length / count + 12;
+    const side = index % 2 ? 1 : -1;
+    return { side, point: track.at(station, side * (track.railOffset + 0.9)),
+      aim: track.at(station + 8, side * 1.5), height: night ? 9.0 : 7 };
+  });
+}
+
+function nightLights(scene, track) {
+  const posts = circuitLamps(track);
+  const floodlights = Array.from({ length: 6 }, () => new T.SpotLight('#d7e8ff', 0, 57, 0.76, 0.61, 1.65));
+  for (const light of floodlights) scene.add(light, light.target);
+  const head = new T.SpotLight('#ddecff', 0, 78, 0.34, 0.61, 1.55);
+  scene.add(head, head.target);
+  return (x, z, yaw) => {
+    const nearest = posts.map(post => ({ post, distance: Math.hypot(x - post.point.x, z - post.point.z) }))
+      .sort((a, b) => a.distance - b.distance);
+    for (const [index, light] of floodlights.entries()) {
+      const { post, distance } = nearest[index];
+      light.position.set(post.point.x, post.height, post.point.z);
+      light.target.position.set(post.aim.x, 0, post.aim.z);
+      light.intensity = 405 * (1 - T.MathUtils.smoothstep(distance, 62, 125));
+    }
+    const fx = Math.sin(yaw), fz = Math.cos(yaw);
+    head.position.set(x + fx * 1.89, 0.57, z + fz * 1.89);
+    head.target.position.set(x + fx * 40, -0.45, z + fz * 40);
+    head.intensity = 380;
+  };
+}
+
+export function lightTrack(scene, track, assets) {
+  const event = track.event;
+  const view = lighting[event.weather];
+  scene.background = new T.Color(view.colors[0]);
+  scene.fog = new T.FogExp2(view.colors[1], view.fog);
   scene.backgroundRotation.y = event.skyYaw;
   scene.environmentRotation.y = event.skyYaw;
-  scene.environmentIntensity = 0.71;
-  assets.sky.then(texture => { if (texture) scene.background = texture; });
-  assets.reflections.then(texture => { if (texture) scene.environment = texture; });
+  scene.environmentIntensity = view.reflections;
+  const panorama = assets.panorama(view.sky);
+  panorama.sky.then(texture => { if (texture) scene.background = texture; });
+  panorama.reflections.then(texture => { if (texture) scene.environment = texture; });
 
-  const direction = new T.Vector3(0.63, 0.42, 0.78).normalize().applyAxisAngle(new T.Vector3(0, 1, 0), event.skyYaw);
-  const sun = new T.DirectionalLight(event.accent, 1.95);
+  const up = new T.Vector3(0, 1, 0);
+  const direction = new T.Vector3(0.63, view.elevation, 0.78).normalize().applyAxisAngle(up, event.skyYaw);
+  const right = up.clone().cross(direction).normalize();
+  const vertical = direction.clone().cross(right).normalize();
+  const sun = new T.DirectionalLight(view.source, view.sun);
   sun.castShadow = true;
   sun.shadow.mapSize.set(1536, 1536);
   sun.shadow.normalBias = 0.028;
@@ -62,11 +114,18 @@ export function lightTrack(scene, event, assets) {
   sun.shadow.radius = 2.2;
   Object.assign(sun.shadow.camera, { left: -36, right: 36, top: 36, bottom: -36, near: 1, far: 130 });
   sun.shadow.camera.updateProjectionMatrix();
-  scene.add(sun, sun.target, new T.HemisphereLight('#cadcf4', '#615940', 0.52));
+  scene.add(sun, sun.target, new T.HemisphereLight('#cadcf4', event.weather === 'night' ? '#485160' : '#615940', view.fill));
+  const updateNight = event.weather === 'night' ? nightLights(scene, track) : null;
 
-  return (x, z) => {
-    sun.target.position.set(x, 0, z);
+  return (x, z, yaw) => {
+    const size = 72 / sun.shadow.mapSize.x;
+    const target = sun.target.position.set(x, 0, z);
+    for (const axis of [right, vertical]) {
+      const coordinate = target.dot(axis);
+      target.addScaledVector(axis, Math.round(coordinate / size) * size - coordinate);
+    }
     sun.position.copy(sun.target.position).addScaledVector(direction, 66);
+    updateNight?.(x, z, yaw);
   };
 }
 

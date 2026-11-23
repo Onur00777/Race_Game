@@ -1,12 +1,15 @@
 import { currentEvent, normalizeLoadout, teamById } from './career.js';
 import { createRace } from './race.js';
+import { legacyEvents } from './events.js';
 
 const carFields = ['x', 'z', 'yaw', 'speed', 'lateral', 'spin', 'steer', 'station',
   'damage', 'frontDamage', 'rearDamage'];
 
 export function raceCheckpoint(career, race, loadout, alternateCamera) {
   return {
-    version: 1,
+    version: 2,
+    event: race.track.event.id,
+    legacy: race.track.event.legacy === true,
     season: career.season,
     round: career.results.length,
     loadout,
@@ -25,13 +28,22 @@ export function raceCheckpoint(career, race, loadout, alternateCamera) {
 
 export function hasSavedRace(career) {
   const save = career.activeRace;
-  return Boolean(save?.version === 1 && save.season === career.season &&
-    save.round === career.results.length && currentEvent(career));
+  const event = currentEvent(career);
+  return Boolean(event && save?.season === career.season && save.round === career.results.length &&
+    (save.version === 1 ? legacyEvents[save.round] : save.version === 2 && save.event === event.id));
+}
+
+export function eventForResume(career) {
+  if (!hasSavedRace(career)) return currentEvent(career);
+  const save = career.activeRace;
+  return (save.version === 1 || save.legacy ? legacyEvents[save.round] : null) ?? currentEvent(career);
 }
 
 export function restoreRace(career, track) {
   if (!hasSavedRace(career)) return null;
   const save = career.activeRace;
+  const event = eventForResume(career);
+  if (track.event.id !== event.id || track.event.laps !== event.laps) return null;
   const loadout = normalizeLoadout(save.loadout);
   const race = createRace(track, teamById(loadout.team), loadout.upgrades, loadout.setup, loadout.appearance);
   if (!Number.isFinite(save.elapsed) || save.elapsed < 0 ||

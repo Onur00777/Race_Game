@@ -1,48 +1,9 @@
 import { carAppearance, decalSlots, defaultSetup, normalizeSetup, sponsors } from './setup.js';
+import { defaultPoints, defaultPrizes, events } from './events.js';
 
 export const gameName = 'Kırmızı Çizgi';
 
-export const events = [
-  {
-    name: 'Sedir Pisti',
-    nameEn: 'Cedar Circuit',
-    date: '12 NİS',
-    dateEn: '12 APR',
-    laps: 2,
-    width: 15,
-    rivalPace: [0.80, 0.75, 0.83, 0.81],
-    accent: '#ffd193',
-    sky: ['#617287', '#a7a394'],
-    skyYaw: 2.64,
-    points: [[-55, 60], [-55, -25], [-38, -81], [16, -106], [66, -64], [69, -12], [37, 19], [51, 63], [23, 111], [-28, 109]],
-  },
-  {
-    name: 'Körfez Virajları',
-    nameEn: 'Bay Curves',
-    date: '26 NİS',
-    dateEn: '26 APR',
-    laps: 2,
-    width: 14,
-    rivalPace: [0.84, 0.93, 0.91, 0.88],
-    accent: '#ffb295',
-    sky: ['#584e65', '#a79c96'],
-    skyYaw: 2.07,
-    points: [[-58, 60], [-58, -26], [-40, -92], [30, -109], [70, -83], [48, -42], [14, -21], [31, 16], [76, 28], [77, 78], [29, 112], [-23, 111]],
-  },
-  {
-    name: 'Zirve Grand Prix',
-    nameEn: 'Summit Grand Prix',
-    date: '10 MAY',
-    dateEn: '10 MAY',
-    laps: 3,
-    width: 16,
-    rivalPace: [0.91, 0.98, 0.98, 0.93],
-    accent: '#b9e2ff',
-    sky: ['#41638a', '#8699a5'],
-    skyYaw: 3.16,
-    points: [[-62, 61], [-62, -34], [-36, -99], [26, -133], [83, -107], [86, -61], [55, -25], [81, 11], [88, 65], [48, 120], [-17, 122]],
-  },
-];
+export { events };
 
 export const teams = [
   { id: 'apex', name: 'Kızıl Motor', color: '#f04b32', unlock: 0, payout: 1, power: 0, grip: 0, perk: 'Dengeli başlangıç', perkEn: 'Balanced setup' },
@@ -66,8 +27,6 @@ export const rivals = [
 
 // Keep the original key and team ID so that existing careers load after the rename.
 const storageKey = 'apex-circuit-career-v1';
-const pointsByPlace = [25, 18, 15, 12, 10];
-const prizes = [1800, 1350, 1100, 950, 850];
 export const maxUpgrade = 3;
 const currencyFormats = { en: new Intl.NumberFormat('en-US'), tr: new Intl.NumberFormat('tr-TR') };
 export const money = (amount, language = 'tr') => '₺' + (currencyFormats[language] ?? currencyFormats.tr).format(amount);
@@ -155,12 +114,13 @@ export function toggleDecal(career, slot) {
   return { ...career, decals };
 }
 
-export function finishEvent(career, order, time, bestLap, loadout = normalizeLoadout(career)) {
+export function finishEvent(career, order, time, bestLap, loadout = normalizeLoadout(career), event = currentEvent(career)) {
   const place = order.indexOf('player') + 1;
-  const points = pointsByPlace[place - 1];
+  const classificationPoints = event?.pointsByPlace ?? defaultPoints;
+  const points = classificationPoints[place - 1];
   const bonus = loadout.decals.length ? (sponsors.find(offer => offer.id === loadout.sponsor)?.payout ?? 0) : 0;
-  const prize = Math.round(prizes[place - 1] * teamById(loadout.team).payout) + bonus;
-  const result = { place, points, prize, bonus, time, bestLap, order };
+  const prize = Math.round((event?.prizes ?? defaultPrizes)[place - 1] * teamById(loadout.team).payout) + bonus;
+  const result = { place, points, prize, bonus, time, bestLap, order, classificationPoints, laps: event?.laps };
   return {
     ...career,
     cash: career.cash + prize,
@@ -174,7 +134,8 @@ export function standings(career) {
   const drivers = [{ id: 'player', name: career.profile?.name ?? 'Sen', color: currentTeam(career).color }, ...rivals];
   return drivers.map(driver => ({
     ...driver,
-    points: career.results.reduce((sum, result) => sum + pointsByPlace[result.order.indexOf(driver.id)], 0),
+    points: career.results.reduce((sum, result) =>
+      sum + (result.classificationPoints ?? defaultPoints)[result.order.indexOf(driver.id)], 0),
     places: Array.from({ length: drivers.length }, (_, index) =>
       career.results.filter(result => result.order[index] === driver.id).length),
   })).sort((a, b) => {

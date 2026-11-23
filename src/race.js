@@ -103,6 +103,9 @@ export function createRace(track, team, upgrades, setup, appearance) {
   const race = { track, player, opponents, cars, previousPoses: cars.map(visualPose),
     elapsed: 0, countdown: 3, order: null, impact: null, throttle: false, backfire: null, engineLevel: upgrades.engine };
   const { topSpeed, acceleration, braking, grip, turn: turnResponse, brakeStability, load } = vehicleStats(team, upgrades, setup);
+  const surfaceGrip = track.event.surfaceGrip;
+  const aggression = track.event.aggression;
+  race.handling = { topSpeed, braking: braking * surfaceGrip, grip: (grip + load * 0.018) * surfaceGrip };
 
   function relativeStation(station, reference) {
     return wrap(station - reference + track.length / 2, track.length) - track.length / 2;
@@ -148,18 +151,19 @@ export function createRace(track, team, upgrades, setup, appearance) {
       return;
     }
     const direction = track.at(car.station);
-    const ahead = clamp(car.speed * 0.48, 9, 23);
+    const ahead = clamp(car.speed * (0.55 - aggression * 0.16), 9, 23);
     const bend = Math.abs(angleBetween(direction.yaw, track.at(car.station + ahead).yaw));
     const surfaceLimit = Math.abs(car.offset) > track.event.width / 2 + 0.6 ? 15 : 47;
-    let target = car.pace * (1 - car.damage * 0.0015) * Math.min(surfaceLimit, 43 / (1 + bend * 1.7));
+    let target = car.pace * (1 - car.damage * 0.0015) * Math.min(surfaceLimit, 43 / (1 + bend * 1.7 / Math.sqrt(surfaceGrip)));
     let lane = car.lane;
     if (watchTraffic) {
       for (const other of opponents) {
         if (other === car || Math.abs(other.offset - car.offset) > 2.35) continue;
         const gap = relativeStation(other.station, car.station);
         if (gap <= 0 || gap > 9) continue;
-        target = Math.min(target, Math.max(4, other.speed + (gap - 5.5) * 1.5));
-        lane = clamp(other.offset < lane ? lane + 1.7 : lane - 1.7, -5.2, 5.2);
+        target = Math.min(target, Math.max(4, other.speed + (gap - (6.11 - aggression * 1.35)) * 1.5));
+        const space = 1.38 + aggression * 0.58;
+        lane = clamp(other.offset < lane ? lane + space : lane - space, -5.2, 5.2);
       }
     }
     car.speed = approach(car.speed, target, (car.speed < target ? 9.5 : 21) * dt);
@@ -200,7 +204,7 @@ export function createRace(track, team, upgrades, setup, appearance) {
     if (gas && !brake) {
       player.speed += (player.speed < 0 ? braking : acceleration * power * (1 - Math.max(0, player.speed) / (damagedTopSpeed + 8))) * dt;
     } else if (brake) {
-      if (player.speed > 0) player.speed = Math.max(0, player.speed - braking * dt);
+      if (player.speed > 0) player.speed = Math.max(0, player.speed - race.handling.braking * dt);
       else if (player.speed > -8) player.speed = Math.max(-8, player.speed - 7 * dt);
     }
     const limit = player.onRoad ? damagedTopSpeed : 12;
@@ -215,7 +219,7 @@ export function createRace(track, team, upgrades, setup, appearance) {
     player.spin *= Math.exp(-(player.onRoad ? 4.3 : 2.65) * dt);
     player.lateral -= player.speed * Math.sin(rotation) * (handbrake ? 1.08 : 0.52);
     const aerodynamicGrip = load * 0.021 * (speed / 42) ** 2;
-    const damping = (grip + aerodynamicGrip + (brake ? brakeStability : 0)) * (1 - player.damage * 0.0019);
+    const damping = (grip + aerodynamicGrip + (brake ? brakeStability : 0)) * (1 - player.damage * 0.0019) * surfaceGrip;
     player.lateral *= Math.exp(-(handbrake ? 1.55 : damping) * (player.onRoad ? 1 : 0.56) * dt);
     const motion = velocity(player);
     player.x += motion.x * dt;

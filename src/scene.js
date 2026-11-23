@@ -1,7 +1,7 @@
 import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { gameName } from './career.js';
-import { addTerrain, addTrees, lightTrack, loadTrackAssets } from './environment.js';
+import { addTerrain, addTrees, circuitLamps, lightTrack, loadTrackAssets } from './environment.js';
 import { createCarModel, sharedCarResources, updateCarModel } from './car-model.js';
 import { createRaceEffects } from './race-effects.js';
 import { renderPose } from './race.js';
@@ -164,7 +164,7 @@ function addTrack(scene, track, assets, label) {
     normalMap: assets.asphaltNormal,
     normalScale: new T.Vector2(0.56, 0.56),
     roughnessMap: assets.asphaltRoughness,
-    roughness: 0.94,
+    roughness: track.event.weather === 'cloud' ? 0.85 : 0.94,
   });
   const runoff = new T.MeshStandardMaterial({ map: assets.gravel, color: '#9c9384', roughness: 1 });
   const paint = standard('#e9e4d2');
@@ -234,16 +234,16 @@ function addTrack(scene, track, assets, label) {
   }
 
   const metal = standard('#899197', 0.53, 0.34);
-  const bulb = new T.MeshBasicMaterial({ color: '#fff5d7' });
-  for (let i = 0; i < track.length; i += 33) {
-    const side = Math.round(i / 33) % 2 ? 1 : -1;
-    const point = track.at(i + 12, side * (track.railOffset + 0.9));
+  const night = track.event.weather === 'night';
+  const bulb = new T.MeshBasicMaterial({ color: night ? new T.Color(3.5, 4.2, 5.3) : '#fff5d7' });
+  for (const { point, side, height } of circuitLamps(track)) {
     const post = new T.Group();
     post.rotation.y = point.yaw;
     post.position.set(point.x, 0, point.z);
-    box(post, metal, 0.13, 7, 0.13, 0, 3.5, 0).castShadow = true;
-    box(post, dark, 1.7, 0.14, 0.23, side * 0.78, 6.94, 0);
-    box(post, bulb, 0.66, 0.068, 0.26, side * 1.37, 6.86, 0);
+    box(post, metal, 0.13, height, 0.13, 0, height / 2, 0).castShadow = true;
+    box(post, dark, night ? 2.16 : 1.7, 0.20, night ? 0.48 : 0.23, -side * 0.78, height - 0.06, 0);
+    const lamp = box(post, bulb, night ? 1.35 : 0.66, 0.070, night ? 0.46 : 0.26, -side * 1.34, height - 0.16, 0);
+    lamp.rotation.z = side * 0.13;
     scene.add(post);
   }
 
@@ -296,7 +296,7 @@ export function createView(canvas, quality) {
       for (const item of resources) if (!shared.has(item)) item.dispose();
     }
     scene = new T.Scene();
-    updateLight = lightTrack(scene, track.event, assets);
+    updateLight = lightTrack(scene, track, assets);
     fitShadowResolution(scene, pipeline.shadowSize());
     addTerrain(scene, track, assets);
     addTrack(scene, track, assets, label);
@@ -370,7 +370,7 @@ export function createView(canvas, quality) {
       model.lastSpeed = car.speed;
     }
     const { x, z, yaw } = cars[0];
-    updateLight(x, z);
+    updateLight(x, z, yaw);
     const fx = Math.sin(yaw);
     const fz = Math.cos(yaw);
     if (mode === 'menu') {
@@ -399,7 +399,7 @@ export function createView(canvas, quality) {
     }
     camera.lookAt(aim);
     cameraReady = true;
-    pipeline.render(scene, camera, dt);
+    pipeline.render(scene, camera, dt, race.track.event.weather === 'night' ? 1.45 : 1);
   }
 
   return { setTrack, draw, drawGarage, snap, setQuality };
