@@ -1,42 +1,71 @@
-import { buyUpgrade, changeTeam, currentEvent, currentTeam, events, finishEvent, gameName, loadCareer, maxUpgrade, money, price, saveCareer, standings, teams, upgrades } from './career.js';
+import { acceptSponsor, buyUpgrade, changeTeam, currentEvent, currentTeam, events, finishEvent, gameName,
+  loadCareer, normalizeLoadout, saveCareer, saveProfile, standings, teamById, teams, toggleDecal } from './career.js';
 import { createRace, createTrack, raceStep } from './race.js';
+import { hasSavedRace, raceCheckpoint, restoreRace } from './progress.js';
 import { createView } from './scene.js';
+import { defaultOrbit, garageAngles } from './studio.js';
+import { decalSlots, normalizeSetup, sliders } from './setup.js';
+import { driverForm, garageMoney, garagePanel, garageStats, garageTabs, setupValue } from './garage.js';
+import { escapeHtml, getLanguage, setLanguage, t, translatedField, upper } from './i18n.js';
+import { createAudio, updateAudio } from './audio.js';
 import './style.css';
 
 const app = document.querySelector('#app');
 app.innerHTML = `
-  <canvas id="circuit" aria-label="Üç boyutlu yarış pisti"></canvas>
+  <div id="circuit-home"><canvas id="circuit" data-label="track"></canvas></div>
   <div class="shade"></div>
   <div class="game-shell">
     <header class="topbar" id="topbar">
       <div class="brand" aria-label="${gameName}"><span class="mark" aria-hidden="true"></span><div>KIRMIZI <span>ÇİZGİ</span></div></div>
-      <nav aria-label="Kariyer menüsü">
-        <button type="button" data-tab="calendar" aria-current="page">Takvim</button>
-        <button type="button" data-tab="garage">Garaj</button>
-        <button type="button" data-tab="teams">Takımlar</button>
+      <nav id="career-nav" data-label="careerNav">
+        <button type="button" data-tab="calendar" data-text="calendar"></button>
+        <button type="button" data-tab="garage" data-text="garage"></button>
+        <button type="button" data-tab="teams" data-text="teams"></button>
       </nav>
-      <div class="top-end"><span id="balance" class="balance"></span><button type="button" data-action="sound" class="sound" aria-pressed="false">Ses kapalı</button></div>
+      <div class="top-end" id="top-end"><span id="balance" class="balance"></span>
+        <button type="button" data-action="sound" class="sound" aria-pressed="false"></button>
+        <button type="button" data-action="profile" class="sound" data-text="profile"></button></div>
     </header>
-    <section id="menu" class="menu" aria-live="polite">
+    <section id="profile-screen" class="driver-screen" hidden></section>
+    <section id="menu" class="menu" hidden>
       <div class="hero" id="hero"></div>
       <div class="paddock">
-        <section id="panel" class="panel" aria-label="Kariyer ayrıntıları"></section>
-        <section id="championship" class="panel championship" aria-label="Şampiyona puanları"></section>
+        <section id="panel" class="panel"></section>
+        <section id="championship" class="panel championship" data-label="league"></section>
       </div>
     </section>
-    <section id="hud" class="hud" hidden aria-label="Yarış bilgileri">
+    <section id="garage" class="garage-screen" hidden>
+      <header class="garage-heading"><div><h1 data-text="garage"></h1><p id="garage-team"></p></div><div id="garage-resume"></div></header>
+      <div class="garage-layout">
+        <section class="garage-stage">
+          <div id="garage-preview" class="garage-preview" data-label="preview"></div>
+          <div class="studio-controls">
+            <div><button type="button" data-view="front" data-text="front"></button><button type="button" data-view="side" data-text="side"></button><button type="button" data-view="rear" data-text="rear"></button></div>
+            <p data-text="orbitHelp"></p>
+            <div><button type="button" data-zoom="-1" data-label="zoomOut">−</button><button type="button" data-zoom="1" data-label="zoomIn">+</button></div>
+          </div>
+          <div id="garage-stats" class="garage-stats"></div>
+        </section>
+        <section class="workbench">
+          <nav class="garage-tabs" data-label="garageNav">${Object.entries(garageTabs).map(([id, label]) =>
+            `<button type="button" data-garage-tab="${id}" data-text="${label}"></button>`).join('')}</nav>
+          <div id="garage-panel" class="garage-panel"></div>
+        </section>
+      </div>
+    </section>
+    <section id="hud" class="hud" hidden data-label="raceInfo">
       <div class="race-top">
         <div class="timing"><small id="race-title"></small><div><b id="laps"></b><span id="clock"></span></div><span id="best-lap"></span></div>
-        <div class="position"><small>SIRA</small><div><b id="position"></b><span> / 5</span></div></div>
-        <button class="secondary pause-button" data-action="pause">Duraklat</button>
+        <div class="position"><small data-text="rank"></small><div><b id="position"></b><span> / 5</span></div></div>
+        <button type="button" class="secondary pause-button" data-action="pause" data-text="pause"></button>
       </div>
       <div id="countdown" class="countdown" aria-live="polite"></div>
       <div class="race-bottom">
-        <canvas id="map" width="180" height="156" aria-label="Pist haritası"></canvas>
-        <div class="drive-help"><span id="road-warning" role="status"></span><div>WASD Sürüş <i>·</i> SPACE El freni <i>·</i> R Piste dön <i>·</i> C Kamera</div></div>
+        <canvas id="map" width="180" height="156" data-label="minimap"></canvas>
+        <div class="drive-help"><span id="road-warning" role="status"></span><div id="drive-help"></div></div>
         <div class="speed">
-          <strong id="speed"></strong><small>KM/SA</small><span><i id="speed-bar"></i></span>
-          <div class="condition"><small>Gövde</small><meter id="body-condition" min="0" max="100" low="42" high="77" optimum="100" aria-label="Gövde durumu" value="100"></meter><b id="condition-percent">100%</b></div>
+          <strong id="speed"></strong><small data-text="kmh"></small><span><i id="speed-bar"></i></span>
+          <div class="condition"><small data-text="body"></small><meter id="body-condition" min="0" max="100" low="42" high="77" optimum="100" data-label="bodyCondition" value="100"></meter><b id="condition-percent">100%</b></div>
         </div>
       </div>
     </section>
@@ -47,135 +76,223 @@ app.innerHTML = `
 
 const byId = id => document.getElementById(id);
 const circuit = byId('circuit');
-const menu = byId('menu');
-const hero = byId('hero');
-const panel = byId('panel');
-const topbar = byId('topbar');
-const hud = byId('hud');
 const overlay = byId('overlay');
 const map = byId('map');
 const mapContext = map.getContext('2d');
+const garagePreview = byId('garage-preview');
 const keys = new Set();
 const drivingKeys = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space']);
-const tabs = { calendar: 'Yarış Takvimi', garage: 'Garaj', teams: 'Takımlar' };
+const screens = ['calendar', 'garage', 'teams'];
+const orbit = { ...defaultOrbit };
 let storage;
-try { storage = window.localStorage; } catch { /* Storage access can be disabled by the browser. */ }
+try { storage = window.localStorage; } catch { /* Keep the current session playable. */ }
 let career = loadCareer(storage);
-let tab = 'calendar';
+let screen = 'calendar';
 let mode = 'menu';
 let paused = false;
 let alternateCamera = false;
-let sound = false;
+let draft;
+let sound = career.sound === true;
 let audio;
+let audioPending;
 let track;
+let trackLabel;
 let race;
+let activeLoadout;
+let garageCar;
+let drag;
 let view;
 let noticeTimeout;
 let mapShape;
 let previousFrame;
 let accumulator = 0;
 let lastHudUpdate = -1;
-let lastRaceElapsed = -1;
+let lastMenuDraw = -Infinity;
+let lastCheckpoint = -Infinity;
 
-const formatTime = seconds => {
-  const milliseconds = Math.floor(seconds * 1000);
-  return String(Math.floor(milliseconds / 60000)).padStart(2, '0') + ':' +
-    String(Math.floor(milliseconds / 1000) % 60).padStart(2, '0') + '.' + String(milliseconds % 1000).padStart(3, '0');
-};
+function formatTime(seconds) {
+  if (!Number.isFinite(seconds)) return '—';
+  const ms = Math.floor(seconds * 1000);
+  return String(Math.floor(ms / 60000)).padStart(2, '0') + ':' +
+    String(Math.floor(ms / 1000) % 60).padStart(2, '0') + '.' + String(ms % 1000).padStart(3, '0');
+}
 
 function notify(message) {
   const notice = byId('notice');
   notice.textContent = message;
   notice.hidden = false;
   clearTimeout(noticeTimeout);
-  noticeTimeout = setTimeout(() => { notice.hidden = true; }, 3800);
+  noticeTimeout = setTimeout(() => { notice.hidden = true; }, 4200);
 }
 
-function persist() {
-  if (!saveCareer(storage, career)) notify('Tarayıcı kayda izin vermiyor. İlerleme bu oturum boyunca kullanılabilir.');
+function persist(quiet = false) {
+  const saved = saveCareer(storage, career);
+  if (!saved && !quiet) notify(t('storageError'));
+  return saved;
 }
 
-function prepare(event) {
-  const changed = track?.event !== event;
-  if (changed) track = createTrack(event);
-  race = createRace(track, currentTeam(career), career.upgrades);
-  if (changed) view.setTrack(track, race.cars);
-  view.snap();
+function refreshLanguage() {
+  document.documentElement.lang = getLanguage();
+  for (const node of app.querySelectorAll('[data-text]')) node.textContent = t(node.dataset.text);
+  for (const node of app.querySelectorAll('[data-label]')) node.setAttribute('aria-label', t(node.dataset.label));
+  byId('drive-help').innerHTML = `WASD ${t('drive')} <i>·</i> SPACE ${t('handbrake')} <i>·</i> R ${t('resetCar')} <i>·</i> C ${t('camera')}`;
+  updateSoundButton();
 }
 
-function showMenu() {
+function updateSoundButton() {
+  const button = app.querySelector('[data-action="sound"]');
+  button.textContent = t(sound ? 'soundOn' : 'soundOff');
+  button.setAttribute('aria-pressed', String(sound));
+}
+
+function playAudio() {
+  updateAudio(audio, race, sound && mode === 'race' && !paused);
+}
+
+function enableAudio() {
+  if (!sound || audio || audioPending) return;
+  audioPending = createAudio().then(created => {
+    audio = created;
+    playAudio();
+  }).catch(() => {
+    sound = false;
+    career = { ...career, sound };
+    persist(true);
+    updateSoundButton();
+    notify(t('audioError'));
+  }).finally(() => { audioPending = null; });
+}
+
+function updateHeader() {
+  byId('balance').textContent = garageMoney(career.cash);
+  byId('career-nav').hidden = byId('top-end').hidden = !career.profile;
+  for (const button of byId('career-nav').querySelectorAll('[data-tab]')) {
+    if (button.dataset.tab === screen) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+  }
+}
+
+function trackFor(event) {
+  return track?.event === event ? track : createTrack(event);
+}
+
+function useTrack(next, nextRace) {
+  const label = translatedField(next.event);
+  if (view && (track !== next || trackLabel !== label)) view.setTrack(next, nextRace.cars, label);
+  track = next;
+  trackLabel = label;
+  race = nextRace;
+  view?.snap();
+  lastMenuDraw = -Infinity;
+}
+
+function previewTrack() {
+  if (!view) return;
+  const next = trackFor(currentEvent(career) ?? events.at(-1));
+  const loadout = normalizeLoadout(career);
+  useTrack(next, createRace(next, currentTeam(career), loadout.upgrades, loadout.setup, loadout.appearance));
+}
+
+function showMenu(next = career.screen) {
   if (overlay.open) overlay.close();
   mode = 'menu';
   paused = false;
   keys.clear();
-  menu.hidden = topbar.hidden = false;
-  hud.hidden = true;
+  screen = career.profile ? (screens.includes(next) || next === 'profile' ? next : 'calendar') : 'profile';
+  if (screen !== 'profile' && screen !== career.screen) {
+    career = { ...career, screen };
+    persist();
+  }
   document.body.classList.remove('driving');
-  if (view) prepare(currentEvent(career) ?? events.at(-1));
-  updateMenu();
+  document.body.classList.toggle('in-garage', screen === 'garage');
+  document.body.classList.toggle('onboarding', screen === 'profile' && !career.profile);
+  byId('menu').hidden = screen !== 'calendar' && screen !== 'teams';
+  byId('garage').hidden = screen !== 'garage';
+  byId('profile-screen').hidden = screen !== 'profile';
+  byId('hud').hidden = true;
+  byId('topbar').hidden = false;
+  const home = screen === 'garage' ? garagePreview : byId('circuit-home');
+  if (circuit.parentNode !== home) home.append(circuit);
+  refreshLanguage();
+  circuit.setAttribute('aria-label', t(screen === 'garage' ? 'preview' : 'track'));
+  updateHeader();
+  if (screen === 'garage') updateGarage();
+  else {
+    previewTrack();
+    if (screen === 'profile') updateProfile();
+    else updateMenu();
+  }
+  playAudio();
+}
+
+function updateProfile() {
+  draft ??= { name: career.profile?.name ?? '', language: getLanguage(), team: career.team };
+  byId('profile-screen').innerHTML = driverForm(career, draft);
+  if (career.profile) return;
+  byId('team-choices').innerHTML = `<fieldset class="team-choices"><legend>${t('startingTeam')}</legend>
+    ${teams.map(team => `<label style="--team:${team.color}"><input type="radio" name="team" value="${team.id}" ${team.id === draft.team ? 'checked' : ''}>
+      <strong>${team.name}</strong><small>${translatedField(team, 'perk')}</small></label>`).join('')}
+  </fieldset>`;
+}
+
+function raceButton(saved) {
+  return `<button type="button" class="primary" data-action="race" ${view ? '' : 'disabled'}>${t(saved ? 'resumeRace' : 'startRace')} <span aria-hidden="true">↗</span></button>`;
 }
 
 function updateMenu() {
   const event = currentEvent(career);
   const team = currentTeam(career);
-  byId('balance').textContent = money(career.cash);
-  for (const button of topbar.querySelectorAll('[data-tab]')) {
-    if (button.dataset.tab === tab) button.setAttribute('aria-current', 'page');
-    else button.removeAttribute('aria-current');
-  }
-  const action = event
-    ? `<button class="primary" data-action="race" ${view ? '' : 'disabled'}>Yarışı başlat <span aria-hidden="true">↗</span></button>`
-    : '<button class="primary" data-action="season">Yeni sezona başla <span aria-hidden="true">↗</span></button>';
-  hero.innerHTML = `
-    <div class="hero-meta"><span></span> SEZON ${String(career.season).padStart(2, '0')} ${event ? `<i></i> ETAP ${career.results.length + 1} / ${events.length}` : ''}</div>
-    <h1>${event?.name ?? 'Sezon tamamlandı'}</h1>
-    <p>${event ? `${event.laps} tur <i>·</i> 5 sürücü <i>·</i> ${team.name}` : `Şampiyon: ${standings(career)[0].name}`}</p>
+  const saved = hasSavedRace(career);
+  const championship = standings(career);
+  const action = event ? raceButton(saved) : `<button type="button" class="primary" data-action="season">${t('newSeason')} <span aria-hidden="true">↗</span></button>`;
+  byId('hero').innerHTML = `
+    <div class="hero-meta"><span></span> ${upper(t('season'))} ${String(career.season).padStart(2, '0')} ${event ? `<i></i> ${upper(t('round'))} ${career.results.length + 1} / ${events.length}` : ''}</div>
+    <h1>${event ? translatedField(event) : t('seasonDone')}</h1>
+    <p>${event ? `${t('laps', event.laps)} <i>·</i> ${t('drivers')} <i>·</i> ${team.name}` : t('champion', escapeHtml(championship[0].name))}</p>
     ${action}
-    <div class="controls"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> <span>Sürüş</span><kbd>SPACE</kbd> <span>El freni</span></div>
+    ${saved ? `<p class="saved-lap">${t('savedLap', Math.min((career.activeRace.cars?.[0]?.lap ?? 0) + 1, event.laps), event.laps, formatTime(career.activeRace.elapsed))}</p>` :
+    `<div class="controls"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> <span>${t('drive')}</span><kbd>SPACE</kbd> <span>${t('handbrake')}</span></div>`}
   `;
-  const calendar = events.map((item, index) => {
-    const result = career.results[index];
-    const status = result ? `${result.place}. sıra <i>·</i> +${result.points} puan` : item === event ? 'Sıradaki' : 'Beklemede';
-    return `<div class="entry ${item === event ? 'current' : ''}"><span class="date">${item.date}</span><div><strong>${item.name}</strong><small>${item.laps} tur${result ? ` <i>·</i> ${money(result.prize)}` : ''}</small></div><span class="entry-status">${status}</span></div>`;
-  }).join('');
-  const garage = upgrades.map(upgrade => {
-    const level = career.upgrades[upgrade.id];
-    const cost = price(upgrade, level);
-    const max = level >= maxUpgrade;
-    return `<div class="entry"><span class="level">${level}/${maxUpgrade}</span><div><strong>${upgrade.name}</strong><small>${upgrade.effect}</small></div><button class="secondary" data-buy="${upgrade.id}" aria-label="${upgrade.name} yükseltmesi ${money(cost)}" ${max || cost > career.cash ? 'disabled' : ''}>${max ? 'Tamamlandı' : money(cost)}</button></div>`;
-  }).join('');
-  const teamList = teams.map(candidate => {
+  const entries = screen === 'teams' ? teams.map(candidate => {
     const active = candidate.id === team.id;
     const locked = candidate.unlock > career.completed;
-    return `<div class="entry ${active ? 'current' : ''}"><span class="team-marker" style="--team:${candidate.color}"></span><div><strong>${candidate.name}</strong><small>${candidate.perk}</small></div><button class="secondary" data-team="${candidate.id}" ${active || locked ? 'disabled' : ''}>${active ? 'Aktif takım' : locked ? `${candidate.unlock} yarış gerekli` : 'Katıl'}</button></div>`;
-  }).join('');
-  panel.innerHTML = `<h2>${tabs[tab]}</h2><div class="entries">${{ calendar, garage, teams: teamList }[tab]}</div>`;
-  byId('championship').innerHTML = `
-    <h2>Şampiyona</h2>
-    <ol>${standings(career).map((driver, index) => `
+    return `<div class="entry ${active ? 'current' : ''}"><span class="team-marker" style="--team:${candidate.color}"></span><div><strong>${candidate.name}</strong><small>${translatedField(candidate, 'perk')}</small></div><button type="button" class="secondary" data-team="${candidate.id}" ${active || locked ? 'disabled' : ''}>${t(active ? 'activeTeam' : locked ? 'requiresRaces' : 'join', candidate.unlock)}</button></div>`;
+  }) : events.map((item, index) => {
+    const result = career.results[index];
+    const status = result ? t('placeLine', result.place, result.points) : item === event ? t(saved ? 'savedRace' : 'upcoming') : t('waiting');
+    return `<div class="entry ${item === event ? 'current' : ''}"><span class="date">${translatedField(item, 'date')}</span><div><strong>${translatedField(item)}</strong><small>${t('laps', item.laps)}${result ? ` <i>·</i> ${garageMoney(result.prize)}` : ''}</small></div><span class="entry-status">${status}</span></div>`;
+  });
+  byId('panel').innerHTML = `<h2>${t(screen === 'teams' ? 'teams' : 'schedule')}</h2><div class="entries">${entries.join('')}</div>`;
+  byId('championship').innerHTML = `<h2>${t('league')}</h2><ol>${championship.map((driver, index) => `
       <li class="${driver.id === 'player' ? 'you' : ''}">
         <span class="rank">${career.results.length ? index + 1 : '–'}</span>
         <span class="driver-dot" style="--driver:${driver.color}"></span>
-        <span>${driver.name}</span><b>${driver.points} <small>PUAN</small></b>
-      </li>`).join('')}
-    </ol>
-  `;
+        <span>${escapeHtml(driver.name)}</span><b>${driver.points} <small>${upper(t('points'))}</small></b>
+      </li>`).join('')}</ol>`;
 }
 
-function startRace() {
-  const event = currentEvent(career);
-  if (!view || !event || mode !== 'menu') return;
-  prepare(event);
-  mode = 'race';
-  keys.clear();
-  accumulator = 0;
-  lastHudUpdate = -1;
-  lastRaceElapsed = -1;
-  menu.hidden = topbar.hidden = true;
-  hud.hidden = false;
-  document.body.classList.add('driving');
-  byId('race-title').textContent = event.name;
-  byId('best-lap').textContent = '';
+function updateGaragePreview() {
+  const loadout = normalizeLoadout(career);
+  garageCar = { x: 0, z: 0, yaw: 0, speed: 0, steer: 0, frontDamage: 0, rearDamage: 0,
+    color: currentTeam(career).color, appearance: loadout.appearance };
+  byId('garage-stats').innerHTML = garageStats(career);
+}
+
+function updateGarage() {
+  const team = currentTeam(career);
+  const saved = hasSavedRace(career);
+  byId('garage-team').textContent = team.name;
+  byId('garage-resume').innerHTML = saved ? raceButton(true) : '';
+  byId('garage-panel').innerHTML = (saved ? `<p class="pending-setup">${t('nextRaceSetup')}</p>` : '') + garagePanel(career);
+  for (const button of byId('garage').querySelectorAll('nav [data-garage-tab]')) {
+    if (button.dataset.garageTab === career.garageTab) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+  }
+  updateHeader();
+  updateGaragePreview();
+}
+
+function buildMap() {
   const xs = track.samples.map(point => point.x);
   const zs = track.samples.map(point => point.z);
   const minX = Math.min(...xs);
@@ -190,13 +307,40 @@ function startRace() {
   track.samples.forEach((sample, index) => index ? path.lineTo(...point(sample)) : path.moveTo(...point(sample)));
   path.closePath();
   mapShape = { path, point };
+}
+
+function startRace() {
+  const event = currentEvent(career);
+  if (!view || !event || mode !== 'menu' || !career.profile) return;
+  const next = trackFor(event);
+  const restored = restoreRace(career, next);
+  if (hasSavedRace(career) && !restored) notify(t('invalidRace'));
+  activeLoadout = restored?.loadout ?? normalizeLoadout(career);
+  alternateCamera = restored?.alternateCamera ?? false;
+  useTrack(next, restored?.race ?? createRace(next, teamById(activeLoadout.team), activeLoadout.upgrades, activeLoadout.setup, activeLoadout.appearance));
+  byId('circuit-home').append(circuit);
+  circuit.setAttribute('aria-label', t('track'));
+  mode = 'race';
+  paused = false;
+  keys.clear();
+  accumulator = 0;
+  lastHudUpdate = lastCheckpoint = -Infinity;
+  byId('menu').hidden = byId('garage').hidden = byId('topbar').hidden = true;
+  byId('hud').hidden = false;
+  document.body.classList.remove('in-garage');
+  document.body.classList.add('driving');
+  byId('race-title').textContent = translatedField(event);
+  buildMap();
   updateHud();
+  saveActiveRace();
+  enableAudio();
+  circuit.focus({ preventScroll: true });
 }
 
 function updateHud() {
   const player = race.player;
   const speed = Math.round(Math.abs(player.speed) * 3.6);
-  byId('laps').textContent = `TUR ${Math.min(player.lap + 1, track.event.laps)} / ${track.event.laps}`;
+  byId('laps').textContent = `${upper(t('lap'))} ${Math.min(player.lap + 1, track.event.laps)} / ${track.event.laps}`;
   byId('clock').textContent = formatTime(race.elapsed);
   byId('position').textContent = race.position();
   byId('speed').textContent = speed;
@@ -205,12 +349,11 @@ function updateHud() {
   byId('body-condition').value = condition;
   byId('condition-percent').textContent = condition + '%';
   const recent = race.impact && race.impact.impulse > 2.6 && race.elapsed - race.impact.time < 1.45;
-  const message = recent ? (race.impact.kind === 'rail' ? 'Bariyer teması' : 'Araç teması') : player.onRoad ? '' : 'Pist dışı';
+  const message = recent ? t(race.impact.kind === 'rail' ? 'railHit' : 'carHit') : player.onRoad ? '' : t('offTrack');
   if (byId('road-warning').textContent !== message) byId('road-warning').textContent = message;
-  byId('best-lap').textContent = player.bestLap ? `EN İYİ TUR  ${formatTime(player.bestLap)}` : '';
-  const startMessage = race.countdown > 0 ? String(Math.ceil(race.countdown)) : race.elapsed < 0.8 ? 'BAŞLA!' : '';
-  const countdown = byId('countdown');
-  if (countdown.textContent !== startMessage) countdown.textContent = startMessage;
+  byId('best-lap').textContent = player.bestLap ? `${upper(t('bestLap'))}  ${formatTime(player.bestLap)}` : '';
+  const startMessage = race.countdown > 0 ? String(Math.ceil(race.countdown)) : race.elapsed < 0.8 ? t('go') : '';
+  if (byId('countdown').textContent !== startMessage) byId('countdown').textContent = startMessage;
   mapContext.clearRect(0, 0, map.width, map.height);
   mapContext.lineWidth = 8;
   mapContext.strokeStyle = '#121619';
@@ -226,20 +369,25 @@ function updateHud() {
   }
 }
 
+function saveActiveRace(quiet = false) {
+  if (mode !== 'race' || race.order) return false;
+  career = { ...career, screen: 'calendar', activeRace: raceCheckpoint(career, race, activeLoadout, alternateCamera) };
+  return persist(quiet);
+}
+
 function pauseRace() {
   if (mode !== 'race' || paused) return;
   keys.clear();
   paused = true;
-  overlay.innerHTML = `
-    <h2>Yarış duraklatıldı</h2>
-    <p>Takvime dönersen bu yarış yeniden başlar.</p>
+  const saved = saveActiveRace(true);
+  updateHud();
+  overlay.innerHTML = `<h2>${t('paused')}</h2><p>${t(saved ? 'pauseSaved' : 'pauseUnsaved')}</p>
     <div class="dialog-actions">
-      <button class="primary" data-action="resume">Yarışa devam et</button>
-      <button class="secondary" data-action="menu">Takvime dön</button>
-    </div>
-  `;
+      <button type="button" class="primary" data-action="resume">${t('resumeRace')}</button>
+      <button type="button" class="secondary" data-action="save-exit">${t(saved ? 'saveExit' : 'backCalendar')}</button>
+    </div>`;
   overlay.showModal();
-  updateAudio();
+  playAudio();
 }
 
 function resumeRace() {
@@ -248,134 +396,182 @@ function resumeRace() {
   accumulator = 0;
   overlay.close();
   circuit.focus({ preventScroll: true });
+  enableAudio();
 }
 
 function finishRace() {
-  career = finishEvent(career, race.order, race.player.finishTime, race.player.bestLap);
+  career = finishEvent(career, race.order, race.player.finishTime, race.player.bestLap, activeLoadout);
+  mode = 'result';
+  keys.clear();
   persist();
   const result = career.results.at(-1);
   const unlocked = teams.find(team => team.unlock === career.completed);
-  mode = 'result';
-  keys.clear();
   overlay.innerHTML = `
-    <div class="hero-meta"><span></span> ${track.event.name}</div>
-    <h2>${result.place}. sırada bitirdin</h2>
+    <div class="hero-meta"><span></span> ${translatedField(track.event)}</div>
+    <h2>${t('raceResult', result.place)}</h2>
     <div class="result-grid">
-      <div><small>ÖDÜL</small><b>${money(result.prize)}</b></div>
-      <div><small>SEZON PUANI</small><b>+${result.points}</b></div>
-      <div><small>TOPLAM SÜRE</small><b>${formatTime(result.time)}</b></div>
-      <div><small>EN İYİ TUR</small><b>${formatTime(result.bestLap)}</b></div>
+      <div><small>${upper(t('prize'))}</small><b>${garageMoney(result.prize)}</b></div>
+      <div><small>${upper(t('seasonPoints'))}</small><b>+${result.points}</b></div>
+      <div><small>${upper(t('totalTime'))}</small><b>${formatTime(result.time)}</b></div>
+      <div><small>${upper(t('bestLap'))}</small><b>${formatTime(result.bestLap)}</b></div>
     </div>
-    ${unlocked ? `<p>${unlocked.name} ile sözleşme artık açık.</p>` : ''}
+    ${result.bonus ? `<p>${t('sponsorBonus', garageMoney(result.bonus))}</p>` : ''}
+    ${unlocked ? `<p>${t('teamUnlocked', unlocked.name)}</p>` : ''}
     <div class="dialog-actions">
-      <button class="primary" data-action="menu">Takvime dön</button>
-      <button class="secondary" data-action="garage">Garaja git</button>
+      <button type="button" class="primary" data-action="calendar">${t('backCalendar')}</button>
+      <button type="button" class="secondary" data-action="garage">${t('backGarage')}</button>
     </div>
   `;
   overlay.showModal();
+  playAudio();
 }
 
-function updateAudio() {
-  if (!audio) return;
-  const speed = Math.abs(race?.player.speed ?? 0);
-  const audible = sound && mode === 'race' && !paused && race.countdown === 0;
-  const gearBand = speed % 10;
-  audio.engine.frequency.setTargetAtTime(42 + gearBand * 6.8 + speed * 0.55, audio.context.currentTime, 0.075);
-  audio.gain.gain.setTargetAtTime(audible ? 0.027 + Math.min(speed / 2500, 0.019) : 0, audio.context.currentTime, 0.08);
-  if (race?.impact && race.impact !== audio.lastImpact) {
-    audio.lastImpact = race.impact;
-    if (audible) crashSound(race.impact, audio);
-  }
+function aimGarage(location) {
+  orbit.azimuth = garageAngles[location];
+  orbit.elevation = location === 'front' ? 0.43 : location === 'side' ? 0.23 : 0.32;
 }
 
-function crashSound(impact, audio) {
-  const { context, crash } = audio;
-  const source = context.createBufferSource();
-  const filter = context.createBiquadFilter();
-  const gain = context.createGain();
-  filter.type = 'lowpass';
-  filter.frequency.value = impact.kind === 'rail' ? 980 : 570;
-  gain.gain.value = Math.min(0.26, impact.impulse * 0.008);
-  source.buffer = crash;
-  source.playbackRate.value = impact.kind === 'rail' ? 1.05 : 0.83;
-  source.connect(filter).connect(gain).connect(context.destination);
-  source.onended = () => {
-    source.disconnect();
-    filter.disconnect();
-    gain.disconnect();
-  };
-  source.start();
-}
-
-async function toggleSound(button) {
-  sound = !sound;
-  if (sound && !audio) {
-    try {
-      const context = new AudioContext();
-      const engine = context.createOscillator();
-      const filter = context.createBiquadFilter();
-      const gain = context.createGain();
-      engine.type = 'sawtooth';
-      filter.frequency.value = 240;
-      gain.gain.value = 0;
-      engine.connect(filter).connect(gain).connect(context.destination);
-      engine.start();
-      const crash = context.createBuffer(1, Math.floor(context.sampleRate * 0.29), context.sampleRate);
-      const noise = crash.getChannelData(0);
-      for (let i = 0; i < noise.length; i++) {
-        const time = i / context.sampleRate;
-        noise[i] = ((Math.random() * 2 - 1) * 0.66 + Math.sin(2 * Math.PI * 57 * time) * 0.4) * Math.exp(-time * 16);
-      }
-      await context.resume();
-      audio = { context, engine, gain, crash, lastImpact: null };
-    } catch {
-      sound = false;
-      notify('Tarayıcı ses çıkışını başlatamadı.');
-    }
-  }
-  button.textContent = sound ? 'Ses açık' : 'Ses kapalı';
-  button.setAttribute('aria-pressed', String(sound));
-  updateAudio();
+function tune(key, value) {
+  career = { ...career, setup: normalizeSetup({ ...career.setup, [key]: value }, career.upgrades.aero) };
+  updateGaragePreview();
+  const output = byId('garage-panel').querySelector(`[data-value="${key}"]`);
+  const spec = sliders.find(item => item.id === key);
+  if (output && spec) output.textContent = setupValue(career.setup[key], spec.suffix);
 }
 
 app.addEventListener('click', event => {
   const button = event.target.closest('button');
   if (!button || button.disabled) return;
-  if (button.dataset.tab) {
-    tab = button.dataset.tab;
-    updateMenu();
-  }
-  if (button.dataset.buy) {
-    const next = buyUpgrade(career, button.dataset.buy);
-    if (next !== career) {
-      career = next;
-      persist();
-      updateMenu();
-      panel.querySelector(`[data-buy="${button.dataset.buy}"]:not(:disabled)`)?.focus();
-    }
-  }
-  if (button.dataset.team) {
-    career = changeTeam(career, button.dataset.team);
-    if (view) race.player.color = currentTeam(career).color;
+  const { dataset } = button;
+  if (dataset.tab && career.profile) showMenu(dataset.tab);
+  if (dataset.garageTab) {
+    career = { ...career, garageTab: dataset.garageTab };
     persist();
-    updateMenu();
+    updateGarage();
   }
-  switch (button.dataset.action) {
+  if (dataset.buy) {
+    career = buyUpgrade(career, dataset.buy);
+    if (dataset.buy === 'aero' && career.upgrades.aero === 1) career = { ...career, garageTab: 'aero' };
+    persist();
+    updateGarage();
+    if (dataset.buy === 'aero') aimGarage('rear');
+  }
+  if (dataset.team) {
+    career = changeTeam(career, dataset.team);
+    persist();
+    showMenu('teams');
+  }
+  if (dataset.wing) {
+    tune('wing', dataset.wing);
+    persist();
+    aimGarage('rear');
+    updateGarage();
+    byId('garage-panel').querySelector(`[data-wing="${dataset.wing}"]`)?.focus();
+  }
+  if (dataset.sponsor) {
+    career = acceptSponsor(career, dataset.sponsor);
+    persist();
+    updateGarage();
+  }
+  if (dataset.view) aimGarage(dataset.view);
+  if (dataset.zoom) orbit.zoom = Math.max(0.72, Math.min(1.42, orbit.zoom + Number(dataset.zoom) * 0.12));
+  switch (dataset.action) {
     case 'race': startRace(); break;
     case 'pause': pauseRace(); break;
     case 'resume': resumeRace(); break;
-    case 'menu': tab = 'calendar'; showMenu(); break;
-    case 'garage': tab = 'garage'; showMenu(); break;
-    case 'sound': toggleSound(button); break;
+    case 'save-exit': saveActiveRace(); showMenu('calendar'); break;
+    case 'calendar': showMenu('calendar'); break;
+    case 'garage': showMenu('garage'); break;
+    case 'profile': draft = undefined; showMenu('profile'); break;
+    case 'cancel-profile':
+      draft = undefined;
+      setLanguage(career.profile.language);
+      showMenu(career.screen);
+      break;
+    case 'sound':
+      sound = !sound;
+      career = { ...career, sound };
+      persist();
+      updateSoundButton();
+      enableAudio();
+      playAudio();
+      break;
     case 'season':
       if (!currentEvent(career)) {
-        career = { ...career, season: career.season + 1, results: [] };
+        career = { ...career, season: career.season + 1, results: [], activeRace: null };
         persist();
-        showMenu();
+        showMenu('calendar');
       }
       break;
   }
 });
+
+app.addEventListener('input', event => {
+  const field = event.target;
+  if (field.form?.id === 'driver-form' && field.name === 'driver') draft.name = field.value;
+  if (field.dataset.tune && field.tagName === 'INPUT') tune(field.dataset.tune, field.type === 'range' ? field.valueAsNumber : field.value);
+});
+
+app.addEventListener('change', event => {
+  const field = event.target;
+  if (field.form?.id === 'driver-form') {
+    if (field.name === 'team') draft.team = field.value;
+    if (field.name === 'language') {
+      draft.language = field.value;
+      setLanguage(field.value);
+      refreshLanguage();
+      previewTrack();
+      updateProfile();
+      byId('driver-form').elements.language.focus();
+    }
+  }
+  if (field.dataset.tune) {
+    tune(field.dataset.tune, field.type === 'range' ? field.valueAsNumber : field.value);
+    persist();
+  }
+  if (field.dataset.decal) {
+    career = toggleDecal(career, field.dataset.decal);
+    const slot = decalSlots.find(item => item.id === field.dataset.decal);
+    aimGarage(slot.view);
+    persist();
+    updateGaragePreview();
+  }
+});
+
+app.addEventListener('submit', event => {
+  if (event.target.id !== 'driver-form') return;
+  event.preventDefault();
+  const fields = new FormData(event.target);
+  const next = saveProfile(career, fields.get('driver'), fields.get('language'), fields.get('team'));
+  if (next === career) {
+    event.target.elements.driver.value = '';
+    event.target.elements.driver.reportValidity();
+    return;
+  }
+  career = next;
+  draft = undefined;
+  setLanguage(career.profile.language);
+  persist();
+  showMenu(career.screen);
+});
+
+garagePreview.addEventListener('pointerdown', event => {
+  if (event.button !== 0) return;
+  drag = { id: event.pointerId, x: event.clientX, y: event.clientY };
+  garagePreview.setPointerCapture(event.pointerId);
+});
+garagePreview.addEventListener('pointermove', event => {
+  if (drag?.id !== event.pointerId) return;
+  orbit.azimuth -= (event.clientX - drag.x) * 0.012;
+  orbit.elevation = Math.max(0.12, Math.min(1.07, orbit.elevation + (event.clientY - drag.y) * 0.008));
+  drag.x = event.clientX;
+  drag.y = event.clientY;
+});
+garagePreview.addEventListener('lostpointercapture', () => { drag = undefined; });
+garagePreview.addEventListener('wheel', event => {
+  event.preventDefault();
+  orbit.zoom = Math.max(0.72, Math.min(1.42, orbit.zoom - Math.sign(event.deltaY) * 0.08));
+}, { passive: false });
 
 window.addEventListener('keydown', event => {
   if (mode === 'race' && event.code === 'Escape') {
@@ -395,12 +591,17 @@ window.addEventListener('keydown', event => {
   if (event.code === 'KeyR') {
     race.reset();
     view.snap();
+    saveActiveRace(true);
   }
-  if (event.code === 'KeyC') alternateCamera = !alternateCamera;
+  if (event.code === 'KeyC') {
+    alternateCamera = !alternateCamera;
+    saveActiveRace(true);
+  }
 });
 window.addEventListener('keyup', event => keys.delete(event.code));
 window.addEventListener('blur', () => { keys.clear(); pauseRace(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) pauseRace(); });
+window.addEventListener('pagehide', () => { saveActiveRace(true); });
 overlay.addEventListener('cancel', event => {
   event.preventDefault();
   if (paused) resumeRace();
@@ -410,12 +611,14 @@ function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.25, Math.max(0, (now - (previousFrame ?? now)) / 1000));
   previousFrame = now;
+  if (mode === 'menu' && screen === 'garage') {
+    view.drawGarage(garageCar, orbit, dt);
+    return;
+  }
   const braking = keys.has('KeyS') || keys.has('ArrowDown');
   if (mode === 'race' && !paused) {
     const input = {
-      gas: keys.has('KeyW') || keys.has('ArrowUp'),
-      brake: braking,
-      handbrake: keys.has('Space'),
+      gas: keys.has('KeyW') || keys.has('ArrowUp'), brake: braking, handbrake: keys.has('Space'),
       steering: Number(keys.has('KeyD') || keys.has('ArrowRight')) - Number(keys.has('KeyA') || keys.has('ArrowLeft')),
     };
     accumulator += dt;
@@ -424,23 +627,24 @@ function frame(now) {
       accumulator -= raceStep;
     }
     if (race.order) finishRace();
-    if (lastHudUpdate < 0 || now - lastHudUpdate > 44 || mode === 'result') {
+    else if (now - lastCheckpoint >= 700) {
+      saveActiveRace(true);
+      lastCheckpoint = now;
+    }
+    if (now - lastHudUpdate > 44 || mode === 'result') {
       updateHud();
       lastHudUpdate = now;
     }
-    updateAudio();
+    playAudio();
   }
-  if (mode === 'result') updateAudio();
-  if (mode !== 'menu' || lastHudUpdate < 0 || lastRaceElapsed !== race.elapsed || now - lastHudUpdate >= 100) {
+  if (mode !== 'menu' || now - lastMenuDraw >= 100) {
     const fraction = mode === 'race' && !paused ? accumulator / raceStep : 1;
     view.draw(race, mode, dt, braking, alternateCamera, paused, fraction);
-    if (mode === 'menu') {
-      lastHudUpdate = now;
-      lastRaceElapsed = race.elapsed;
-    }
+    if (mode === 'menu') lastMenuDraw = now;
   }
 }
 
+setLanguage(career.profile?.language);
 try {
   view = createView(circuit);
   circuit.tabIndex = -1;
@@ -448,6 +652,6 @@ try {
   requestAnimationFrame(frame);
 } catch {
   view = undefined;
-  updateMenu();
-  notify('3D pist başlatılamadı. WebGL 2 destekli bir tarayıcı ve donanım hızlandırması gerekiyor.');
+  showMenu();
+  notify(t('webglError'));
 }

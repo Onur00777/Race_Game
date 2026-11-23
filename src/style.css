@@ -130,6 +130,92 @@ dialog p { margin: 12px 0; color: #d7c9bb; }
 .result-grid b { font: 750 1.42rem var(--display); }
 #notice { position: fixed; z-index: 1; right: 21px; bottom: 12px; max-width: min(370px, calc(100vw - 42px)); padding: 10px 13px; background: #211d19; border: 1px solid #ff754e66; border-radius: 4px; }
 
+.hero .saved-lap { margin: 15px 0 0; font-size: .86rem; color: #ffd0ae; }
+.championship li > span:nth-child(3) { overflow-wrap: anywhere; }
+
+.driver-screen { display: grid; flex: 1; align-items: center; padding: 40px clamp(22px, 5.3vw, 86px); }
+.profile-card { width: min(100%, 660px); padding: clamp(22px, 4vw, 43px); border: 1px solid #f7d9b337; border-top: 3px solid var(--orange); border-radius: 8px; background: #151919f3; box-shadow: 0 24px 86px #0006; }
+.profile-top { display: flex; justify-content: space-between; align-items: start; gap: 17px; }
+.profile-top h1, .garage-heading h1 { max-width: initial; margin: 0; font: italic 810 clamp(32px, 5vw, 62px)/1 var(--display); letter-spacing: -.055em; text-transform: none; text-shadow: none; }
+.profile-card > p { margin: 13px 0 24px; color: #d1c6b7; }
+.profile-top label, .profile-name { display: grid; gap: 6px; font-size: .82rem; }
+.profile-top label { flex: none; color: #deccba; }
+.profile-name input, .profile-top select, .tune-field select { min-height: 42px; width: 100%; border-radius: 4px; border: 1px solid #fce1cc40; color: inherit; background: #101414; padding: 8px 10px; font: inherit; }
+.profile-name input { font-size: 1.04rem; }
+.profile-name input:focus-visible, select:focus-visible, input[type="range"]:focus-visible, input[type="color"]:focus-visible { outline: 2px solid #ffb297; outline-offset: 2px; }
+.team-choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 19px 0 0; padding: 0; border: 0; min-width: 0; }
+.team-choices legend { margin-bottom: 8px; padding: 0; font-size: .82rem; font-weight: 650; }
+.team-choices label { position: relative; display: grid; gap: 4px; align-content: start; min-width: 0; min-height: 86px; padding: 10px 11px; border: 1px solid #fff3; border-left: 3px solid var(--team); border-radius: 4px; background: #ffffff0a; cursor: pointer; }
+.team-choices label:has(input:checked) { border-color: var(--team); background: #ffffff16; }
+.team-choices input { margin: 0 0 3px; justify-self: start; accent-color: var(--team); }
+.team-choices strong { font-size: .88rem; }
+.team-choices small { font-size: .72rem; color: #d3c6bb; }
+.profile-actions { display: flex; align-items: center; gap: 12px; margin-top: 24px; }
+
+.in-garage { background: radial-gradient(ellipse at 35% 15%, #202729, #111414 65%); }
+.in-garage .shade { display: none; }
+.garage-screen { padding: 22px clamp(19px, 5.3vw, 86px) 32px; }
+.garage-heading { display: flex; justify-content: space-between; align-items: end; gap: 16px; margin-bottom: 19px; }
+.garage-heading h1 { font-size: clamp(36px, 5.5vw, 62px); }
+.garage-heading p { margin: 5px 0 0; color: #c8b9aa; }
+.garage-layout { --preview-height: clamp(375px, 54vh, 590px); display: grid; grid-template-columns: minmax(0, 1.61fr) minmax(315px, 1fr); gap: 15px; align-items: start; }
+.garage-stage, .workbench { min-width: 0; border: 1px solid #f7d9b32d; border-radius: 8px; background: #171a1b; overflow: hidden; }
+.garage-preview { position: relative; width: 100%; height: var(--preview-height); background: #11171d; cursor: grab; touch-action: none; }
+.garage-preview:active { cursor: grabbing; }
+#garage-preview #circuit { position: absolute; }
+.studio-controls { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 12px; border-block: 1px solid var(--line); }
+.studio-controls > div { display: flex; gap: 5px; }
+.studio-controls button { border: 1px solid #ffffff26; background: #ffffff08; border-radius: 4px; padding: 5px 9px; font-size: .75rem; font-weight: 650; }
+.studio-controls button:hover { border-color: var(--orange); }
+.studio-controls p { margin: 0; font-size: .72rem; color: #c3b8ac; text-align: center; }
+.garage-stats { display: grid; grid-template-columns: 1fr 1fr 1.12fr; }
+.garage-stats > div { display: grid; gap: 3px; padding: 12px 14px; min-width: 0; }
+.garage-stats > div + div { border-left: 1px solid var(--line); }
+.garage-stats small { font-size: .72rem; color: var(--muted); }
+.garage-stats b { font: 730 clamp(18px, 2.3vw, 29px)/1 var(--display); }
+.garage-stats b span { font-size: .56em; font-weight: 650; color: #ecc0a5; }
+.garage-tabs { display: grid; grid-template-columns: 1fr 1fr 1.28fr 1.48fr; gap: 4px; min-height: 57px; padding: 0 7px; border-bottom: 1px solid var(--line); }
+.garage-tabs button { font-size: clamp(.70rem, 1.05vw, .88rem); text-wrap: balance; line-height: 1.15; }
+.garage-panel { max-height: calc(var(--preview-height) + 35px); overflow-y: auto; scrollbar-gutter: stable; padding: 16px 14px 20px; }
+.work-title { margin: 0 0 9px; font: 730 1.25rem/1.2 var(--display); }
+.work-row { display: flex; align-items: center; justify-content: space-between; gap: 11px; min-height: 87px; padding: 11px 0; border-bottom: 1px solid var(--line); }
+.work-row h3 { margin: 1px 0 3px; font: 730 1.04rem/1.2 var(--display); }
+.work-row p, .work-row small, .tune-slider small, .tune-field small { margin: 0; color: var(--muted); font-size: .73rem; }
+.work-row small { color: #eab094; }
+.work-row button { flex: none; font-size: .76rem; }
+.tune-slider, .tune-field { display: grid; gap: 5px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.tune-slider strong, .tune-field strong, .color-input strong { font-size: .89rem; }
+.tune-field select { min-height: 34px; font-size: .85rem; }
+.tune-slider span, .color-input { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.tune-slider output { color: #ffb89d; font: 680 .95rem/1 var(--display); font-variant-numeric: tabular-nums; }
+.tune-slider input { margin-inline: 0; width: 100%; accent-color: var(--orange); }
+.wing-options, .decal-options { display: grid; gap: 8px; min-width: 0; margin: 12px 0; padding: 0; border: 0; }
+.wing-options { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.wing-options legend, .decal-options legend { margin-bottom: 8px; padding: 0; font-size: .84rem; font-weight: 700; }
+.wing-option { display: grid; justify-items: start; align-items: start; align-content: space-between; gap: 4px; border-radius: 4px; border: 1px solid #ffffff26; background: #ffffff0a; padding: 9px 7px; text-align: left; }
+.wing-option[aria-pressed="true"] { border-color: var(--orange); background: #ff754e20; }
+.wing-option:disabled { opacity: .59; }
+.wing-option strong, .wing-option small { font-size: .72rem; }
+.wing-option small { color: #cbbbae; }
+.wing-diagram { align-self: end; height: 19px; width: min(100%, 52px); margin-bottom: 2px; background: #e2b7a4; }
+.wing-touring { clip-path: polygon(0 12%, 100% 12%, 100% 38%, 74% 38%, 74% 100%, 65% 100%, 65% 38%, 35% 38%, 35% 100%, 26% 100%, 26% 38%, 0 38%); }
+.wing-swan { clip-path: polygon(0 47%, 21% 47%, 32% 4%, 47% 4%, 47% 100%, 39% 100%, 39% 26%, 26% 63%, 0 63%, 0 47%, 55% 47%, 55% 4%, 69% 4%, 83% 47%, 100% 47%, 100% 64%, 77% 64%, 64% 26%, 64% 100%, 55% 100%, 55% 64%, 0 64%); }
+.wing-twin { clip-path: polygon(0 8%, 100% 8%, 100% 59%, 74% 59%, 74% 100%, 64% 100%, 64% 59%, 36% 59%, 36% 100%, 26% 100%, 26% 59%, 0 59%, 0 47%, 92% 47%, 92% 24%, 8% 24%, 8% 47%, 0 47%); }
+.color-input { padding: 11px 0; }
+.color-input input { width: 54px; height: 33px; padding: 2px; background: #181b1b; border: 1px solid #fff4; border-radius: 4px; cursor: pointer; }
+.garage-empty, .pending-setup, .decal-options p { margin: 0 0 10px; color: #d7c8bc; font-size: .82rem; }
+.pending-setup { border-left: 2px solid var(--orange); padding-left: 8px; }
+.sponsor-row { min-height: 63px; }
+.sponsor-row h3 { color: var(--sponsor); font-style: italic; }
+.decal-options label { display: flex; align-items: center; gap: 6px; font-size: .86rem; color: #e7d7c8; }
+.decal-options input { accent-color: var(--orange); }
+.decal-options:disabled { opacity: .60; }
+
+@media (max-width: 900px) {
+  .garage-layout { grid-template-columns: minmax(0, 1.3fr) minmax(285px, 1fr); }
+  .studio-controls p { display: none; }
+}
+
 @media (max-width: 715px) {
   .topbar { grid-template-columns: 1fr 1fr; gap: 0 10px; padding: 12px 16px 0; }
   .top-end { grid-column: 2; grid-row: 1; gap: 10px; }
@@ -145,6 +231,12 @@ dialog p { margin: 12px 0; color: #d7c9bb; }
   .paddock { grid-template-columns: 1fr; }
   .drive-help { font-size: .65rem; }
   .race-bottom { gap: 8px; }
+  .driver-screen { padding: 24px 15px; }
+  .garage-screen { padding: 17px 13px 24px; }
+  .garage-layout { --preview-height: clamp(290px, 50vh, 430px); grid-template-columns: 1fr; }
+  .garage-panel { max-height: none; }
+  .garage-stats > div { padding: 10px 7px; }
+  .garage-tabs button { font-size: .76rem; }
 }
 
 @media (max-width: 385px) {
@@ -153,6 +245,13 @@ dialog p { margin: 12px 0; color: #d7c9bb; }
   .entry { gap: 6px; grid-template-columns: 43px minmax(0, 1fr) auto; }
   .speed { min-width: 75px; }
   .condition { gap: 3px; }
+  .profile-top { gap: 7px; }
+  .profile-top h1 { font-size: 28px; }
+  .team-choices { grid-template-columns: 1fr; }
+  .team-choices label { min-height: 0; grid-template-columns: auto 1fr; align-items: center; padding: 6px 7px; }
+  .team-choices small { grid-column: 2; }
+  .top-end { gap: 5px; }
+  .top-end button { padding: 4px 5px; font-size: .70rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
