@@ -366,7 +366,7 @@ export function createView(canvas, quality) {
         shakePhase = 0;
       }
     }
-    effects.update(dt, mode === 'race' && !paused ? race.player : null, canvas.height);
+    effects.update(dt, mode === 'race' && !paused ? race : null, canvas.height);
     skidMarks.update(race, mode === 'race' && !paused, mode === 'race' || mode === 'result');
     const cars = race.cars.map((car, index) => renderPose(car, race.previousPoses[index], fraction));
     racingLine.update(race, cars[0], mode === 'race' && guide);
