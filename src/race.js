@@ -2,6 +2,7 @@ import { CatmullRomCurve3, Vector3 } from 'three';
 import { rivals } from './career.js';
 import { railRunoff, resolveBarrierContact, resolveVehicleContact, velocity } from './contact.js';
 import { vehicleStats } from './setup.js';
+import { difficultyId } from './difficulty.js';
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const wrap = (value, period) => ((value % period) + period) % period;
@@ -87,7 +88,7 @@ export function createTrack(event) {
 
 const bodyState = () => ({ speed: 0, lateral: 0, spin: 0, steer: 0, damage: 0, frontDamage: 0, rearDamage: 0 });
 
-export function createRace(track, team, upgrades, setup, appearance) {
+export function createRace(track, team, upgrades, setup, appearance, options = {}) {
   const finish = track.length * track.event.laps;
   const player = {
     id: 'player', color: team.color, station: -18, ...track.at(-18, 2.5), ...bodyState(),
@@ -101,7 +102,7 @@ export function createRace(track, team, upgrades, setup, appearance) {
       ...track.at(station, offset), ...bodyState(), finishTime: null };
   });
   const cars = [player, ...opponents];
-  const race = { track, player, opponents, cars, previousPoses: cars.map(visualPose),
+  const race = { track, player, opponents, cars, difficulty: difficultyId(options.difficulty), previousPoses: cars.map(visualPose),
     elapsed: 0, countdown: 3, order: null, impact: null, throttle: false, backfire: null, engineLevel: upgrades.engine };
   const { topSpeed, acceleration, braking, grip, turn: turnResponse, brakeStability, load } = vehicleStats(team, upgrades, setup);
   const surfaceGrip = track.event.surfaceGrip;
