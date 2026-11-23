@@ -81,12 +81,12 @@ function nightLights(scene, track) {
       const { post, distance } = nearest[index];
       light.position.set(post.point.x, post.height, post.point.z);
       light.target.position.set(post.aim.x, 0, post.aim.z);
-      light.intensity = 405 * (1 - T.MathUtils.smoothstep(distance, 62, 125));
+      light.intensity = 320 * (1 - T.MathUtils.smoothstep(distance, 62, 125));
     }
     const fx = Math.sin(yaw), fz = Math.cos(yaw);
     head.position.set(x + fx * 1.89, 0.57, z + fz * 1.89);
     head.target.position.set(x + fx * 40, -0.45, z + fz * 40);
-    head.intensity = 380;
+    head.intensity = 205;
   };
 }
 
@@ -94,6 +94,7 @@ export function lightTrack(scene, track, assets) {
   const event = track.event;
   const view = lighting[event.weather];
   scene.background = new T.Color(view.colors[0]);
+  scene.backgroundIntensity = event.weather === 'night' ? 0.50 : 1;
   scene.fog = new T.FogExp2(view.colors[1], view.fog);
   scene.backgroundRotation.y = event.skyYaw;
   scene.environmentRotation.y = event.skyYaw;

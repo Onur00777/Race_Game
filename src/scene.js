@@ -406,7 +406,7 @@ export function createView(canvas, quality) {
     }
     camera.lookAt(aim);
     cameraReady = true;
-    pipeline.render(scene, camera, dt, race.track.event.weather === 'night' ? 1.45 : 1);
+    pipeline.render(scene, camera, dt, race.track.event.weather === 'night' ? 1.18 : 1);
   }
 
   return { setTrack, draw, drawGarage, snap, setQuality };
