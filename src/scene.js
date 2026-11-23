@@ -6,7 +6,8 @@ import { createCarModel, sharedCarResources, updateCarModel } from './car-model.
 import { createRaceEffects } from './race-effects.js';
 import { renderPose } from './race.js';
 import { createStudio } from './studio.js';
-import { createRenderPipeline, fitShadowResolution, qualityMode } from './render-pipeline.js';
+import { createRenderPipeline, fitShadowResolution } from './render-pipeline.js';
+import { qualityMode } from './graphics-settings.js';
 import { createRacingLineView } from './racing-line-view.js';
 import { addTrackDetails } from './track-details.js';
 

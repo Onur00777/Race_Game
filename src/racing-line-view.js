@@ -38,7 +38,7 @@ export function createRacingLineView() {
       varying vec2 vLine;
       void main() {
         float side = abs(vLine.x - .5);
-        float mark = abs(fract(vLine.y / 3.3 - side * .60 + .35) - .50);
+        float mark = abs(fract(vLine.y / 3.3 + side * .60 + .35) - .50);
         float arrow = 1. - smoothstep(.10, .19, mark);
         float edges = 1. - smoothstep(.35, .50, side);
         float fade = smoothstep(0., 4., vLine.y) * (1. - smoothstep(101., 148., vLine.y));

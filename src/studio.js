@@ -2,9 +2,6 @@ import * as T from 'three';
 import { createCarModel, updateCarModel } from './car-model.js';
 import { fitShadowResolution } from './render-pipeline.js';
 
-export const defaultOrbit = { azimuth: 0.96, elevation: 0.36, zoom: 1 };
-export const garageAngles = { front: 0.80, side: 1.57, rear: 2.58 };
-
 export function createStudio(assets, shadowSize) {
   const scene = new T.Scene();
   scene.background = new T.Color('#11171d');

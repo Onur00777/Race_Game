@@ -3,6 +3,8 @@ import { escapeHtml, getLanguage, local, t, translatedField } from './i18n.js';
 import { compounds, decalSlots, sliders, sponsors, vehicleStats, wings } from './setup.js';
 
 export const garageTabs = { parts: 'parts', tuning: 'tuning', aero: 'aero', sponsors: 'livery' };
+export const defaultOrbit = { azimuth: 0.96, elevation: 0.36, zoom: 1 };
+export const garageAngles = { front: 0.80, side: 1.57, rear: 2.58 };
 export const garageMoney = amount => money(amount, getLanguage());
 const selected = active => active ? 'selected' : '';
 const checked = active => active ? 'checked' : '';

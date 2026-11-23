@@ -116,11 +116,23 @@ const cabinShape = loft([
   [0.02, 0.559, 0.70, 1.043, 1.179], [0.27, 0.58, 0.69, 0.94, 1.065],
   [0.51, 0.619, 0.68, 0.81, 0.916], [0.79, 0.651, 0.68, 0.70, 0.758], [0.89, 0.64, 0.68, 0.691, 0.711],
 ]);
-const roofShape = loft([
-  [-0.83, 0.43, 1.09, 1.10, 1.134], [-0.63, 0.469, 1.13, 1.15, 1.194],
-  [-0.39, 0.48, 1.146, 1.167, 1.217], [-0.12, 0.478, 1.144, 1.162, 1.205],
-  [0.08, 0.43, 1.107, 1.121, 1.168], [0.19, 0.38, 1.078, 1.091, 1.123],
-]);
+function separateRoof(geometry) {
+  const windows = [], roof = [];
+  const index = geometry.index.array;
+  const positions = geometry.getAttribute('position');
+  for (let i = 0; i < index.length; i += 3) {
+    const triangle = [index[i], index[i + 1], index[i + 2]];
+    const z = triangle.reduce((sum, vertex) => sum + positions.getZ(vertex), 0) / 3;
+    const y = triangle.reduce((sum, vertex) => sum + positions.getY(vertex), 0) / 3;
+    const x = triangle.reduce((sum, vertex) => sum + Math.abs(positions.getX(vertex)), 0) / 3;
+    const painted = z >= -0.83 && z <= 0.19 && y >= 1.08 && x < 0.37;
+    (painted ? roof : windows).push(...triangle);
+  }
+  geometry.setIndex([...windows, ...roof]);
+  geometry.addGroup(0, windows.length, 0);
+  geometry.addGroup(windows.length, roof.length, 1);
+}
+separateRoof(cabinShape);
 const wingShape = loft([
   [-2.04, 0.99, 1.01, 1.02, 1.037], [-1.97, 1.01, 0.993, 1.018, 1.046],
   [-1.84, 1.01, 0.975, 1.022, 1.052], [-1.71, 1.0, 0.975, 1.01, 1.033], [-1.66, 0.96, 0.99, 0.999, 1.012],
@@ -161,7 +173,7 @@ spokeParts.forEach(part => part.dispose());
 
 export const sharedCarResources = new Set([box, rubber, carbon, inset, aluminum, rotor, caliper, mirror,
   glass, headlight, tailLight, brakeLight, lensHousing, tire, rimLip, brakeDisc, center, tailPipe, intake, shadowPlane, shadowMaterial,
-  bodyShape, cabinShape, roofShape, wingShape, diffuserPanel, grillPanel, tailHousing, tailStrip, headStrip, spokes,
+  bodyShape, cabinShape, wingShape, diffuserPanel, grillPanel, tailHousing, tailStrip, headStrip, spokes,
   splitterShape, sidewall, rotorFace, exhaustTube, flameShape, flameMaterial, flameCore]);
 
 const stockParts = { tires: 0, brakes: 0, aero: 0, engine: 0 };
@@ -359,8 +371,7 @@ export function createCarModel(color) {
   const paint = new T.MeshPhysicalMaterial({ color, metalness: 0.27, roughness: 0.34,
     clearcoat: 0.92, clearcoatRoughness: 0.15, envMapIntensity: 1.35 });
   const body = mount(shell, bodyShape.clone(), paint);
-  mount(shell, cabinShape, glass);
-  mount(shell, roofShape, paint);
+  mount(shell, cabinShape, [glass, paint]);
   const wing = addWing(shell);
   const decals = decalMounts.map(({ slot, geometry }) => {
     const mesh = mount(shell, geometry, inset);

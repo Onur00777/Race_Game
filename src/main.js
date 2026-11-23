@@ -2,14 +2,12 @@ import { acceptSponsor, buyUpgrade, changeTeam, currentEvent, currentTeam, event
   loadCareer, normalizeLoadout, saveCareer, saveProfile, standings, teamById, teams, toggleDecal } from './career.js';
 import { createRace, createTrack, raceStep } from './race.js';
 import { eventForResume, hasSavedRace, raceCheckpoint, restoreRace } from './progress.js';
-import { createView } from './scene.js';
-import { defaultOrbit, garageAngles } from './studio.js';
 import { decalSlots, normalizeSetup, sliders } from './setup.js';
-import { driverForm, garageMoney, garagePanel, garageStats, garageTabs, previewPart, setupValue } from './garage.js';
+import { defaultOrbit, driverForm, garageAngles, garageMoney, garagePanel, garageStats, garageTabs, previewPart, setupValue } from './garage.js';
 import { escapeHtml, getLanguage, setLanguage, t, translatedField, upper } from './i18n.js';
 import { createAudio, updateAudio } from './audio.js';
 import { animateAmount, createWallet } from './wallet.js';
-import { graphicsModes, qualityMode } from './render-pipeline.js';
+import { graphicsModes, qualityMode } from './graphics-settings.js';
 import { circuitMap, drawBriefingMap } from './circuit-map.js';
 import { legacyEvents } from './events.js';
 import './style.css';
@@ -746,14 +744,19 @@ function frame(now) {
   }
 }
 
-setLanguage(career.profile?.language);
-try {
-  view = createView(circuit, career.graphics);
-  circuit.tabIndex = -1;
-  showMenu();
-  requestAnimationFrame(frame);
-} catch {
-  view = undefined;
-  showMenu();
-  notify(t('webglError'));
+async function startGame() {
+  setLanguage(career.profile?.language);
+  try {
+    const { createView } = await import('./scene.js');
+    view = createView(circuit, career.graphics);
+    circuit.tabIndex = -1;
+    showMenu();
+    requestAnimationFrame(frame);
+  } catch {
+    view = undefined;
+    showMenu();
+    notify(t('webglError'));
+  }
 }
+
+startGame();

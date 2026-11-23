@@ -3,23 +3,18 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-
-export const graphicsModes = {
-  performance: { pixelRatio: 1, scale: 0.9, pixels: 1920 * 1080, shadow: 1024, samples: 0, bloom: false },
-  high: { pixelRatio: 1.6, scale: 1, pixels: 2688 * 1512, shadow: 2048, samples: 2, bloom: true },
-  ultra: { pixelRatio: 2.5, scale: 2, pixels: 3840 * 2160, shadow: 4096, samples: 4, bloom: true },
-};
-
-export const qualityMode = value => Object.hasOwn(graphicsModes, value) ? value : 'high';
+import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
+import { graphicsModes, qualityMode } from './graphics-settings.js';
 
 export function createRenderPipeline(renderer, mode) {
   let quality = graphicsModes[qualityMode(mode)];
   const hdr = renderer.extensions.has('EXT_color_buffer_float');
   const gl = renderer.getContext();
-  const supportedSamples = hdr ? gl.getInternalformatParameter(gl.RENDERBUFFER, gl.RGBA16F, gl.SAMPLES) : [];
+  const supportedSamples = hdr ? (gl.getInternalformatParameter(gl.RENDERBUFFER, gl.RGBA16F, gl.SAMPLES) ?? []) : [];
   let composer;
   let scenePass;
   let bloom;
+  let smaa;
 
   function resize(width, height) {
     const ratio = Math.min(quality.pixelRatio, Math.max(quality.scale, window.devicePixelRatio * quality.scale),
@@ -34,10 +29,13 @@ export function createRenderPipeline(renderer, mode) {
       composer = new EffectComposer(renderer, target);
       scenePass = new RenderPass(null, null);
       bloom = new UnrealBloomPass(new T.Vector2(1, 1), 0.28, 0.32, 1.16);
+      smaa = new SMAAPass();
       composer.addPass(scenePass);
       composer.addPass(bloom);
+      composer.addPass(smaa);
       composer.addPass(new OutputPass());
     }
+    smaa.enabled = samples < 2;
     composer.renderTarget1.samples = composer.renderTarget2.samples = samples;
     composer.setSize(width, height);
     composer.setPixelRatio(ratio);
@@ -54,9 +52,17 @@ export function createRenderPipeline(renderer, mode) {
     composer.render(dt);
   }
 
+  function setQuality(mode) {
+    quality = graphicsModes[qualityMode(mode)];
+    if (composer && !quality.bloom) {
+      for (const pass of composer.passes) pass.dispose();
+      composer.dispose();
+      composer = null;
+    }
+  }
+
   return {
-    resize, render,
-    setQuality: mode => { quality = graphicsModes[qualityMode(mode)]; },
+    resize, render, setQuality,
     shadowSize: () => Math.min(quality.shadow, renderer.capabilities.maxTextureSize),
   };
 }
