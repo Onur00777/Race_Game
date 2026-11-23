@@ -4,7 +4,7 @@ import { currentTeam, events, finishEvent, newCareer, normalizeLoadout } from '.
 import { difficulties, purseFor } from '../src/difficulty.js';
 import { eventDifficulty, raceCheckpoint, restoreRace } from '../src/progress.js';
 import { createRace, createTrack, raceStep } from '../src/race.js';
-import { wakeFactor } from '../src/race-ai.js';
+import { createRaceIntel, wakeFactor } from '../src/race-ai.js';
 
 const order = ['player', 'deniz', 'selin', 'ece', 'mert'];
 
@@ -55,4 +55,25 @@ test('drafting depends on the physical wake and never on race position', () => {
   assert.equal(wakeFactor(track, ahead, [behind, ahead], gap), 0);
   ahead.offset = 3.5;
   assert.equal(wakeFactor(track, behind, [behind, ahead], gap), 0);
+});
+
+test('traffic changes the passing lane and only Legend covers an approaching challenger', () => {
+  const track = createTrack(events[0]);
+  const driver = (id, station, offset, speed) => ({ id, ...track.at(station, offset), station, offset, speed,
+    lateral: 0, lane: 0, onRoad: true, pace: 1 });
+  const behind = driver('player', 26, 0.8, 34);
+  const ahead = driver('player', 50, 0, 26);
+  for (const tier of Object.keys(difficulties)) {
+    const rival = driver('deniz', 38, 0, 30);
+    const { controls } = createRaceIntel(track, tier, [rival], (a, b) => a - b);
+    const free = controls(rival, [rival], 15, raceStep);
+    const defend = controls(rival, [rival, behind], 15, raceStep);
+    const attack = controls(rival, [rival, ahead], 15, raceStep);
+    assert.equal(defend.gas, free.gas);
+    assert.equal(defend.draft, 0);
+    if (tier === 'legend') assert.ok(defend.intent > free.intent + 1.2);
+    else assert.equal(defend.intent, free.intent);
+    assert.ok(attack.intent - free.intent > 2);
+    assert.equal(attack.draft > 0, tier === 'hard' || tier === 'legend');
+  }
 });

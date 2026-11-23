@@ -20,6 +20,7 @@ test('previous career saves retain rewards and make new garage fields available'
   assert.equal(career.team, legacy.team);
   assert.deepEqual(career.upgrades, { ...legacy.upgrades, aero: 0 });
   assert.equal(career.setup.frontCamber, -1.5);
+  assert.equal(career.condition.damage, 0);
 });
 
 test('race resumes with lap, damage, opponent positions and the original loadout', () => {
@@ -32,7 +33,7 @@ test('race resumes with lap, damage, opponent positions and the original loadout
   race.elapsed = 72.5;
   race.countdown = 0;
   Object.assign(race.player, track.at(track.length + 72), {
-    lap: 1, station: track.length + 72, speed: 22, damage: 27, frontDamage: 0.31, lapStarted: 52, bestLap: 48.8,
+    lap: 1, station: track.length + 72, speed: 22, damage: 27, frontDamage: 0.31, rightDamage: 0.41, lapStarted: 52, bestLap: 48.8,
   });
   race.opponents[0].finishTime = 68.75;
   career = { ...career, activeRace: raceCheckpoint(career, race, loadout, true), sponsor: null, decals: [] };
@@ -40,6 +41,7 @@ test('race resumes with lap, damage, opponent positions and the original loadout
   const restored = restoreRace(loadCareer(storage), track);
   assert.equal(restored.race.elapsed, 72.5);
   assert.equal(restored.race.player.damage, 27);
+  assert.equal(restored.race.player.rightDamage, 0.41);
   assert.equal(restored.race.player.bestLap, 48.8);
   assert.equal(restored.race.opponents[0].finishTime, 68.75);
   assert.equal(restored.alternateCamera, true);
