@@ -189,7 +189,7 @@ dialog p { margin: 12px 0; color: #d7c9bb; }
 .garage-heading { display: flex; justify-content: space-between; align-items: end; gap: 16px; margin-bottom: 19px; }
 .garage-heading h1 { font-size: clamp(36px, 5.5vw, 62px); }
 .garage-heading p { margin: 5px 0 0; color: #c8b9aa; }
-.garage-layout { --preview-height: clamp(375px, 54vh, 590px); display: grid; grid-template-columns: minmax(0, 1.61fr) minmax(315px, 1fr); gap: 15px; align-items: start; }
+.garage-layout { --preview-height: clamp(352px, 49vh, 580px); display: grid; grid-template-columns: minmax(0, 1.61fr) minmax(315px, 1fr); gap: 15px; align-items: start; }
 .garage-stage, .workbench { min-width: 0; border: 1px solid #f7d9b32d; border-radius: 8px; background: #171a1b; overflow: hidden; }
 .garage-preview { position: relative; width: 100%; height: var(--preview-height); background: #11171d; cursor: grab; touch-action: none; }
 .garage-preview:active { cursor: grabbing; }
@@ -273,6 +273,8 @@ button, input, output, select, meter { font-variant-numeric: tabular-nums; }
 
 @media (max-width: 900px) {
   .garage-layout { grid-template-columns: minmax(0, 1.3fr) minmax(285px, 1fr); }
+  .garage-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .garage-stats > div:nth-child(n + 4) { border-top: 1px solid var(--line); }
   .studio-controls p { display: none; }
 }
 
@@ -299,8 +301,6 @@ button, input, output, select, meter { font-variant-numeric: tabular-nums; }
   .garage-layout { --preview-height: clamp(290px, 50vh, 430px); grid-template-columns: 1fr; }
   .garage-panel { max-height: none; }
   .garage-stats > div { padding: 10px 7px; }
-  .garage-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .garage-stats > div:nth-child(n + 4) { border-top: 1px solid var(--line); }
   .garage-tabs button { font-size: .76rem; }
 }
 
