@@ -30,7 +30,7 @@ Duraklat menüsünden ideal çizgiyi açıp kapatabilir ve görüntü kalitesini
 
 İlk girişte sürücünün adını, başlangıç takımını ve oyun dilini seç. Türkçe ve İngilizce arasında Profil ekranından geçebilirsin.
 
-Kariyer ve açık yarış aynı tarayıcıda, aynı site adresinde otomatik kaydedilir. Yarışta tur, süre, konum, hız, rakipler ve hasar düzenli olarak kaydedilir. Sekmeyi kapatıp ya da sayfayı yenileyip takvimden **Yarışa devam et** ile kaldığın yerden dönebilirsin. Duraklat menüsünde kaydedip takvime dönme ve mevcut yarışı yeniden başlatma seçenekleri var.
+Kariyer ve açık yarış aynı tarayıcıda, aynı site adresinde otomatik kaydedilir. Yarışta tur, süre, konum, hız, rakipler, zorluk, lastik izleri ve hasar kaydedilir. Sekmeyi kapatıp ya da sayfayı yenileyip takvimden **Yarışa devam et** ile kaldığın yerden dönebilirsin. Duraklat menüsünden takvime dönebilir, hasarı koruyarak yarışı yeniden başlatabilir veya yarıştan çekilebilirsin.
 
 Yeni sezonda takvim ve puanlar sıfırlanır. Kazanç, takım erişimi ve yükseltmeler korunur.
 
@@ -40,6 +40,7 @@ Yeni sezonda takvim ve puanlar sıfırlanır. Kazanç, takım erişimi ve yükse
 - **Ayarlar** bölümünden dişli oranını, lastik hamurunu, ön ve arka kamberi ve fren dengesini değiştir.
 - **Aerodinamik** bölümünde satın aldığın seviyeye göre arka kanat şeklini, açısını ve rengini seç. Kanat açısı arttıkça yere basma kuvveti artar, son hız biraz düşer.
 - **Sponsor ve çıkartmalar** bölümünde sözleşme yapıp çıkartmayı kaputa, kapılara veya arka tampona yerleştir. En az bir çıkartma takılıyken yarış bitirirsen sponsor bonusu alırsın.
+- **Servis** bölümünde gövde durumunu, dört bölgenin hasarını ve onarım bedelini gör. Hasarlı bölgeyi seçerek kamerayı o tarafa çevirebilirsin. Araç %0 durumdaysa ve kasadaki para onarıma yetmiyorsa, kalan tutarı gelecek yarış ödüllerinden ödeyebilirsin.
 
 Aracı sürükleyerek çevir, kaydırarak yakınlaştır veya ön, yan ve arka görünüm düğmelerini kullan. Yarıda kaydedilmiş bir yarış, başladığı takım ve araç ayarlarıyla devam eder. Garaj değişiklikleri sonraki yarışta uygulanır.
 
@@ -49,11 +50,15 @@ Parça kartının üzerine gelerek veya klavyeyle odaklanarak sonraki seviyeyi �
 
 Sedir Pisti iki turluk bir gün batımı sprinti, Körfez Virajları dört turluk bir gece yarışı, Zirve Grand Prix altı turluk bir dayanıklılık yarışı ve Marmara GP dört turluk bir öğle yarışı. Takvim, sonraki yarışın haritasını, tur sayısını, hava durumunu ve toplam ödül havuzunu gösterir.
 
+Yarışa başlamadan önce **Kolay (1,00×)**, **Orta (1,25×)**, **Zor (1,60×)** veya **Efsane (2,25×)** seç. Ödül çarpanı sıralama ödülüne uygulanır. Zor ve Efsane rakipler düzlükte hava koridorunu kullanır. Efsane rakipler viraj girişinde fren basıncını kademeli bırakır ve bir rakip arkadan yaklaştığında iç hattı kapatmaya çalışır. Rakiplerin performansı aracın fiziğine ve pistteki trafiğe bağlıdır.
+
 ## Çarpışma ve hasar
 
-Rakipler darbenin yönüne ve hızına göre savrulur. Bordürün dışındaki çakıl hızını düşürür. Bariyer veya başka bir araçla sert temas, gövdeyi ezer ve yarış sonuna kadar hızlanmayı ve tutuşu azaltır. Gövde durumunu hız göstergesinin altında görebilirsin. Araba bir sonraki yarışa onarılmış olarak çıkar.
+Sert fren, el freni ve yüksek yanal kayma her teker için ayrı lastik izi, duman ve lastik sesi üretebilir. Rakipler de aynı kayma ve temas modelini kullanır.
 
-Çarpışma testleri için `npm test` çalıştır.
+Çarpışma hasarı darbenin hızına, açısına ve gövde bölgesine göre değişir. Gövde %70’e kadar tam performans sağlar. %69–40 aralığında son hız, tutuş ve yere basma kuvveti düşer. %39 ve altında motor gücü azalır, asimetrik hasar aracı yana çekebilir. %35’in altında kaput duman çıkarır. %0, ödülsüz ve puansız mekanik arızadır (DNF). Hasar onarılana kadar sonraki yarışa taşınır.
+
+Fizik, kariyer ve kayıt testleri için `npm test` çalıştır.
 
 ## Görsel varlıklar
 
