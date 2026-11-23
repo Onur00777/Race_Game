@@ -23,7 +23,22 @@ Terminalde görünen yerel adresi aç. Dağıtıma hazır dosyaları oluşturmak
 - **C** — Kamera mesafesini değiştir
 - **Esc** — Duraklat / devam et
 
-Kariyer otomatik olarak aynı tarayıcıda kaydedilir. Yeni sezonda takvim ve puanlar sıfırlanır. Kazanç, takım erişimi ve yükseltmeler korunur.
+## Profil ve kayıt
+
+İlk girişte sürücünün adını, başlangıç takımını ve oyun dilini seç. Türkçe ve İngilizce arasında Profil ekranından geçebilirsin.
+
+Kariyer ve açık yarış aynı tarayıcıda, aynı site adresinde otomatik kaydedilir. Yarışta tur, süre, konum, hız, rakipler ve hasar düzenli olarak kaydedilir. Sekmeyi kapatıp ya da sayfayı yenileyip takvimden **Yarışa devam et** ile kaldığın yerden dönebilirsin. Duraklat menüsünde kaydedip takvime dönme ve mevcut yarışı yeniden başlatma seçenekleri var.
+
+Yeni sezonda takvim ve puanlar sıfırlanır. Kazanç, takım erişimi ve yükseltmeler korunur.
+
+## 3D garaj
+
+- **Parçalar** bölümünden motor, lastik, fren ve aerodinamik yükseltmelerini al.
+- **Ayarlar** bölümünden dişli oranını, lastik hamurunu, ön ve arka kamberi ve fren dengesini değiştir.
+- **Aerodinamik** bölümünde satın aldığın seviyeye göre arka kanat şeklini, açısını ve rengini seç. Kanat açısı arttıkça yere basma kuvveti artar, son hız biraz düşer.
+- **Sponsor ve çıkartmalar** bölümünde sözleşme yapıp çıkartmayı kaputa, kapılara veya arka tampona yerleştir. En az bir çıkartma takılıyken yarış bitirirsen sponsor bonusu alırsın.
+
+Aracı sürükleyerek çevir, kaydırarak yakınlaştır veya ön, yan ve arka görünüm düğmelerini kullan. Yarıda kaydedilmiş bir yarış, başladığı takım ve araç ayarlarıyla devam eder. Garaj değişiklikleri sonraki yarışta uygulanır.
 
 ## Çarpışma ve hasar
 
