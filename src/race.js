@@ -134,7 +134,8 @@ export function createRace(track, team, upgrades) {
     const direction = track.at(car.station);
     const ahead = clamp(car.speed * 0.48, 9, 23);
     const bend = Math.abs(angleBetween(direction.yaw, track.at(car.station + ahead).yaw));
-    const target = car.pace * (1 - car.damage * 0.0015) * Math.min(47, 43 / (1 + bend * 1.7));
+    const surfaceLimit = Math.abs(car.offset) > track.event.width / 2 + 0.6 ? 15 : 47;
+    const target = car.pace * (1 - car.damage * 0.0015) * Math.min(surfaceLimit, 43 / (1 + bend * 1.7));
     car.speed = approach(car.speed, target, (car.speed < target ? 9.5 : 21) * dt);
     const motion = velocity(car);
     const previous = car.station;
@@ -166,12 +167,12 @@ export function createRace(track, team, upgrades) {
     if (gas && !brake) {
       player.speed += (player.speed < 0 ? braking : acceleration * power * (1 - Math.max(0, player.speed) / (damagedTopSpeed + 8))) * dt;
     } else if (brake) {
-      player.speed = player.speed > 0 ? Math.max(0, player.speed - braking * dt) : player.speed - 7 * dt;
+      if (player.speed > 0) player.speed = Math.max(0, player.speed - braking * dt);
+      else if (player.speed > -8) player.speed = Math.max(-8, player.speed - 7 * dt);
     }
     const limit = player.onRoad ? damagedTopSpeed : 12;
     if (player.speed > limit) player.speed = approach(player.speed, limit, (player.onRoad ? 13 : 32) * dt);
     if (!newHeading || handbrake) player.speed = approach(player.speed, 0, (handbrake ? 14 : 2.8) * dt);
-    player.speed = Math.max(-8, player.speed);
 
     const speed = Math.abs(player.speed);
     player.steer = approach(player.steer, steering, dt * 5.5);

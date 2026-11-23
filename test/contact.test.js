@@ -54,3 +54,17 @@ test('the race reports hard crashes and resetting preserves damage until the nex
   assert.equal(race.player.spin, 0);
   assert.equal(createRace(track, team, career.upgrades).player.damage, 0);
 });
+
+test('reverse gear limits engine speed without discarding recoil momentum', () => {
+  const career = newCareer();
+  const race = createRace(createTrack(events[0]), currentTeam(career), career.upgrades);
+  const brake = { gas: false, brake: true, steering: 0, handbrake: false };
+  race.countdown = 0;
+  race.player.speed = -15;
+  race.update(1 / 120, brake);
+  assert(race.player.speed < -14);
+
+  race.player.speed = -7.99;
+  race.update(1 / 120, brake);
+  assert.equal(race.player.speed, -8);
+});
