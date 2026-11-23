@@ -1,4 +1,4 @@
-import { buyUpgrade, changeTeam, currentEvent, currentTeam, events, finishEvent, loadCareer, maxUpgrade, money, price, saveCareer, standings, teams, upgrades } from './career.js';
+import { buyUpgrade, changeTeam, currentEvent, currentTeam, events, finishEvent, gameName, loadCareer, maxUpgrade, money, price, saveCareer, standings, teams, upgrades } from './career.js';
 import { createRace, createTrack } from './race.js';
 import { createView } from './scene.js';
 import './style.css';
@@ -9,7 +9,7 @@ app.innerHTML = `
   <div class="shade"></div>
   <div class="game-shell">
     <header class="topbar" id="topbar">
-      <div class="brand"><span class="mark" aria-hidden="true"></span><div>APEX <span>CIRCUIT</span></div></div>
+      <div class="brand" aria-label="${gameName}"><span class="mark" aria-hidden="true"></span><div>KIRMIZI <span>ÇİZGİ</span></div></div>
       <nav aria-label="Kariyer menüsü">
         <button type="button" data-tab="calendar" aria-current="page">Takvim</button>
         <button type="button" data-tab="garage">Garaj</button>

@@ -1,3 +1,5 @@
+export const gameName = 'Kırmızı Çizgi';
+
 export const events = [
   {
     name: 'Sedir Pisti',
@@ -32,7 +34,7 @@ export const events = [
 ];
 
 export const teams = [
-  { id: 'apex', name: 'Apex Works', color: '#f65b38', unlock: 0, payout: 1, power: 0, grip: 0, perk: 'Dengeli başlangıç' },
+  { id: 'apex', name: 'Kızıl Motor', color: '#f04b32', unlock: 0, payout: 1, power: 0, grip: 0, perk: 'Dengeli başlangıç' },
   { id: 'volt', name: 'Volt Motorsport', color: '#42cbc1', unlock: 1, payout: 1, power: 2.2, grip: 0, perk: 'Daha yüksek motor gücü' },
   { id: 'summit', name: 'Summit Racing', color: '#c7a5ff', unlock: 2, payout: 1.2, power: 0, grip: 0.3, perk: '+%20 ödül ve daha iyi tutuş' },
 ];
@@ -50,6 +52,7 @@ export const rivals = [
   { id: 'mert', name: 'Mert Aydın', color: '#f2e8de', pace: 0.86 },
 ];
 
+// Keep the original key and team ID so that existing careers load after the rename.
 const storageKey = 'apex-circuit-career-v1';
 const pointsByPlace = [25, 18, 15, 12, 10];
 const prizes = [1800, 1350, 1100, 950, 850];

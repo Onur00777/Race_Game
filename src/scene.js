@@ -1,4 +1,5 @@
 import * as T from 'three';
+import { gameName } from './career.js';
 
 const vector = (x, y, z) => new T.Vector3(x, y, z);
 const standard = (color, roughness = 0.78, metalness = 0) => new T.MeshStandardMaterial({ color, roughness, metalness });
@@ -289,7 +290,7 @@ function addTrack(scene, renderer, track) {
     box(gantry, red, 0.74, 1.6, 0.77, side * (half + 1.5), 0.81, 0);
   }
   box(gantry, dark, half * 2 + 3.4, 1.02, 0.68, 0, 5.3, 0);
-  const sign = new T.Mesh(new T.PlaneGeometry(half * 2 + 2.5, 0.89), textPanel('APEX CIRCUIT     /     ' + track.event.name));
+  const sign = new T.Mesh(new T.PlaneGeometry(half * 2 + 2.5, 0.89), textPanel(gameName + '     /     ' + track.event.name));
   sign.position.set(0, 5.31, -0.35);
   sign.rotation.y = Math.PI;
   gantry.add(sign);
