@@ -14,9 +14,9 @@ const rotor = new T.MeshStandardMaterial({ color: '#9da09f', roughness: 0.61, me
 const caliper = new T.MeshStandardMaterial({ color: '#9e2920', roughness: 0.37, metalness: 0.26 });
 const mirror = new T.MeshStandardMaterial({ color: '#bac4d1', roughness: 0.12, metalness: 0.92 });
 const glass = new T.MeshPhysicalMaterial({ color: '#18212b', roughness: 0.18, metalness: 0.19, clearcoat: 0.85, clearcoatRoughness: 0.11 });
-const headlight = new T.MeshStandardMaterial({ color: '#a9bdc8', emissive: '#c8e5ed', emissiveIntensity: 0.78, roughness: 0.34 });
-const tailLight = new T.MeshStandardMaterial({ color: '#8f0d0a', emissive: '#ff2713', emissiveIntensity: 1.14, roughness: 0.31 });
-const brakeLight = new T.MeshStandardMaterial({ color: '#b62117', emissive: '#ff4131', emissiveIntensity: 2.8, roughness: 0.29 });
+const headlight = new T.MeshStandardMaterial({ color: '#a9bdc8', emissive: '#d6ecff', emissiveIntensity: 2.75, roughness: 0.34 });
+const tailLight = new T.MeshStandardMaterial({ color: '#8f0d0a', emissive: '#f92010', emissiveIntensity: 1.86, roughness: 0.31 });
+const brakeLight = new T.MeshStandardMaterial({ color: '#b62117', emissive: '#ff3622', emissiveIntensity: 5.8, roughness: 0.29 });
 const lensHousing = new T.MeshPhysicalMaterial({ color: '#330e14', roughness: 0.20, clearcoat: 1, metalness: 0.14 });
 const tireProfile = [[0.249, -0.149], [0.309, -0.149], [0.337, -0.143], [0.355, -0.12],
   [wheelRadius, -0.088], [wheelRadius, 0.088], [0.355, 0.12], [0.337, 0.143], [0.309, 0.149], [0.249, 0.149]];
@@ -59,6 +59,7 @@ function loft(stations, wheelArches = false) {
   const sides = 48;
   const contours = stations.map(contour);
   const positions = [];
+  const uv = [];
   const indices = [];
   for (let i = 0; i < stations.length; i++) {
     for (let j = 0; j < sides; j++) {
@@ -74,6 +75,7 @@ function loft(stations, wheelArches = false) {
         }
       }
       positions.push(x, height, z);
+      uv.push(j / sides, (z - stations[0][0]) / Math.max(0.01, stations.at(-1)[0] - stations[0][0]));
       if (i === 0) continue;
       const a = (i - 1) * sides + j;
       const b = (i - 1) * sides + (j + 1) % sides;
@@ -84,6 +86,7 @@ function loft(stations, wheelArches = false) {
   const end = stations.at(-1);
   const start = stations[0];
   positions.push(0, (start[2] + start[4]) / 2, start[0], 0, (end[2] + end[4]) / 2, end[0]);
+  uv.push(0.5, 0, 0.5, 1);
   for (let side = 0; side < sides; side++) {
     const next = (side + 1) % sides;
     const n = (stations.length - 1) * sides;
@@ -91,6 +94,7 @@ function loft(stations, wheelArches = false) {
   }
   const geometry = new T.BufferGeometry();
   geometry.setAttribute('position', new T.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new T.Float32BufferAttribute(uv, 2));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
   return geometry;
@@ -137,6 +141,11 @@ const grillPanel = panel([[-0.61, 0.30], [0.61, 0.30], [0.71, 0.39], [0.58, 0.44
 const tailHousing = panel([[0, 0.015], [0.45, 0.002], [0.60, 0.04], [0.59, 0.085], [0.06, 0.080]]);
 const tailStrip = panel([[0.02, 0.051], [0.46, 0.032], [0.574, 0.057], [0.57, 0.070], [0.025, 0.066]]);
 const headStrip = panel([[0, 0.006], [0.36, 0.055], [0.45, 0.105], [0.45, 0.128], [0.36, 0.086], [0, 0.028]]);
+const splitterShape = panel([[-0.97, -0.13], [-0.89, -0.35], [-0.70, -0.43], [0.70, -0.43],
+  [0.89, -0.35], [0.97, -0.13], [0.93, 0.24], [0.63, 0.32], [-0.63, 0.32], [-0.93, 0.24]]).rotateX(-Math.PI / 2);
+const sidewall = new T.RingGeometry(0.263, 0.345, 64);
+const rotorFace = new T.RingGeometry(0.077, 0.195, 48);
+const exhaustTube = new T.CylinderGeometry(0.064, 0.056, 0.13, 18, 1, true).rotateX(Math.PI / 2);
 const spokeParts = [];
 for (let i = 0; i < 7; i++) {
   const angle = i * 2 * Math.PI / 7;
@@ -147,9 +156,11 @@ spokeParts.forEach(part => part.dispose());
 
 export const sharedCarResources = new Set([box, rubber, carbon, inset, aluminum, rotor, caliper, mirror,
   glass, headlight, tailLight, brakeLight, lensHousing, tire, rimLip, brakeDisc, center, tailPipe, intake, shadowPlane, shadowMaterial,
-  bodyShape, cabinShape, roofShape, wingShape, diffuserPanel, grillPanel, tailHousing, tailStrip, headStrip, spokes]);
+  bodyShape, cabinShape, roofShape, wingShape, diffuserPanel, grillPanel, tailHousing, tailStrip, headStrip, spokes,
+  splitterShape, sidewall, rotorFace, exhaustTube]);
 
-const defaultAppearance = { wing: 'touring', wingColor: '#21272d', wingAngle: 3, frontCamber: -1, rearCamber: -1, decals: [] };
+const stockParts = { tires: 0, brakes: 0, aero: 0, engine: 0 };
+const defaultAppearance = { wing: 'touring', wingColor: '#21272d', wingAngle: 3, frontCamber: -1, rearCamber: -1, decals: [], parts: stockParts };
 const projector = new T.Mesh(bodyShape, carbon);
 const decalMounts = [
   ['hood', [0, 0.66, 1.46], [-Math.PI / 2, 0, 0], [0.77, 0.32, 0.32]],
@@ -163,6 +174,85 @@ const decalMounts = [
 });
 
 const logos = new Map();
+let finish;
+
+function finishTexture(size, draw) {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  draw(canvas.getContext('2d'));
+  const texture = new T.CanvasTexture(canvas);
+  texture.colorSpace = T.SRGBColorSpace;
+  texture.anisotropy = 4;
+  sharedCarResources.add(texture);
+  return texture;
+}
+
+function finishMaterials() {
+  if (finish) return finish;
+  const weave = finishTexture(128, ctx => {
+    for (let y = 0; y < 8; y++) {
+      for (let x = 0; x < 8; x++) {
+        const x0 = x * 16, y0 = y * 16;
+        const horizontal = ((x + y * 2) % 4) < 2;
+        const g = horizontal ? ctx.createLinearGradient(x0, y0, x0, y0 + 16) : ctx.createLinearGradient(x0, y0, x0 + 16, y0);
+        g.addColorStop(0, '#828791');
+        g.addColorStop(0.32, horizontal ? '#cbd1da' : '#a8b0bb');
+        g.addColorStop(1, '#5d626d');
+        ctx.fillStyle = g;
+        ctx.fillRect(x0, y0, 16, 16);
+      }
+    }
+  });
+  weave.wrapS = weave.wrapT = T.RepeatWrapping;
+  weave.repeat.set(5, 4);
+  const tirePrint = finishTexture(256, ctx => {
+    ctx.translate(128, 128);
+    ctx.font = 'bold 17px Rajdhani, Arial, sans-serif';
+    ctx.fillStyle = '#e0e4dc';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (const [word, base] of [['KIRMIZI SPORT', -0.75], ['COMPETITION', 2.48]]) {
+      [...word].forEach((letter, index) => {
+        ctx.save();
+        ctx.rotate(base + index * 0.092);
+        ctx.fillText(letter, 0, -109);
+        ctx.restore();
+      });
+    }
+    ctx.strokeStyle = '#aab6ff';
+    ctx.lineWidth = 3;
+    for (const a of [1.22, 4.37]) {
+      ctx.beginPath();
+      ctx.arc(0, 0, 110, a, a + 0.29);
+      ctx.stroke();
+    }
+  });
+  const drilling = finishTexture(256, ctx => {
+    const gradient = ctx.createRadialGradient(128, 128, 25, 128, 128, 126);
+    gradient.addColorStop(0, '#555b62');
+    gradient.addColorStop(0.68, '#d7dfe2');
+    gradient.addColorStop(0.92, '#777e84');
+    gradient.addColorStop(1, '#b2b7b8');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 12; i++) {
+      for (const radius of [73, 89, 106]) {
+        const angle = i * Math.PI / 6 + radius * 0.013;
+        ctx.beginPath();
+        ctx.arc(128 + Math.cos(angle) * radius, 128 + Math.sin(angle) * radius, 3.7, 0, Math.PI * 2);
+        ctx.fillStyle = '#23272c';
+        ctx.fill();
+      }
+    }
+  });
+  const composite = new T.MeshPhysicalMaterial({ color: '#363e47', map: weave, roughness: 0.38, metalness: 0.42,
+    clearcoat: 0.52, side: T.DoubleSide });
+  const lettering = new T.MeshStandardMaterial({ map: tirePrint, transparent: true, depthWrite: false, roughness: 0.88 });
+  const steel = new T.MeshStandardMaterial({ map: drilling, metalness: 0.70, roughness: 0.37 });
+  finish = { weave, composite, lettering, steel };
+  for (const material of [composite, lettering, steel]) sharedCarResources.add(material);
+  return finish;
+}
 function sponsorMaterial(id) {
   if (logos.has(id)) return logos.get(id);
   const sponsor = sponsors.find(item => item.id === id);
@@ -194,7 +284,8 @@ function sponsorMaterial(id) {
 }
 
 function addWing(shell) {
-  const paint = new T.MeshPhysicalMaterial({ color: defaultAppearance.wingColor, roughness: 0.34, metalness: 0.32, clearcoat: 0.62 });
+  const paint = new T.MeshPhysicalMaterial({ color: defaultAppearance.wingColor, map: finishMaterials().weave,
+    roughness: 0.32, metalness: 0.36, clearcoat: 0.78 });
   const options = {};
   for (const [id, height, width, depth] of [
     ['stock', 0.745, 0.83, 0.50], ['touring', 0.98, 0.92, 0.88], ['swan', 1.13, 1.0, 1.12], ['twin', 1.20, 1.04, 1.03],
@@ -227,6 +318,8 @@ function addWing(shell) {
 
 function addWheels(root) {
   const wheels = [];
+  const { lettering, steel } = finishMaterials();
+  const performanceCaliper = caliper.clone();
   for (const side of [-1, 1]) {
     for (const axle of axles) {
       const holder = new T.Group();
@@ -234,13 +327,18 @@ function addWheels(root) {
       root.add(holder);
       const wheel = new T.Group();
       holder.add(wheel);
-      mount(wheel, tire, rubber);
+      const tyre = mount(wheel, tire, rubber);
       mount(wheel, rimLip, aluminum, side * 0.14);
       mount(wheel, spokes, aluminum, side * 0.128);
       mount(wheel, center, aluminum, side * 0.141);
-      mount(holder, brakeDisc, rotor, side * 0.089);
-      block(holder, caliper, 0.035, 0.103, 0.088, side * 0.109, 0.057, -0.158).rotation.x = 0.34;
-      wheels.push({ holder, wheel, side, steering: axle > 0 });
+      const print = mount(wheel, sidewall, lettering);
+      print.rotation.y = side * Math.PI / 2;
+      const disk = mount(wheel, brakeDisc, rotor, side * 0.089);
+      const face = mount(wheel, rotorFace, steel, side * 0.103);
+      face.rotation.y = side * Math.PI / 2;
+      const calliper = block(holder, performanceCaliper, 0.044, 0.113, 0.094, side * 0.108, 0.057, -0.16);
+      calliper.rotation.x = 0.34;
+      wheels.push({ holder, wheel, side, steering: axle > 0, tyre, print, disk, face, calliper });
     }
   }
   return wheels;
@@ -268,19 +366,39 @@ export function createCarModel(color) {
   const rear = new T.Group();
   const nose = new T.Group();
   shell.add(rear, nose);
-  mount(rear, diffuserPanel, carbon, 0, 0, -2.128).rotation.y = Math.PI;
+  const { composite } = finishMaterials();
+  const diffuser = new T.Group();
+  diffuser.position.set(0, 0.23, -2.08);
+  rear.add(diffuser);
+  mount(diffuser, diffuserPanel, composite, 0, -0.23, -0.05).rotation.y = Math.PI;
+  const fins = [-0.62, -0.36, -0.12, 0.12, 0.36, 0.62].map(x => {
+    const fin = block(diffuser, composite, 0.036, 0.095, 0.31, x, 0.017, 0.055);
+    fin.rotation.x = -0.19;
+    return fin;
+  });
   mount(nose, grillPanel, inset, 0, 0, 2.151);
-  block(nose, carbon, 1.62, 0.045, 0.29, 0, 0.235, 2.00);
+  const splitter = new T.Group();
+  splitter.position.set(0, 0.224, 1.86);
+  nose.add(splitter);
+  mount(splitter, splitterShape, composite);
+  block(splitter, carbon, 1.43, 0.036, 0.051, 0, -0.015, 0.36);
   const lights = [];
+  const exhausts = [];
+  const skirts = [];
   for (const side of [-1, 1]) {
-    block(shell, carbon, 0.092, 0.083, 1.49, side * 0.883, 0.215, -0.02);
+    skirts.push(block(shell, composite, 0.115, 0.072, 1.54, side * 0.884, 0.213, -0.02));
+    block(shell, inset, 0.009, 0.10, 0.26, side * 0.901, 0.364, -0.57).rotation.y = side * 0.13;
     block(shell, carbon, 0.194, 0.033, 0.059, side * 0.727, 0.808, 0.364);
     block(shell, paint, 0.172, 0.073, 0.122, side * 0.833, 0.842, 0.365).rotation.y = side * 0.12;
     block(shell, mirror, 0.128, 0.044, 0.005, side * 0.834, 0.844, 0.302);
     block(shell, carbon, 0.035, 0.285, 0.048, side * 0.571, 0.899, -0.31).rotation.z = -side * 0.19;
-    block(rear, carbon, 0.03, 0.10, 0.23, side * 0.42, 0.224, -2.02);
-    mount(rear, tailPipe, aluminum, side * 0.58, 0.324, -2.128);
-    mount(rear, intake, inset, side * 0.58, 0.324, -2.121).rotation.y = Math.PI;
+    const exhaust = new T.Group();
+    exhaust.position.set(side * 0.58, 0.324, -2.139);
+    rear.add(exhaust);
+    mount(exhaust, exhaustTube, aluminum, 0, 0, 0.046);
+    mount(exhaust, tailPipe, aluminum);
+    mount(exhaust, intake, inset, 0, 0, 0.014).rotation.y = Math.PI;
+    exhausts.push(exhaust);
     const tail = new T.Group();
     tail.position.set(side * 0.167, 0.521, -2.139);
     tail.scale.x = -side;
@@ -288,9 +406,15 @@ export function createCarModel(color) {
     rear.add(tail);
     mount(tail, tailHousing, lensHousing);
     lights.push(mount(tail, tailStrip, tailLight, 0, 0, 0.004));
-    const head = mount(nose, headStrip, headlight, side * 0.307, 0.450, 2.112);
+    for (let diode = 0; diode < 3; diode++) {
+      lights.push(block(tail, tailLight, 0.025, 0.007, 0.006, 0.17 + diode * 0.076, 0.026, 0.006));
+    }
+    const head = mount(nose, headStrip, headlight, side * 0.307, 0.448, 2.156);
     head.scale.x = side;
-    head.rotation.y = side * 0.23;
+    head.rotation.y = side * 0.31;
+    for (let diode = 0; diode < 3; diode++) {
+      block(nose, headlight, 0.052, 0.012, 0.009, side * (0.395 + diode * 0.074), 0.438 + diode * 0.012, 2.145 - diode * 0.011);
+    }
   }
   block(rear, lensHousing, 0.27, 0.035, 0.02, 0, 0.669, -2.025);
   block(rear, aluminum, 0.22, 0.067, 0.018, 0, 0.444, -2.123);
@@ -299,24 +423,43 @@ export function createCarModel(color) {
     if (object.isMesh && object !== shadow) object.castShadow = object.receiveShadow = true;
   });
   for (const { mesh } of decals) mesh.castShadow = mesh.receiveShadow = false;
-  return { root, shell, paint, body, rear, nose, wheels, lights, wing, decals, frontDamage: 0, rearDamage: 0 };
+  for (const { print, face } of wheels) print.castShadow = face.castShadow = false;
+  return { root, shell, paint, body, rear, nose, wheels, lights, wing, decals, splitter, diffuser, fins, skirts, exhausts,
+    frontDamage: 0, rearDamage: 0 };
 }
 
 function applyAppearance(model, appearance) {
   if (model.appearance === appearance) return;
   model.appearance = appearance;
+  const { aero, engine, tires, brakes } = appearance.parts ?? stockParts;
   model.wing.paint.color.set(appearance.wingColor);
   for (const [id, { frame, blade }] of Object.entries(model.wing.options)) {
     frame.visible = appearance.wing === id;
+    frame.scale.set(1 + aero * 0.039, 1 + aero * 0.026, 1 + aero * 0.122);
     blade.rotation.x = T.MathUtils.degToRad(appearance.wingAngle);
   }
+  model.splitter.scale.set(0.89 + aero * 0.063, 1, 0.78 + aero * 0.17);
+  model.diffuser.scale.set(0.92 + aero * 0.041, 1 + aero * 0.21, 0.62 + aero * 0.18);
+  for (const [index, fin] of model.fins.entries()) fin.visible = aero >= 2 || index === 1 || index === 4;
+  model.skirts.forEach(skirt => { skirt.scale.x = 0.09 + aero * 0.021; });
+  model.exhausts.forEach(pipe => { pipe.scale.set(1 + engine * 0.18, 1 + engine * 0.18, 1 + engine * 0.21); });
   const logo = sponsorMaterial(appearance.sponsor);
   for (const { slot, mesh } of model.decals) {
     mesh.visible = Boolean(logo && appearance.decals.includes(slot));
     if (logo) mesh.material = logo;
   }
-  for (const { holder, side, steering } of model.wheels) {
+  for (const { holder, side, steering, tyre, print, disk, face, calliper } of model.wheels) {
     holder.rotation.z = -side * T.MathUtils.degToRad(steering ? appearance.frontCamber : appearance.rearCamber);
+    tyre.scale.x = 1 + tires * 0.095;
+    tyre.position.x = -side * tires * 0.007;
+    print.position.x = side * (0.150 + tires * 0.007);
+    print.visible = tires > 0;
+    disk.scale.set(1, 0.87 + brakes * 0.076, 0.87 + brakes * 0.076);
+    face.scale.setScalar(0.87 + brakes * 0.076);
+    face.visible = brakes > 0;
+    calliper.material.color.set(['#5e6870', '#e23c29', '#fbb63e', '#ffc750'][brakes]);
+    calliper.position.z = -0.137 - brakes * 0.013;
+    calliper.scale.y = 0.093 + brakes * 0.018;
   }
 }
 

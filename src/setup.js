@@ -58,8 +58,8 @@ export function vehicleStats(team, parts, input) {
   const setup = normalizeSetup(input, parts.aero);
   const wing = activeWing(setup, parts.aero);
   const compound = compounds.find(item => item.id === setup.compound);
-  const load = wing ? wing.load + setup.downforce * (3.1 + parts.aero * 0.25) : 0;
-  const drag = wing ? wing.drag + setup.downforce * 0.16 : 0;
+  const load = wing ? wing.load + setup.downforce * (3.1 + parts.aero * 0.25) + (parts.aero - wing.level) * 7 : 0;
+  const drag = wing ? wing.drag + setup.downforce * 0.16 + (parts.aero - wing.level) * 0.20 : 0;
   const rearBalance = 1.18 - Math.abs(setup.rearCamber + 1.5) * 0.43;
   return {
     topSpeed: 54 + parts.engine * 3.35 + team.power - setup.gearing * 1.75 - drag + compound.rolling,
@@ -76,5 +76,5 @@ export function carAppearance(loadout) {
   const { setup, upgrades, sponsor, decals } = loadout;
   const wing = activeWing(setup, upgrades.aero);
   return { wing: wing?.id ?? 'stock', wingColor: setup.wingColor, wingAngle: setup.downforce,
-    frontCamber: setup.frontCamber, rearCamber: setup.rearCamber, sponsor, decals };
+    frontCamber: setup.frontCamber, rearCamber: setup.rearCamber, sponsor, decals, parts: upgrades };
 }
