@@ -20,10 +20,10 @@ export function raceCheckpoint(career, race, loadout, alternateCamera) {
     countdown: race.countdown,
     cars: race.cars.map((car, index) => ({
       ...Object.fromEntries(carFields.map(key => [key, car[key]])),
-      id: car.id,
+      id: car.id, offset: car.offset, onRoad: car.onRoad,
       ...(index === 0
-        ? { lap: car.lap, lapStarted: car.lapStarted, bestLap: car.bestLap, onRoad: car.onRoad }
-        : { offset: car.offset, finishTime: car.finishTime }),
+        ? { lap: car.lap, lapStarted: car.lapStarted, bestLap: car.bestLap }
+        : { aiOffset: car.aiOffset, stuck: car.stuck, finishTime: car.finishTime }),
     })),
   };
 }
@@ -61,13 +61,17 @@ export function restoreRace(career, track) {
     const state = save.cars[i];
     if (!state || car.id !== state.id || !carFields.every(key => Number.isFinite(state[key]))) return null;
     for (const key of carFields) car[key] = state[key];
+    const projection = track.project(car.x, car.z);
+    car.offset = Number.isFinite(state.offset) ? state.offset : projection.offset;
+    car.onRoad = typeof state.onRoad === 'boolean' ? state.onRoad : projection.distance <= event.width / 2 + 0.6;
     if (i === 0) {
       if (!Number.isInteger(state.lap) || state.lap < 0 || state.lap >= track.event.laps ||
           !Number.isFinite(state.lapStarted) || !(state.bestLap === null || Number.isFinite(state.bestLap))) return null;
-      Object.assign(car, { lap: state.lap, lapStarted: state.lapStarted, bestLap: state.bestLap, onRoad: state.onRoad !== false });
+      Object.assign(car, { lap: state.lap, lapStarted: state.lapStarted, bestLap: state.bestLap });
     } else {
       if (!Number.isFinite(state.offset) || !(state.finishTime === null || Number.isFinite(state.finishTime))) return null;
-      Object.assign(car, { offset: state.offset, finishTime: state.finishTime });
+      Object.assign(car, { aiOffset: Number.isFinite(state.aiOffset) ? state.aiOffset : car.offset,
+        stuck: Number.isFinite(state.stuck) ? Math.max(0, Math.min(5.5, state.stuck)) : 0, finishTime: state.finishTime });
     }
     race.previousPoses[i] = { x: car.x, z: car.z, yaw: car.yaw, speed: car.speed, steer: car.steer, station: car.station };
   }

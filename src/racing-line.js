@@ -2,7 +2,7 @@ const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const mix = (a, b, amount) => a + (b - a) * amount;
 const signedAngle = angle => Math.atan2(Math.sin(angle), Math.cos(angle));
 
-export function makeRacingLine(track, handling) {
+export function makeRacingLine(track, handling, driving = {}) {
   const count = Math.ceil(track.length / 2.1);
   const spacing = track.length / count;
   const corner = distance => {
@@ -11,8 +11,8 @@ export function makeRacingLine(track, handling) {
   };
   const offsets = new Float32Array(count);
   const limits = new Float32Array(count);
-  const lateralGrip = handling.grip * 1.34;
-  const braking = Math.min(12.4, handling.braking * 0.53);
+  const lateralGrip = driving.lateralGrip ?? handling.grip * 1.34;
+  const braking = driving.braking ?? Math.min(12.4, handling.braking * 0.53);
   for (let i = 0; i < count; i++) {
     const station = i * spacing;
     const bend = corner(station);
@@ -35,7 +35,7 @@ export function makeRacingLine(track, handling) {
       const next = (start + 1) % count;
       const fraction = index % 1;
       const offset = mix(offsets[start], offsets[next], fraction);
-      return { ...track.at(distance, offset), offset, targetSpeed: mix(limits[start], limits[next], fraction) };
+      return { ...track.at(distance, offset), offset, curvature: corner(distance), targetSpeed: mix(limits[start], limits[next], fraction) };
     },
   };
 }
