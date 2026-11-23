@@ -5,6 +5,7 @@ import { addTerrain, addTrees, lightTrack, loadTrackAssets } from './environment
 import { createCarModel, sharedCarResources, updateCarModel } from './car-model.js';
 import { createRaceEffects } from './race-effects.js';
 import { renderPose } from './race.js';
+import { createStudio } from './studio.js';
 
 const standard = (color, roughness = 0.78, metalness = 0) => new T.MeshStandardMaterial({ color, roughness, metalness });
 const boxGeometry = new T.BoxGeometry(1, 1, 1);
@@ -154,7 +155,7 @@ function addGrandstand(scene, track, metal) {
   }
 }
 
-function addTrack(scene, track, assets) {
+function addTrack(scene, track, assets, label) {
   const half = track.event.width / 2;
   const asphalt = new T.MeshStandardMaterial({
     color: '#a1a3a8',
@@ -207,7 +208,7 @@ function addTrack(scene, track, assets) {
     box(gantry, red, 0.74, 1.6, 0.77, side * pillar, 0.81, 0).castShadow = true;
   }
   box(gantry, dark, pillar * 2 + 0.45, 1.02, 0.68, 0, 5.3, 0).castShadow = true;
-  const sign = new T.Mesh(new T.PlaneGeometry(pillar * 2 - 0.8, 0.89), textPanel(gameName + '     /     ' + track.event.name));
+  const sign = new T.Mesh(new T.PlaneGeometry(pillar * 2 - 0.8, 0.89), textPanel(gameName + '     /     ' + label));
   sign.position.set(0, 5.31, -0.35);
   sign.rotation.y = Math.PI;
   gantry.add(sign);
@@ -273,8 +274,9 @@ export function createView(canvas) {
   let cameraReady = false;
   let width = 0;
   let height = 0;
+  let studio;
 
-  function setTrack(track, cars) {
+  function setTrack(track, cars, label = track.event.name) {
     if (scene) {
       const resources = new Set();
       const shared = new Set([...assets.shared, ...sharedCarResources, boxGeometry]);
@@ -294,7 +296,7 @@ export function createView(canvas) {
     scene = new T.Scene();
     updateLight = lightTrack(scene, track.event, assets);
     addTerrain(scene, track, assets);
-    addTrack(scene, track, assets);
+    addTrack(scene, track, assets, label);
     addTrees(scene, track);
     effects = createRaceEffects(scene);
     models = cars.map(car => {
@@ -309,16 +311,27 @@ export function createView(canvas) {
     cameraReady = false;
   }
 
-  function draw(race, mode, dt, braking, alternateCamera, paused, fraction = 1) {
+  function resize() {
     if (width !== canvas.clientWidth || height !== canvas.clientHeight) {
       width = canvas.clientWidth;
       height = canvas.clientHeight;
-      if (width < 1 || height < 1) return;
+      if (width < 1 || height < 1) return false;
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.35));
       renderer.setSize(width, height, false);
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
     }
+    return width > 0 && height > 0;
+  }
+
+  function drawGarage(car, orbit, dt) {
+    if (!resize()) return;
+    studio ??= createStudio(assets);
+    studio.draw(renderer, car, orbit, width / height, dt);
+  }
+
+  function draw(race, mode, dt, braking, alternateCamera, paused, fraction = 1) {
+    if (!resize()) return;
     if (drawnRace !== race) {
       drawnRace = race;
       lastImpact = null;
@@ -376,5 +389,5 @@ export function createView(canvas) {
     renderer.render(scene, camera);
   }
 
-  return { setTrack, draw, snap };
+  return { setTrack, draw, drawGarage, snap };
 }
