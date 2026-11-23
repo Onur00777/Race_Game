@@ -1,10 +1,11 @@
 import * as T from 'three';
 import { createCarModel, updateCarModel } from './car-model.js';
+import { fitShadowResolution } from './render-pipeline.js';
 
 export const defaultOrbit = { azimuth: 0.96, elevation: 0.36, zoom: 1 };
 export const garageAngles = { front: 0.80, side: 1.57, rear: 2.58 };
 
-export function createStudio(assets) {
+export function createStudio(assets, shadowSize) {
   const scene = new T.Scene();
   scene.background = new T.Color('#11171d');
   scene.fog = new T.Fog('#11171d', 9, 23);
@@ -32,7 +33,7 @@ export function createStudio(assets) {
   const key = new T.DirectionalLight('#fff0dc', 3.05);
   key.position.set(2.5, 6, 4.5);
   key.castShadow = true;
-  key.shadow.mapSize.set(1024, 1024);
+  key.shadow.mapSize.set(Math.min(2048, shadowSize), Math.min(2048, shadowSize));
   Object.assign(key.shadow.camera, { left: -4.4, right: 4.4, top: 4.4, bottom: -4.4, near: 0.1, far: 17 });
   key.shadow.camera.updateProjectionMatrix();
   key.shadow.normalBias = 0.022;
@@ -49,7 +50,7 @@ export function createStudio(assets) {
   const target = new T.Vector3();
   let displayed;
 
-  function draw(renderer, car, orbit, aspect, dt) {
+  function draw(render, car, orbit, aspect, dt) {
     if (camera.aspect !== aspect) {
       camera.aspect = aspect;
       camera.updateProjectionMatrix();
@@ -66,8 +67,8 @@ export function createStudio(assets) {
     target.set(0, 0.56, 0);
     camera.lookAt(target);
     updateCarModel(model, car, dt, false);
-    renderer.render(scene, camera);
+    render(scene, camera, dt, 0.8);
   }
 
-  return { draw };
+  return { draw, setShadowSize: size => fitShadowResolution(scene, Math.min(2048, size)) };
 }

@@ -6,6 +6,7 @@ import { createCarModel, sharedCarResources, updateCarModel } from './car-model.
 import { createRaceEffects } from './race-effects.js';
 import { renderPose } from './race.js';
 import { createStudio } from './studio.js';
+import { createRenderPipeline, fitShadowResolution, qualityMode } from './render-pipeline.js';
 
 const standard = (color, roughness = 0.78, metalness = 0) => new T.MeshStandardMaterial({ color, roughness, metalness });
 const boxGeometry = new T.BoxGeometry(1, 1, 1);
@@ -250,12 +251,13 @@ function addTrack(scene, track, assets, label) {
   addGrandstand(scene, track, metal);
 }
 
-export function createView(canvas) {
+export function createView(canvas, quality) {
   const renderer = new T.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
   renderer.toneMapping = T.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.12;
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = T.PCFShadowMap;
+  renderer.shadowMap.type = T.PCFSoftShadowMap;
+  const pipeline = createRenderPipeline(renderer, quality);
   const assets = loadTrackAssets(renderer);
   const camera = new T.PerspectiveCamera(48, 1, 0.1, 960);
   const aim = new T.Vector3();
@@ -295,6 +297,7 @@ export function createView(canvas) {
     }
     scene = new T.Scene();
     updateLight = lightTrack(scene, track.event, assets);
+    fitShadowResolution(scene, pipeline.shadowSize());
     addTerrain(scene, track, assets);
     addTrack(scene, track, assets, label);
     addTrees(scene, track);
@@ -316,8 +319,7 @@ export function createView(canvas) {
       width = canvas.clientWidth;
       height = canvas.clientHeight;
       if (width < 1 || height < 1) return false;
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.35));
-      renderer.setSize(width, height, false);
+      pipeline.resize(width, height);
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
     }
@@ -326,8 +328,17 @@ export function createView(canvas) {
 
   function drawGarage(car, orbit, dt) {
     if (!resize()) return;
-    studio ??= createStudio(assets);
-    studio.draw(renderer, car, orbit, width / height, dt);
+    if (!studio) studio = createStudio(assets, pipeline.shadowSize());
+    studio.draw(pipeline.render, car, orbit, width / height, dt);
+  }
+
+  function setQuality(next) {
+    if (qualityMode(next) === qualityMode(quality)) return;
+    quality = next;
+    pipeline.setQuality(next);
+    fitShadowResolution(scene, pipeline.shadowSize());
+    studio?.setShadowSize(pipeline.shadowSize());
+    width = height = 0;
   }
 
   function draw(race, mode, dt, braking, alternateCamera, paused, fraction = 1) {
@@ -386,8 +397,8 @@ export function createView(canvas) {
     }
     camera.lookAt(aim);
     cameraReady = true;
-    renderer.render(scene, camera);
+    pipeline.render(scene, camera, dt);
   }
 
-  return { setTrack, draw, drawGarage, snap };
+  return { setTrack, draw, drawGarage, snap, setQuality };
 }

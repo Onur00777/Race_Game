@@ -9,6 +9,7 @@ import { driverForm, garageMoney, garagePanel, garageStats, garageTabs, setupVal
 import { escapeHtml, getLanguage, setLanguage, t, translatedField, upper } from './i18n.js';
 import { createAudio, updateAudio } from './audio.js';
 import { animateAmount, createWallet } from './wallet.js';
+import { graphicsModes, qualityMode } from './render-pipeline.js';
 import './style.css';
 
 const app = document.querySelector('#app');
@@ -397,6 +398,8 @@ function pauseRace() {
 
 function renderPause(saved) {
   overlay.innerHTML = `<h2>${t('paused')}</h2><p>${t(saved ? 'pauseSaved' : 'pauseUnsaved')}</p>
+    <label class="pause-setting"><span>${t('graphics')}</span><select data-graphics>${Object.keys(graphicsModes).map(mode =>
+      `<option value="${mode}" ${mode === qualityMode(career.graphics) ? 'selected' : ''}>${t(mode)}</option>`).join('')}</select></label>
     <div class="dialog-actions">
       <button type="button" class="primary" data-action="resume">${t('resumeRace')}</button>
       <button type="button" class="secondary" data-action="save-exit">${t(saved ? 'saveExit' : 'backCalendar')}</button>
@@ -551,6 +554,11 @@ app.addEventListener('input', event => {
 
 app.addEventListener('change', event => {
   const field = event.target;
+  if (field.hasAttribute('data-graphics')) {
+    career = { ...career, graphics: qualityMode(field.value) };
+    view?.setQuality(career.graphics);
+    persist();
+  }
   if (field.form?.id === 'driver-form') {
     if (field.name === 'team') {
       draft.team = field.value;
@@ -693,7 +701,7 @@ function frame(now) {
 
 setLanguage(career.profile?.language);
 try {
-  view = createView(circuit);
+  view = createView(circuit, career.graphics);
   circuit.tabIndex = -1;
   showMenu();
   requestAnimationFrame(frame);
