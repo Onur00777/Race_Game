@@ -88,7 +88,7 @@ export function createSkidMarks(capacity = 32768) {
 
   function sample(wheel, last) {
     if (!wheel.onRoad || wheel.slip < 0.16 || wheel.speed < 5.5) return null;
-    const contact = { x: wheel.x, z: wheel.z, width: 0.087 + wheel.slip * 0.064,
+    const contact = { x: wheel.x, z: wheel.z, width: 0.075 + wheel.slip * 0.059 + Math.min(1, wheel.speed / 36) * 0.025,
       alpha: (0.19 + wheel.slip * 0.65) * Math.min(1, wheel.speed / 17) };
     if (!last) return contact;
     const dx = contact.x - last.x;
