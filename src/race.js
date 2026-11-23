@@ -1,5 +1,6 @@
 import { CatmullRomCurve3, Vector3 } from 'three';
 import { rivals } from './career.js';
+import { railRunoff, resolveBarrierContact, resolveVehicleContact, velocity } from './contact.js';
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const wrap = (value, period) => ((value % period) + period) % period;
@@ -12,6 +13,7 @@ export function createTrack(event) {
   const count = 480;
   const length = curve.getLength();
   const spacing = length / count;
+  const railOffset = event.width / 2 + railRunoff;
   const samples = Array.from({ length: count }, (_, index) => {
     const point = curve.getPointAt(index / count);
     const tangent = curve.getTangentAt(index / count);
@@ -38,58 +40,116 @@ export function createTrack(event) {
   function project(x, z) {
     let nearest = Infinity;
     let station = 0;
+    let offset = 0;
+    let dx = 0;
+    let dz = 0;
     for (let index = 0; index < count; index++) {
       const a = samples[index];
       const b = samples[(index + 1) % count];
-      const dx = b.x - a.x;
-      const dz = b.z - a.z;
-      const along = clamp(((x - a.x) * dx + (z - a.z) * dz) / (dx * dx + dz * dz), 0, 1);
-      const distance = (x - a.x - dx * along) ** 2 + (z - a.z - dz * along) ** 2;
+      const sx = b.x - a.x;
+      const sz = b.z - a.z;
+      const segmentLengthSquared = sx * sx + sz * sz;
+      const along = clamp(((x - a.x) * sx + (z - a.z) * sz) / segmentLengthSquared, 0, 1);
+      const ox = x - a.x - sx * along;
+      const oz = z - a.z - sz * along;
+      const distance = ox * ox + oz * oz;
       if (distance < nearest) {
         nearest = distance;
         station = (index + along) * spacing;
+        const segmentLength = Math.sqrt(segmentLengthSquared);
+        dx = sx / segmentLength;
+        dz = sz / segmentLength;
+        offset = -dz * ox + dx * oz;
       }
     }
-    return { station, distance: Math.sqrt(nearest) };
+    return { station, distance: Math.sqrt(nearest), offset, dx, dz };
   }
 
-  return { event, length, spacing, samples, at, project };
+  return { event, length, spacing, railOffset, samples, at, project };
 }
+
+const bodyState = () => ({ speed: 0, lateral: 0, spin: 0, steer: 0, damage: 0, frontDamage: 0, rearDamage: 0 });
 
 export function createRace(track, team, upgrades) {
   const finish = track.length * track.event.laps;
   const player = {
-    id: 'player', color: team.color, station: -18, ...track.at(-18, 2.5), speed: 0,
-    lateral: 0, steer: 0, onRoad: true, lap: 0, lapStarted: 0, bestLap: null,
+    id: 'player', color: team.color, station: -18, ...track.at(-18, 2.5), ...bodyState(),
+    onRoad: true, lap: 0, lapStarted: 0, bestLap: null,
   };
   const opponents = rivals.map((rival, index) => {
     const station = -2 - Math.floor(index / 2) * 8;
     const lane = index % 2 ? 2.5 : -2.5;
-    return { ...rival, pace: rival.pace * track.event.rivalPace[index], station, lane,
-      ...track.at(station, lane), speed: 0, steer: 0, finishTime: null };
+    const offset = lane + Math.sin(station * 0.028) * 0.85;
+    return { ...rival, pace: rival.pace * track.event.rivalPace[index], station, lane, offset,
+      ...track.at(station, offset), ...bodyState(), finishTime: null };
   });
-  const race = { track, player, opponents, cars: [player, ...opponents], elapsed: 0, countdown: 3, order: null };
+  const race = { track, player, opponents, cars: [player, ...opponents], elapsed: 0, countdown: 3, order: null, impact: null };
   const topSpeed = 54 + upgrades.engine * 3 + team.power;
   const acceleration = 13 + upgrades.engine * 1.7 + team.power * 0.45;
   const braking = 24 + upgrades.brakes * 4.5;
   const grip = 4.6 + upgrades.tires * 0.85 + team.grip;
 
+  function relativeStation(station, reference) {
+    return wrap(station - reference + track.length / 2, track.length) - track.length / 2;
+  }
+
   function reset() {
-    Object.assign(player, track.at(player.station), { speed: 0, lateral: 0, steer: 0, onRoad: true });
+    const nearby = opponents.filter(car => Math.abs(relativeStation(car.station, player.station)) < 5);
+    const offset = [0, -4.2, 4.2].find(lane => nearby.every(car => Math.abs(car.offset - lane) > 2.2)) ?? 0;
+    Object.assign(player, track.at(player.station, offset), { speed: 0, lateral: 0, spin: 0, steer: 0, onRoad: true });
+  }
+
+  function damageAt(car, impact) {
+    if (!car || impact.impulse <= 2.6) return;
+    const amount = (impact.impulse - 2.6) * 1.65;
+    const along = (impact.x - car.x) * Math.sin(car.yaw) + (impact.z - car.z) * Math.cos(car.yaw);
+    car.damage = Math.min(100, car.damage + amount);
+    car.frontDamage = Math.min(1, car.frontDamage + amount * clamp(0.5 + along * 0.3, 0, 1) / 66);
+    car.rearDamage = Math.min(1, car.rearDamage + amount * clamp(0.5 - along * 0.3, 0, 1) / 66);
+  }
+
+  function reportImpact(impact, first, second) {
+    if (!impact) return;
+    damageAt(first, impact);
+    damageAt(second, impact);
+    if (impact.impulse > 1.1 && (first === player || second === player)) {
+      race.impact = { ...impact, kind: second ? 'vehicle' : 'rail', time: race.elapsed };
+    }
+  }
+
+  function settleOpponent(car, projection) {
+    car.offset = projection.offset;
+    const advance = relativeStation(projection.station, car.station);
+    if (Math.abs(advance) < 4 && car.finishTime === null) car.station = Math.min(finish - 0.001, car.station + advance);
   }
 
   function moveOpponent(car, dt, elapsed) {
-    if (car.finishTime !== null) return;
+    if (car.finishTime !== null) {
+      car.speed = Math.max(0, car.speed - dt * 6.5);
+      car.station += car.speed * dt;
+      car.offset = approach(car.offset, Math.sign(car.lane) * (track.event.width / 2 + 2.5), dt * 2.3);
+      Object.assign(car, track.at(car.station, car.offset));
+      return;
+    }
+    const direction = track.at(car.station);
     const ahead = clamp(car.speed * 0.48, 9, 23);
-    const bend = Math.abs(angleBetween(track.at(car.station).yaw, track.at(car.station + ahead).yaw));
-    const target = car.pace * Math.min(47, 43 / (1 + bend * 1.7));
+    const bend = Math.abs(angleBetween(direction.yaw, track.at(car.station + ahead).yaw));
+    const target = car.pace * (1 - car.damage * 0.0015) * Math.min(47, 43 / (1 + bend * 1.7));
     car.speed = approach(car.speed, target, (car.speed < target ? 9.5 : 21) * dt);
+    const motion = velocity(car);
     const previous = car.station;
-    car.station = Math.min(finish, car.station + car.speed * dt);
-    const pose = track.at(car.station, car.lane + Math.sin(car.station * 0.028) * 0.85);
-    car.steer = -angleBetween(car.yaw, pose.yaw) * 4;
+    const forwardSpeed = motion.x * direction.dx + motion.z * direction.dz;
+    car.station = Math.min(finish, car.station + forwardSpeed * dt);
+    const desired = car.lane + Math.sin(car.station * 0.028) * 0.85;
+    car.offset += (-motion.x * direction.dz + motion.z * direction.dx + (desired - car.offset) * 2.1) * dt;
+    const pose = track.at(car.station, car.offset);
+    const deviation = angleBetween(direction.yaw, car.yaw) * Math.exp(-4 * dt) + car.spin * dt;
+    car.steer = clamp(-angleBetween(car.yaw, pose.yaw) * 7, -1, 1);
+    car.lateral *= Math.exp(-4.2 * dt);
+    car.spin *= Math.exp(-4.5 * dt);
     Object.assign(car, pose);
-    if (car.station >= finish) car.finishTime = elapsed - dt + (finish - previous) / car.speed;
+    car.yaw += deviation;
+    if (car.station >= finish) car.finishTime = elapsed - dt + (finish - previous) / forwardSpeed;
   }
 
   function update(dt, input) {
@@ -101,12 +161,14 @@ export function createRace(track, team, upgrades) {
     race.elapsed += dt;
     const { gas, brake, handbrake, steering } = input;
     const newHeading = Number(gas) - Number(brake);
+    const power = 1 - player.damage * 0.0028;
+    const damagedTopSpeed = topSpeed * (1 - player.damage * 0.002);
     if (gas && !brake) {
-      player.speed += (player.speed < 0 ? braking : acceleration * (1 - Math.max(0, player.speed) / (topSpeed + 8))) * dt;
+      player.speed += (player.speed < 0 ? braking : acceleration * power * (1 - Math.max(0, player.speed) / (damagedTopSpeed + 8))) * dt;
     } else if (brake) {
       player.speed = player.speed > 0 ? Math.max(0, player.speed - braking * dt) : player.speed - 7 * dt;
     }
-    const limit = player.onRoad ? topSpeed : 12;
+    const limit = player.onRoad ? damagedTopSpeed : 12;
     if (player.speed > limit) player.speed = approach(player.speed, limit, (player.onRoad ? 13 : 32) * dt);
     if (!newHeading || handbrake) player.speed = approach(player.speed, 0, (handbrake ? 14 : 2.8) * dt);
     player.speed = Math.max(-8, player.speed);
@@ -115,38 +177,48 @@ export function createRace(track, team, upgrades) {
     player.steer = approach(player.steer, steering, dt * 5.5);
     const turn = player.steer * Math.min(speed / 5, 1) * (2.35 / (1 + speed * 0.024));
     const rotation = -turn * Math.sign(player.speed) * dt;
-    player.yaw += rotation * (handbrake ? 1.25 : 1);
+    player.yaw += rotation * (handbrake ? 1.25 : 1) + player.spin * dt;
+    player.spin *= Math.exp(-(player.onRoad ? 4.3 : 2.65) * dt);
     player.lateral -= player.speed * Math.sin(rotation);
-    player.lateral *= Math.exp(-(handbrake ? 1.4 : grip) * (player.onRoad ? 1 : 0.5) * dt);
-    player.x += (Math.sin(player.yaw) * player.speed + Math.cos(player.yaw) * player.lateral) * dt;
-    player.z += (Math.cos(player.yaw) * player.speed - Math.sin(player.yaw) * player.lateral) * dt;
+    player.lateral *= Math.exp(-(handbrake ? 1.4 : grip * (1 - player.damage * 0.0019)) * (player.onRoad ? 1 : 0.5) * dt);
+    const motion = velocity(player);
+    player.x += motion.x * dt;
+    player.z += motion.z * dt;
 
-    for (const car of opponents) {
-      moveOpponent(car, dt, race.elapsed);
-      if (car.finishTime !== null) continue;
-      const dx = player.x - car.x;
-      const dz = player.z - car.z;
-      const longitudinal = dx * car.dx + dz * car.dz;
-      const side = dx * -car.dz + dz * car.dx;
-      if (Math.abs(longitudinal) < 3.65 && Math.abs(side) < 1.82) {
-        const direction = Math.sign(side) || 1;
-        const separation = (1.82 - Math.abs(side)) * direction;
-        player.x -= car.dz * separation;
-        player.z += car.dx * separation;
-        player.speed *= 0.84;
+    for (const car of opponents) moveOpponent(car, dt, race.elapsed);
+    const active = race.cars.filter(car => car.finishTime == null || car.speed > 1);
+    for (let i = 0; i < active.length; i++) {
+      for (let j = i + 1; j < active.length; j++) {
+        const a = active[i];
+        const b = active[j];
+        const previousX = b.x;
+        const previousZ = b.z;
+        const ax = a.x;
+        const az = a.z;
+        reportImpact(resolveVehicleContact(a, b), a, b);
+        if (a !== player && (ax !== a.x || az !== a.z)) settleOpponent(a, track.project(a.x, a.z));
+        if (previousX !== b.x || previousZ !== b.z) settleOpponent(b, track.project(b.x, b.z));
       }
+    }
+
+    for (const car of active) {
+      const projection = track.project(car.x, car.z);
+      if (car === player && projection.distance > track.railOffset + 8) {
+        reset();
+        continue;
+      }
+      const x = car.x;
+      const z = car.z;
+      reportImpact(resolveBarrierContact(car, projection, track.railOffset), car);
+      if (car !== player && (x !== car.x || z !== car.z)) settleOpponent(car, track.project(car.x, car.z));
     }
 
     const projection = track.project(player.x, player.z);
     player.onRoad = projection.distance <= track.event.width / 2 + 0.6;
-    const delta = projection.station - wrap(player.station, track.length);
-    const advance = wrap(delta + track.length / 2, track.length) - track.length / 2;
-    if (projection.distance > track.event.width / 2 + 23) reset();
+    const advance = relativeStation(projection.station, player.station);
     const previous = player.station;
-    // Ignore jumps between nearby sections, while allowing a normal curb cut.
-    if (Math.abs(advance) < 6 && projection.distance <= track.event.width / 2 + 3) {
-      player.station += advance;
-    }
+    // Preserve progress through runoff, but ignore jumps to a nearby hairpin.
+    if (Math.abs(advance) < 6) player.station += advance;
 
     const lap = Math.floor(player.station / track.length);
     if (lap >= player.lap && player.station >= 0 && (previous < 0 || lap > player.lap)) {
@@ -162,9 +234,12 @@ export function createRace(track, team, upgrades) {
       player.finishTime = race.elapsed - dt + dt * (finish - previous) / advance;
       // Let the remaining drivers take the flag for the championship standings.
       for (const car of opponents) {
-        for (let elapsed = race.elapsed + 0.1; car.finishTime === null; elapsed += 0.1) {
-          moveOpponent(car, 0.1, elapsed);
+        if (car.finishTime !== null) continue;
+        const prediction = { ...car };
+        for (let elapsed = race.elapsed + 0.1; prediction.finishTime === null; elapsed += 0.1) {
+          moveOpponent(prediction, 0.1, elapsed);
         }
+        car.finishTime = prediction.finishTime;
       }
       race.elapsed = player.finishTime;
       race.order = [...race.cars].sort((a, b) => a.finishTime - b.finishTime).map(car => car.id);

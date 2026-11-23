@@ -252,6 +252,44 @@ function textPanel(text) {
   return new T.MeshBasicMaterial({ map });
 }
 
+function addGuardrails(scene, track, material) {
+  const railMaterial = material.clone();
+  railMaterial.side = T.DoubleSide;
+  const spacing = 3.3;
+  const count = Math.ceil(track.length / spacing);
+  const posts = new T.InstancedMesh(boxGeometry, material, count * 2);
+  const post = new T.Object3D();
+  post.scale.set(0.14, 0.89, 0.15);
+  for (const [sideIndex, side] of [-1, 1].entries()) {
+    const offset = side * track.railOffset;
+    const vertices = [];
+    const indices = [];
+    const heights = [0.41, 0.50, 0.58, 0.69, 0.76];
+    for (let i = 0; i <= track.samples.length; i++) {
+      for (const [row, height] of heights.entries()) {
+        const point = track.at(i * track.spacing, offset + side * (row % 2 === 0 ? 0.12 : 0));
+        vertices.push(point.x, height, point.z);
+        if (i === 0 || row === 0) continue;
+        const vertex = i * heights.length + row;
+        indices.push(vertex, vertex - 1, vertex - heights.length, vertex - 1, vertex - heights.length - 1, vertex - heights.length);
+      }
+    }
+    const geometry = new T.BufferGeometry();
+    geometry.setAttribute('position', new T.Float32BufferAttribute(vertices, 3));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+    scene.add(new T.Mesh(geometry, railMaterial));
+    for (let i = 0; i < count; i++) {
+      const point = track.at(i * track.length / count, offset + side * 0.20);
+      post.position.set(point.x, 0.39, point.z);
+      post.rotation.y = point.yaw;
+      post.updateMatrix();
+      posts.setMatrixAt(sideIndex * count + i, post.matrix);
+    }
+  }
+  scene.add(posts);
+}
+
 function addTrack(scene, renderer, track) {
   const half = track.event.width / 2;
   const grassMap = surface(renderer, [83, 92, 65], 32);
@@ -285,11 +323,12 @@ function addTrack(scene, renderer, track) {
   gantry.position.set(gate.x, 0, gate.z);
   gantry.rotation.y = gate.yaw;
   scene.add(gantry);
+  const pillar = track.railOffset + 0.55;
   for (const side of [-1, 1]) {
-    box(gantry, dark, 0.39, 5.5, 0.58, side * (half + 1.5), 2.75, 0);
-    box(gantry, red, 0.74, 1.6, 0.77, side * (half + 1.5), 0.81, 0);
+    box(gantry, dark, 0.39, 5.5, 0.58, side * pillar, 2.75, 0);
+    box(gantry, red, 0.74, 1.6, 0.77, side * pillar, 0.81, 0);
   }
-  box(gantry, dark, half * 2 + 3.4, 1.02, 0.68, 0, 5.3, 0);
+  box(gantry, dark, pillar * 2 + 0.45, 1.02, 0.68, 0, 5.3, 0);
   const sign = new T.Mesh(new T.PlaneGeometry(half * 2 + 2.5, 0.89), textPanel(gameName + '     /     ' + track.event.name));
   sign.position.set(0, 5.31, -0.35);
   sign.rotation.y = Math.PI;
@@ -305,7 +344,7 @@ function addTrack(scene, renderer, track) {
   const bulb = new T.MeshBasicMaterial({ color: '#fff5d7' });
   for (let i = 0; i < track.length; i += 33) {
     const side = Math.round(i / 33) % 2 ? 1 : -1;
-    const point = track.at(i + 12, side * (half + 4.7));
+    const point = track.at(i + 12, side * (track.railOffset + 0.9));
     const post = new T.Group();
     post.rotation.y = point.yaw;
     post.position.set(point.x, 0, point.z);
@@ -315,18 +354,12 @@ function addTrack(scene, renderer, track) {
     scene.add(post);
   }
 
-  for (let i = -60; i < 37; i += 2.8) {
-    for (const side of [-1, 1]) {
-      const point = track.at(i, side * (half + 2.6));
-      box(scene, metal, 0.1, 0.65, 0.1, point.x, 0.32, point.z);
-      box(scene, metal, 0.14, 0.3, 2.86, point.x, 0.47, point.z).rotation.y = point.yaw;
-    }
-  }
+  addGuardrails(scene, track, metal);
 
   const stand = new T.Group();
-  const standPose = track.at(26, 16);
+  const standPose = track.at(30, track.railOffset + 4.7);
   stand.position.set(standPose.x, 0, standPose.z);
-  stand.rotation.y = standPose.yaw - Math.PI / 2;
+  stand.rotation.y = standPose.yaw + Math.PI / 2;
   scene.add(stand);
   for (let step = 0; step < 6; step++) {
     box(stand, dark, 29, 0.5 + step * 0.49, 1.2, 0, (0.5 + step * 0.49) / 2, -step);
