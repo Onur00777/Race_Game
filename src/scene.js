@@ -2,9 +2,9 @@ import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { gameName } from './career.js';
 import { addTerrain, addTrees, lightTrack, loadTrackAssets } from './environment.js';
+import { createCarModel, sharedCarResources, updateCarModel } from './car-model.js';
 
 const standard = (color, roughness = 0.78, metalness = 0) => new T.MeshStandardMaterial({ color, roughness, metalness });
-const basic = color => new T.MeshBasicMaterial({ color });
 const boxGeometry = new T.BoxGeometry(1, 1, 1);
 
 function box(parent, material, width, height, depth, x, y, z) {
@@ -36,90 +36,6 @@ function strip(track, left, right, height, material, start = 0, count = track.sa
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
   return new T.Mesh(geometry, material);
-}
-
-function profile(material, rings) {
-  const vertices = [];
-  const indices = [];
-  for (const [z, width, shoulder, crown, bottom] of rings) {
-    vertices.push(-width, bottom, z, -width, shoulder, z, -width * 0.73, crown, z, width * 0.73, crown, z, width, shoulder, z, width, bottom, z);
-  }
-  for (let i = 0; i < rings.length - 1; i++) {
-    for (let side = 0; side < 6; side++) {
-      const a = i * 6 + side;
-      const b = i * 6 + (side + 1) % 6;
-      indices.push(a, a + 6, b, b, a + 6, b + 6);
-    }
-  }
-  const end = (rings.length - 1) * 6;
-  for (let i = 1; i < 5; i++) indices.push(0, i, i + 1, end, end + i + 1, end + i);
-  const geometry = new T.BufferGeometry();
-  geometry.setAttribute('position', new T.Float32BufferAttribute(vertices, 3));
-  geometry.setIndex(indices);
-  const faceted = geometry.toNonIndexed();
-  geometry.dispose();
-  faceted.computeVertexNormals();
-  return new T.Mesh(faceted, material);
-}
-
-const shadowMaterial = new T.ShaderMaterial({
-  transparent: true, depthWrite: false,
-  vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }',
-  fragmentShader: 'varying vec2 vUv; void main() { float a = 1. - smoothstep(.16, .5, length(vUv - .5)); gl_FragColor = vec4(0.015, 0.01, 0.013, a * .74); }',
-});
-const shadowPlane = new T.PlaneGeometry(1, 1);
-const wheelGeometry = new T.CylinderGeometry(0.37, 0.37, 0.32, 20).rotateZ(Math.PI / 2);
-const rimGeometry = new T.CylinderGeometry(0.245, 0.245, 0.334, 16).rotateZ(Math.PI / 2);
-const rubber = standard('#141619');
-const carbon = standard('#222528', 0.51, 0.24);
-const rims = standard('#626e73', 0.36, 0.54);
-const glass = standard('#152437', 0.18, 0.26);
-const headlight = basic('#d9f2ff');
-const tailLight = basic('#ff301a');
-const brakeLight = basic('#ff8b66');
-const stripe = standard('#f8e6c5');
-
-function carModel(color) {
-  const root = new T.Group();
-  const shadow = new T.Mesh(shadowPlane, shadowMaterial);
-  shadow.rotation.x = -Math.PI / 2;
-  shadow.scale.set(3.6, 5.8, 1);
-  shadow.position.y = 0.022;
-  root.add(shadow);
-  const shell = new T.Group();
-  root.add(shell);
-  const paint = standard(color, 0.27, 0.24);
-  const body = profile(paint, [[-2.02, 0.93, 0.64, 0.73, 0.28], [-1.53, 1, 0.72, 0.8, 0.23], [-0.67, 0.96, 0.7, 0.81, 0.23], [0.94, 0.94, 0.66, 0.71, 0.23], [1.62, 1, 0.61, 0.65, 0.26], [2.12, 0.85, 0.43, 0.5, 0.27]]);
-  shell.add(body);
-  shell.add(profile(glass, [[-1.43, 0.68, 0.77, 0.8, 0.68], [-0.66, 0.68, 1.07, 1.23, 0.77], [0.24, 0.63, 1.06, 1.19, 0.72], [0.86, 0.67, 0.68, 0.73, 0.66]]));
-  const roof = box(shell, paint, 0.97, 0.055, 0.78, 0, 1.23, -0.22);
-  roof.rotation.x = 0.043;
-  box(shell, carbon, 1.88, 0.11, 0.47, 0, 0.29, 1.98);
-  box(shell, carbon, 1.83, 0.23, 0.11, 0, 0.35, -2.02);
-  box(shell, carbon, 2.24, 0.11, 0.36, 0, 1.02, -1.86);
-  const lights = [];
-  const wheels = [];
-  for (const side of [-1, 1]) {
-    box(shell, carbon, 0.10, 0.36, 0.15, side * 0.64, 0.86, -1.83);
-    box(shell, paint, 0.08, 0.19, 0.42, side * 1.12, 1.04, -1.85);
-    box(shell, carbon, 0.14, 0.13, 2.4, side * 0.93, 0.29, 0.06);
-    box(shell, paint, 0.27, 0.10, 0.20, side * 0.94, 0.87, 0.55);
-    box(shell, headlight, 0.47, 0.065, 0.035, side * 0.57, 0.447, 2.127);
-    lights.push(box(shell, tailLight, 0.61, 0.067, 0.04, side * 0.55, 0.57, -2.029));
-    box(shell, stripe, 0.06, 0.012, 0.48, side * 0.15, 0.769, -1.77).rotation.x = -0.13;
-    for (const z of [-1.3, 1.36]) {
-      const holder = new T.Group();
-      holder.position.set(side * 0.92, 0.37, z);
-      const wheel = new T.Group();
-      wheel.add(new T.Mesh(wheelGeometry, rubber), new T.Mesh(rimGeometry, rims));
-      box(wheel, carbon, 0.343, 0.035, 0.40, 0, 0, 0);
-      box(wheel, carbon, 0.344, 0.40, 0.035, 0, 0, 0);
-      holder.add(wheel);
-      root.add(holder);
-      wheels.push({ holder, wheel, front: z > 0 });
-    }
-  }
-  return { root, paint, shell, lights, wheels };
 }
 
 function textPanel(text) {
@@ -311,7 +227,7 @@ export function createView(canvas) {
   function setTrack(track, cars) {
     if (scene) {
       const resources = new Set();
-      const shared = new Set([...assets.shared, boxGeometry, shadowPlane, shadowMaterial, wheelGeometry, rimGeometry, rubber, carbon, rims, glass, headlight, tailLight, brakeLight, stripe]);
+      const shared = new Set([...assets.shared, ...sharedCarResources, boxGeometry]);
       scene.traverse(object => {
         if (object.geometry) resources.add(object.geometry);
         if (object.isInstancedMesh) object.dispose();
@@ -331,10 +247,7 @@ export function createView(canvas) {
     addTrack(scene, track, assets);
     addTrees(scene, track);
     models = cars.map(car => {
-      const model = carModel(car.color);
-      model.root.traverse(object => {
-        if (object.isMesh && object.geometry !== shadowPlane) object.castShadow = object.receiveShadow = true;
-      });
+      const model = createCarModel(car.color);
       scene.add(model.root);
       return model;
     });
@@ -359,17 +272,9 @@ export function createView(canvas) {
       const car = race.cars[i];
       const model = models[i];
       model.root.visible = mode !== 'menu' || i === 0;
-      model.root.position.set(car.x, 0, car.z);
-      model.root.rotation.y = car.yaw;
-      model.shell.rotation.z = car.steer * Math.min(Math.abs(car.speed) / 650, 0.055);
-      if (i === 0) {
-        model.paint.color.set(car.color);
-        for (const light of model.lights) light.material = braking ? brakeLight : tailLight;
-      }
-      for (const { holder, wheel, front } of model.wheels) {
-        if (front) holder.rotation.y = -car.steer * 0.3;
-        wheel.rotation.x -= car.speed * dt / 0.37;
-      }
+      const isBraking = i === 0 ? braking : (model.lastSpeed ?? car.speed) - car.speed > dt * 4;
+      updateCarModel(model, car, dt, isBraking);
+      model.lastSpeed = car.speed;
     }
     const { x, z, yaw } = race.player;
     updateLight(x, z);
