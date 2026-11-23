@@ -30,5 +30,6 @@ export function payoutBreakdown(result) {
     ${result.teamPrize ? `<div><dt>${t('difficultyTeamPrize')}</dt><dd>+${garageMoney(result.teamPrize)}</dd></div>` : ''}
     <div><dt>${t('difficultyBonus')}</dt><dd>${multiplierLabel(result.multiplier)} · +${garageMoney(result.racePrize - result.teamPrize - result.basePrize)}</dd></div>
     ${result.bonus ? `<div><dt>${t('fixedSponsorBonus')}</dt><dd>+${garageMoney(result.bonus)}</dd></div>` : ''}
+    ${result.repayment ? `<div><dt>${t('repairRepayment')}</dt><dd>−${garageMoney(result.repayment)}</dd></div>` : ''}
   </dl>`;
 }

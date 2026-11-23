@@ -12,7 +12,10 @@ export function vehicleCondition(value) {
   };
 }
 
-export const integrity = car => Math.max(0, Math.ceil(100 - portion(car?.damage, 100)));
+export function integrity(car) {
+  const wear = portion(car?.damage, 100);
+  return wear === 100 ? 0 : Math.max(1, Math.floor(100 - wear));
+}
 const exposure = { frontDamage: 1.07, rearDamage: 0.91, leftDamage: 1.0, rightDamage: 1.0 };
 
 export function applyImpact(car, impact, flipped = false, anotherCar = false) {

@@ -173,6 +173,9 @@ dialog p { margin: 12px 0; color: #d7c9bb; }
 .dialog-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 21px; }
 .dialog-actions button { padding-inline: 13px; }
 .dialog-link { margin-top: 16px; background: none; border: 0; padding: 4px 0; color: #eab094; font-size: .84rem; text-decoration: underline; text-underline-offset: 3px; }
+.pause-alternatives { display: flex; flex-wrap: wrap; justify-content: space-between; column-gap: 16px; }
+.retirement-reason { color: #ff977d; font-weight: 650; }
+.result-condition b { padding-left: .35em; color: var(--ink); font-family: var(--display); }
 .pause-setting { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 0; color: #eadacb; font-size: .86rem; }
 .pause-setting select { min-width: 9em; max-width: 55%; padding: 6px 9px; border: 1px solid #fce1cc40; border-radius: 4px; color: inherit; background: #111719; }
 .pause-setting input { accent-color: var(--orange); }
@@ -239,8 +242,29 @@ dialog p { margin: 12px 0; color: #d7c9bb; }
 .stat-forecast { left: var(--left); width: var(--length); box-shadow: 0 0 8px currentColor; }
 .stat-forecast.gain { color: #79e8a8; background: currentColor; }
 .stat-forecast.loss { color: #ffae6b; background: currentColor; }
-.garage-tabs { display: grid; grid-template-columns: 1fr 1fr 1.28fr 1.48fr; gap: 4px; min-height: 57px; padding: 0 7px; border-bottom: 1px solid var(--line); }
+.garage-tabs { display: grid; grid-template-columns: .95fr .95fr 1.26fr 1.4fr .9fr; gap: 4px; min-height: 57px; padding: 0 7px; border-bottom: 1px solid var(--line); }
 .garage-tabs button { font-size: clamp(.70rem, 1.05vw, .88rem); text-wrap: balance; line-height: 1.15; }
+.service-condition { --service-accent: #8ed2a2; border: 1px solid var(--line); border-radius: 8px; padding: 14px; background: linear-gradient(128deg, #8ed2a213, #10182038); }
+.service-condition[data-level="damaged"] { --service-accent: #ffbc71; background: linear-gradient(128deg, #ffbc7116, #10182038); }
+.service-condition[data-level="critical"] { --service-accent: #ff846e; background: linear-gradient(128deg, #ff846e1a, #10182038); }
+.service-condition > div, .service-checkout { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.service-condition strong { color: var(--service-accent); font: 750 2.7rem/.95 var(--display); }
+.service-condition strong span { margin-left: 1px; font-size: .58em; }
+.service-condition small, .service-checkout small { font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+.service-condition meter { display: block; width: 100%; height: 8px; margin: 9px 0 10px; accent-color: var(--service-accent); }
+.service-condition meter::-webkit-meter-bar { border: 0; border-radius: 6px; background: #090d10; }
+.service-condition meter::-webkit-meter-optimum-value, .service-condition meter::-webkit-meter-suboptimum-value,
+.service-condition meter::-webkit-meter-even-less-good-value { border-radius: 6px; background: var(--service-accent); }
+.service-condition p, .service-checkout ~ p { margin: 0; font-size: .84rem; color: #b8c3d0; }
+.inspection-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 12px; }
+.inspection-grid button { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px; min-height: 34px; }
+.inspection-grid button b { color: #acbdc8; }
+.inspection-grid .has-wear { color: #ff9e6e; }
+.inspection-label { margin: 7px 0 0; color: #b8c3d0; font-size: .76rem; }
+.service-checkout { border-top: 1px solid var(--line); margin: 15px 0 7px; padding-top: 12px; }
+.service-checkout > div { display: grid; gap: 4px; }
+.service-checkout b { font: 750 1.6rem/1 var(--display); }
+.service-checkout ~ .repair-debt { margin-top: 6px; color: #ffc481; }
 .garage-panel { max-height: calc(var(--preview-height) + 35px); overflow-y: auto; scrollbar-gutter: stable; padding: 16px 14px 20px; }
 .work-title { margin: 0 0 9px; font: 730 1.25rem/1.2 var(--display); }
 .work-row { display: flex; align-items: center; justify-content: space-between; gap: 11px; min-height: 87px; padding: 11px 0; border-bottom: 1px solid var(--line); }

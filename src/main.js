@@ -1,5 +1,5 @@
 import { acceptSponsor, buyUpgrade, changeTeam, currentEvent, currentTeam, events, finishEvent, gameName,
-  loadCareer, normalizeLoadout, saveCareer, saveProfile, standings, teamById, teams, toggleDecal } from './career.js';
+  loadCareer, normalizeLoadout, repairVehicle, saveCareer, saveProfile, standings, teamById, teams, toggleDecal } from './career.js';
 import { createRace, createTrack, raceStep } from './race.js';
 import { eventDifficulty, eventForResume, hasSavedRace, raceCheckpoint, restoreRace } from './progress.js';
 import { decalSlots, normalizeSetup, sliders } from './setup.js';
@@ -12,7 +12,7 @@ import { circuitMap, drawBriefingMap } from './circuit-map.js';
 import { legacyEvents } from './events.js';
 import { difficultyId, purseFor } from './difficulty.js';
 import { difficultyBadge, difficultyControls, payoutBreakdown } from './race-ui.js';
-import { integrity } from './vehicle-damage.js';
+import { integrity, vehicleCondition } from './vehicle-damage.js';
 import './style.css';
 
 const app = document.querySelector('#app');
@@ -224,7 +224,7 @@ function previewTrack() {
   const next = trackFor(eventForResume(career) ?? events.at(-1));
   const loadout = normalizeLoadout(career);
   const team = screen === 'profile' && !career.profile && draft ? teamById(draft.team) ?? currentTeam(career) : currentTeam(career);
-  useTrack(next, createRace(next, team, loadout.upgrades, loadout.setup, loadout.appearance));
+  useTrack(next, createRace(next, team, loadout.upgrades, loadout.setup, loadout.appearance, { condition: career.condition }));
 }
 
 function showMenu(next = career.screen) {
@@ -270,6 +270,7 @@ function updateProfile() {
 }
 
 function raceButton(saved) {
+  if (!saved && integrity(career.condition) === 0) return `<button type="button" class="primary" data-action="service">${t('repairRequired')} <span aria-hidden="true">↗</span></button>`;
   return `<button type="button" class="primary" data-action="race" ${view ? '' : 'disabled'}>${t(saved ? 'resumeRace' : 'startRace')} <span aria-hidden="true">↗</span></button>`;
 }
 
@@ -309,7 +310,7 @@ function updateMenu() {
     const result = career.results[index];
     const active = item.id === event?.id;
     const laps = result ? result.laps ?? legacyEvents[index]?.laps ?? item.laps : active ? event.laps : item.laps;
-    const status = result ? t('placeLine', result.place, result.points) : active ? t(saved ? 'savedRace' : 'upcoming') : t('waiting');
+    const status = result ? (result.retired ? 'DNF' : t('placeLine', result.place, result.points)) : active ? t(saved ? 'savedRace' : 'upcoming') : t('waiting');
     return `<div class="entry ${active ? 'current' : ''}"><span class="date">${translatedField(item, 'date')}</span><div><strong>${translatedField(item)}</strong><small>${t('laps', laps)} <i>·</i> ${result ? garageMoney(result.prize) : t(item.format)}</small></div><span class="entry-status">${status}</span></div>`;
   });
   byId('panel').innerHTML = `<h2>${t(screen === 'teams' ? 'teams' : 'schedule')}</h2><div class="entries">${entries.join('')}</div>`;
@@ -323,7 +324,8 @@ function updateMenu() {
 
 function updateGaragePreview() {
   const loadout = normalizeLoadout(career);
-  garageCar = { x: 0, z: 0, yaw: 0, speed: 0, steer: 0, frontDamage: 0, rearDamage: 0,
+  const condition = hasSavedRace(career) ? career.activeRace.cars?.[0] ?? career.condition : career.condition;
+  garageCar = { x: 0, z: 0, yaw: 0, speed: 0, steer: 0, ...vehicleCondition(condition),
     color: currentTeam(career).color, appearance: loadout.appearance };
   showStats(career);
 }
@@ -340,7 +342,7 @@ function updateGarage() {
   byId('garage-team').textContent = team.name;
   byId('garage-resume').innerHTML = saved ? raceButton(true) : '';
   const panel = byId('garage-panel');
-  panel.innerHTML = (saved ? `<p class="pending-setup">${t('nextRaceSetup')}</p>` : '') + garagePanel(career);
+  panel.innerHTML = (saved && career.garageTab !== 'service' ? `<p class="pending-setup">${t('nextRaceSetup')}</p>` : '') + garagePanel(career, saved);
   if (career.garageTab !== previousGarageTab) panel.scrollTop = 0;
   previousGarageTab = career.garageTab;
   for (const button of byId('garage').querySelectorAll('nav [data-garage-tab]')) {
@@ -351,16 +353,20 @@ function updateGarage() {
   updateGaragePreview();
 }
 
-function startRace() {
+function startRace(restart = false) {
   const event = eventForResume(career);
   if (!view || !event || mode !== 'menu' || !career.profile) return;
   const next = trackFor(event);
   const restored = restoreRace(career, next);
   if (hasSavedRace(career) && !restored) notify(t('invalidRace'));
-  activeLoadout = restored?.loadout ?? normalizeLoadout(career);
-  alternateCamera = restored?.alternateCamera ?? false;
-  useTrack(next, restored?.race ?? createRace(next, teamById(activeLoadout.team), activeLoadout.upgrades, activeLoadout.setup,
-    activeLoadout.appearance, { difficulty: eventDifficulty(career) }));
+  if (!restored && integrity(career.condition) === 0) return openService();
+  if (!restart) {
+    activeLoadout = restored?.loadout ?? normalizeLoadout(career);
+    alternateCamera = restored?.alternateCamera ?? false;
+  }
+  const continued = !restart && restored?.race;
+  useTrack(next, continued || createRace(next, teamById(activeLoadout.team), activeLoadout.upgrades, activeLoadout.setup,
+    activeLoadout.appearance, { difficulty: eventDifficulty(career), condition: career.condition }));
   byId('circuit-home').append(circuit);
   circuit.setAttribute('aria-label', t('track'));
   mode = 'race';
@@ -451,14 +457,18 @@ function renderPause(saved) {
       <button type="button" class="primary" data-action="resume">${t('resumeRace')}</button>
       <button type="button" class="secondary" data-action="save-exit">${t(saved ? 'saveExit' : 'backCalendar')}</button>
     </div>
-    <button type="button" class="dialog-link" data-action="restart">${t('restartRace')}</button>`;
+    <div class="pause-alternatives">
+      <button type="button" class="dialog-link" data-action="restart">${t('restartRace')}</button>
+      <button type="button" class="dialog-link" data-action="retire">${t('retireRace')}</button>
+    </div>`;
 }
 
-function askRestart() {
-  overlay.innerHTML = `<h2>${t('restartRace')}</h2><p>${t('restartHint')}</p><div class="dialog-actions">
-    <button type="button" class="secondary" data-action="cancel-restart">${t('keepRace')}</button>
-    <button type="button" class="primary" data-action="confirm-restart">${t('restartRace')}</button></div>`;
-  overlay.querySelector('[data-action="cancel-restart"]').focus();
+function confirmRaceAction(action) {
+  const [heading, hint] = action === 'retire' ? ['retireRace', 'retireHint'] : ['restartRace', 'restartHint'];
+  overlay.innerHTML = `<h2>${t(heading)}</h2><p>${t(hint)}</p><div class="dialog-actions">
+    <button type="button" class="secondary" data-action="keep-race">${t('keepRace')}</button>
+    <button type="button" class="primary" data-action="confirm-${action}">${t(heading)}</button></div>`;
+  overlay.querySelector('[data-action="keep-race"]').focus();
 }
 
 function resumeRace() {
@@ -471,37 +481,51 @@ function resumeRace() {
 }
 
 function finishRace() {
-  career = finishEvent(career, race.order, race.player.finishTime, race.player.bestLap, activeLoadout, track.event, { difficulty: race.difficulty });
+  career = finishEvent(career, race.order, race.player.finishTime ?? race.elapsed, race.player.bestLap, activeLoadout, track.event, {
+    difficulty: race.difficulty, retired: race.retired, retiredDrivers: race.retiredDrivers, condition: race.player,
+  });
   mode = 'result';
+  paused = false;
   keys.clear();
+  updateHud();
   persist();
   const result = career.results.at(-1);
-  const unlocked = teams.find(team => team.unlock === career.completed);
+  const condition = integrity(result.condition);
+  const unlocked = !result.retired && teams.find(team => team.unlock === career.completed);
   overlay.innerHTML = `
     <div class="result-heading"><div class="hero-meta"><span></span> ${translatedField(track.event)}</div>${difficultyBadge(result.difficulty)}</div>
-    <h2>${t('raceResult', result.place)}</h2>
+    <h2>${result.retired ? 'DNF' : t('raceResult', result.place)}</h2>
+    ${result.retired ? `<p class="retirement-reason">${t(condition === 0 ? 'mechanicalFailure' : 'driverRetired')}</p>` : ''}
     <div class="result-grid">
       <div class="result-payout"><small>${upper(t('prize'))}</small><b id="result-prize" aria-label="${garageMoney(result.prize)}">${garageMoney(0)}</b></div>
       <div><small>${upper(t('seasonPoints'))}</small><b>+${result.points}</b></div>
       <div><small>${upper(t('totalTime'))}</small><b>${formatTime(result.time)}</b></div>
       <div><small>${upper(t('bestLap'))}</small><b>${formatTime(result.bestLap)}</b></div>
     </div>
-    ${payoutBreakdown(result)}
+    ${result.retired ? '' : payoutBreakdown(result)}
+    <p class="result-condition">${t('bodyCondition')} <b>${condition}%</b></p>
     ${unlocked ? `<p>${t('teamUnlocked', unlocked.name)}</p>` : ''}
     <div class="dialog-actions">
       <button type="button" class="primary" data-action="calendar">${t('backCalendar')}</button>
-      <button type="button" class="secondary" data-action="garage">${t('backGarage')}</button>
+      <button type="button" class="secondary" data-action="${condition < 100 ? 'service' : 'garage'}">${t(condition < 100 ? 'openService' : 'backGarage')}</button>
     </div>
   `;
-  overlay.showModal();
+  if (overlay.open) overlay.querySelector('[data-action="calendar"]').focus();
+  else overlay.showModal();
   const amount = byId('result-prize');
   animateAmount(value => { if (amount.isConnected) amount.textContent = garageMoney(value); }, 0, result.prize, 720);
   playAudio();
 }
 
+function openService() {
+  career = { ...career, garageTab: 'service' };
+  persist();
+  showMenu('garage');
+}
+
 function aimGarage(location) {
-  orbit.azimuth = garageAngles[location];
-  orbit.elevation = location === 'front' ? 0.43 : location === 'side' ? 0.23 : 0.32;
+  orbit.azimuth = location === 'right' ? -garageAngles.side : garageAngles[location];
+  orbit.elevation = location === 'front' ? 0.43 : location === 'side' || location === 'right' ? 0.23 : 0.32;
 }
 
 function tune(key, value) {
@@ -557,20 +581,42 @@ app.addEventListener('click', event => {
     case 'race': startRace(); break;
     case 'pause': pauseRace(); break;
     case 'resume': resumeRace(); break;
-    case 'restart': askRestart(); break;
-    case 'cancel-restart':
+    case 'restart':
+    case 'retire':
+      confirmRaceAction(dataset.action);
+      break;
+    case 'keep-race':
       renderPause(saveActiveRace(true));
       overlay.querySelector('[data-action="resume"]').focus();
       break;
     case 'confirm-restart':
-      career = { ...career, activeRace: null };
+      career = { ...career, condition: vehicleCondition(race.player) };
       overlay.close();
       mode = 'menu';
-      startRace();
+      startRace(true);
+      break;
+    case 'confirm-retire':
+      race.retire();
+      finishRace();
       break;
     case 'save-exit': saveActiveRace(); showMenu('calendar'); break;
     case 'calendar': showMenu('calendar'); break;
     case 'garage': showMenu('garage'); break;
+    case 'service': openService(); break;
+    case 'repair':
+    case 'finance-repair': {
+      if (hasSavedRace(career)) break;
+      const candidate = { ...career, activeRace: null };
+      const repaired = repairVehicle(candidate, dataset.action === 'finance-repair');
+      if (candidate !== repaired) {
+        career = repaired;
+        persist();
+        updateGarage();
+        byId('garage-panel').querySelector('.service-condition')?.focus();
+        notify(t('repairComplete'));
+      }
+      break;
+    }
     case 'profile': draft = undefined; showMenu('profile'); break;
     case 'cancel-profile':
       draft = undefined;

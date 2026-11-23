@@ -1,14 +1,49 @@
-import { currentTeam, maxUpgrade, money, price, upgrades } from './career.js';
+import { currentTeam, maxUpgrade, money, price, repairQuote, upgrades } from './career.js';
 import { escapeHtml, getLanguage, local, t, translatedField } from './i18n.js';
 import { compounds, decalSlots, sliders, sponsors, vehicleStats, wings } from './setup.js';
+import { integrity, vehicleCondition } from './vehicle-damage.js';
 
-export const garageTabs = { parts: 'parts', tuning: 'tuning', aero: 'aero', sponsors: 'livery' };
+export const garageTabs = { parts: 'parts', tuning: 'tuning', aero: 'aero', sponsors: 'livery', service: 'service' };
 export const defaultOrbit = { azimuth: 0.96, elevation: 0.36, zoom: 1 };
 export const garageAngles = { front: 0.80, side: 1.57, rear: 2.58 };
 export const garageMoney = amount => money(amount, getLanguage());
 const selected = active => active ? 'selected' : '';
 const checked = active => active ? 'checked' : '';
 const disabled = value => value ? 'disabled' : '';
+const inspectionZones = [
+  ['frontDamage', 'zoneFront', 'front'], ['rearDamage', 'zoneRear', 'rear'],
+  ['leftDamage', 'zoneLeft', 'side'], ['rightDamage', 'zoneRight', 'right'],
+];
+
+function servicePanel(career, saved) {
+  const condition = vehicleCondition(saved ? career.activeRace.cars?.[0] ?? career.condition : career.condition);
+  const health = integrity(condition);
+  const { cost, shortfall, canFinance } = repairQuote({ ...career, condition });
+  const tier = health < 40 ? 'critical' : health < 70 ? 'damaged' : 'healthy';
+  const status = health === 100 ? 'serviceHealthy' : health === 0 ? 'mechanicalFailure' :
+    health < 40 ? 'serviceCritical' : health < 70 ? 'serviceReduced' : 'serviceCosmetic';
+  return `
+    <div class="service-condition" data-level="${tier}" tabindex="-1">
+      <div><small>${t('bodyCondition')}</small><strong>${health}<span>%</span></strong></div>
+      <meter value="${health}" min="0" max="100" low="40" high="70" optimum="100" aria-label="${t('bodyCondition')}"></meter>
+      <p>${t(status)}</p>
+    </div>
+    <div class="inspection-grid">
+      ${inspectionZones.map(([zone, label, view]) => `<button type="button" class="secondary" data-view="${view}">
+        <span>${t(label)}</span><b class="${condition[zone] > 0.1 ? 'has-wear' : ''}">${Math.round(condition[zone] * 100)}%</b>
+      </button>`).join('')}
+    </div>
+    <p class="inspection-label">${t('zoneWear')}</p>
+    <div class="service-checkout">
+      <div><small>${t('repairCost')}</small><b>${garageMoney(cost)}</b></div>
+      <button type="button" class="primary" data-action="${canFinance ? 'finance-repair' : 'repair'}" ${disabled(saved || !cost || shortfall && !canFinance)}>
+        ${t(canFinance ? 'financeRepair' : 'repairVehicle')}
+      </button>
+    </div>
+    ${saved ? `<p>${t('serviceActiveRace')}</p>` : shortfall ? `<p>${t(canFinance ? 'financeRepairHint' : 'repairShortfall', garageMoney(shortfall))}</p>` : ''}
+    ${career.repairDebt ? `<p class="repair-debt">${t('repairDebt', garageMoney(career.repairDebt))}</p>` : ''}
+  `;
+}
 
 export function setupValue(value, suffix) {
   const display = new Intl.NumberFormat(getLanguage(), { maximumFractionDigits: 1 }).format(value);
@@ -71,11 +106,12 @@ const panels = {
       <p>${t('decalHint')}</p>
       ${decalSlots.map(slot => `<label><input type="checkbox" data-decal="${slot.id}" ${checked(career.decals.includes(slot.id))}> ${local(slot.name)}</label>`).join('')}
     </fieldset>`,
+  service: servicePanel,
 };
 
-export function garagePanel(career) {
+export function garagePanel(career, saved) {
   const id = Object.hasOwn(garageTabs, career.garageTab) ? career.garageTab : 'parts';
-  return `<h3 class="work-title">${t(garageTabs[id])}</h3>${panels[id](career)}`;
+  return `<h3 class="work-title">${t(garageTabs[id])}</h3>${panels[id](career, saved)}`;
 }
 
 function telemetry(career) {

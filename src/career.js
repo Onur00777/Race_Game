@@ -1,6 +1,7 @@
 import { carAppearance, decalSlots, defaultSetup, normalizeSetup, sponsors } from './setup.js';
 import { defaultPoints, defaultPrizes, events } from './events.js';
 import { difficulties, difficultyId } from './difficulty.js';
+import { integrity, vehicleCondition } from './vehicle-damage.js';
 
 export const gameName = 'Kırmızı Çizgi';
 
@@ -28,6 +29,7 @@ export const rivals = [
 
 // Keep the original key and team ID so that existing careers load after the rename.
 const storageKey = 'apex-circuit-career-v1';
+const positiveMoney = value => Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
 export const maxUpgrade = 3;
 const currencyFormats = { en: new Intl.NumberFormat('en-US'), tr: new Intl.NumberFormat('tr-TR') };
 export const money = (amount, language = 'tr') => '₺' + (currencyFormats[language] ?? currencyFormats.tr).format(amount);
@@ -41,6 +43,7 @@ export function newCareer() {
     cash: 400, team: teams[0].id, upgrades: { engine: 0, tires: 0, brakes: 0, aero: 0 },
     setup: { ...defaultSetup }, sponsor: null, decals: [], completed: 0, season: 1, results: [],
     profile: null, activeRace: null, difficulty: 'medium', screen: 'calendar', garageTab: 'parts',
+    condition: vehicleCondition(), repairDebt: 0,
   };
 }
 
@@ -61,7 +64,8 @@ export function loadCareer(storage) {
     const career = JSON.parse(storage.getItem(storageKey));
     if (career && currentTeam(career) && Array.isArray(career.results) && career.upgrades) {
       const { team, upgrades: parts, setup, sponsor, decals } = normalizeLoadout(career);
-      return { ...newCareer(), ...career, team, upgrades: parts, setup, sponsor, decals, difficulty: difficultyId(career.difficulty) };
+      return { ...newCareer(), ...career, team, upgrades: parts, setup, sponsor, decals, difficulty: difficultyId(career.difficulty),
+        condition: vehicleCondition(career.condition), repairDebt: positiveMoney(career.repairDebt) };
     }
   } catch {
     // The career still works for the current session when storage is unavailable.
@@ -115,23 +119,44 @@ export function toggleDecal(career, slot) {
   return { ...career, decals };
 }
 
+export function repairQuote(career) {
+  const { damage } = vehicleCondition(career.condition);
+  const cost = Math.ceil((damage * 8 + damage ** 2 * 0.055) / 5) * 5;
+  return { cost, shortfall: Math.max(0, cost - career.cash), canFinance: integrity(career.condition) === 0 && cost > career.cash };
+}
+
+export function repairVehicle(career, finance = false) {
+  const { cost, shortfall, canFinance } = repairQuote(career);
+  if (career.activeRace || !cost || (shortfall && (!finance || !canFinance))) return career;
+  return {
+    ...career, condition: vehicleCondition(), cash: career.cash - (cost - shortfall),
+    repairDebt: positiveMoney(career.repairDebt) + shortfall,
+  };
+}
+
 export function finishEvent(career, order, time, bestLap, loadout = normalizeLoadout(career), event = currentEvent(career), options = {}) {
+  const retired = options.retired === true;
+  const retiredDrivers = [...new Set([...(options.retiredDrivers ?? []), ...(retired ? ['player'] : [])])];
+  const condition = vehicleCondition(options.condition ?? career.condition);
   const place = order.indexOf('player') + 1;
   const classificationPoints = event?.pointsByPlace ?? defaultPoints;
-  const points = classificationPoints[place - 1];
-  const bonus = loadout.decals.length ? (sponsors.find(offer => offer.id === loadout.sponsor)?.payout ?? 0) : 0;
+  const points = retired ? 0 : classificationPoints[place - 1] ?? 0;
+  const bonus = !retired && loadout.decals.length ? (sponsors.find(offer => offer.id === loadout.sponsor)?.payout ?? 0) : 0;
   const difficulty = difficultyId(options.difficulty, 'easy');
   const multiplier = difficulties[difficulty].multiplier;
-  const basePrize = (event?.prizes ?? defaultPrizes)[place - 1];
+  const basePrize = retired ? 0 : (event?.prizes ?? defaultPrizes)[place - 1] ?? 0;
   const teamPrize = Math.round(basePrize * (teamById(loadout.team).payout - 1));
   const racePrize = Math.round((basePrize + teamPrize) * multiplier);
-  const prize = racePrize + bonus;
+  const repayment = Math.min(positiveMoney(career.repairDebt), racePrize + bonus);
+  const prize = racePrize + bonus - repayment;
   const result = { place, points, prize, bonus, basePrize, teamPrize, racePrize, difficulty, multiplier,
-    time, bestLap, order, classificationPoints, laps: event?.laps };
+    time, bestLap, order, classificationPoints, laps: event?.laps, retired, retiredDrivers, repayment, condition };
   return {
     ...career,
     cash: career.cash + prize,
-    completed: career.completed + 1,
+    completed: career.completed + Number(!retired),
+    condition,
+    repairDebt: positiveMoney(career.repairDebt) - repayment,
     activeRace: null,
     results: [...career.results, result],
   };
@@ -141,10 +166,12 @@ export function standings(career) {
   const drivers = [{ id: 'player', name: career.profile?.name ?? 'Sen', color: currentTeam(career).color }, ...rivals];
   return drivers.map(driver => ({
     ...driver,
-    points: career.results.reduce((sum, result) =>
-      sum + (result.classificationPoints ?? defaultPoints)[result.order.indexOf(driver.id)], 0),
+    points: career.results.reduce((sum, result) => {
+      if (result.retiredDrivers?.includes(driver.id)) return sum;
+      return sum + ((result.classificationPoints ?? defaultPoints)[result.order.indexOf(driver.id)] ?? 0);
+    }, 0),
     places: Array.from({ length: drivers.length }, (_, index) =>
-      career.results.filter(result => result.order[index] === driver.id).length),
+      career.results.filter(result => result.order[index] === driver.id && !result.retiredDrivers?.includes(driver.id)).length),
   })).sort((a, b) => {
     if (a.points !== b.points) return b.points - a.points;
     for (let index = 0; index < a.places.length; index++) {
