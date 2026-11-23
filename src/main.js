@@ -109,6 +109,8 @@ let accumulator = 0;
 let lastHudUpdate = -1;
 let lastMenuDraw = -Infinity;
 let lastCheckpoint = -Infinity;
+let pendingTuning = false;
+let previousGarageTab;
 
 function formatTime(seconds) {
   if (!Number.isFinite(seconds)) return '—';
@@ -127,6 +129,7 @@ function notify(message) {
 
 function persist(quiet = false) {
   const saved = saveCareer(storage, career);
+  if (saved) pendingTuning = false;
   if (!saved && !quiet) notify(t('storageError'));
   return saved;
 }
@@ -190,7 +193,8 @@ function previewTrack() {
   if (!view) return;
   const next = trackFor(currentEvent(career) ?? events.at(-1));
   const loadout = normalizeLoadout(career);
-  useTrack(next, createRace(next, currentTeam(career), loadout.upgrades, loadout.setup, loadout.appearance));
+  const team = screen === 'profile' && !career.profile && draft ? teamById(draft.team) ?? currentTeam(career) : currentTeam(career);
+  useTrack(next, createRace(next, team, loadout.upgrades, loadout.setup, loadout.appearance));
 }
 
 function showMenu(next = career.screen) {
@@ -283,7 +287,10 @@ function updateGarage() {
   const saved = hasSavedRace(career);
   byId('garage-team').textContent = team.name;
   byId('garage-resume').innerHTML = saved ? raceButton(true) : '';
-  byId('garage-panel').innerHTML = (saved ? `<p class="pending-setup">${t('nextRaceSetup')}</p>` : '') + garagePanel(career);
+  const panel = byId('garage-panel');
+  panel.innerHTML = (saved ? `<p class="pending-setup">${t('nextRaceSetup')}</p>` : '') + garagePanel(career);
+  if (career.garageTab !== previousGarageTab) panel.scrollTop = 0;
+  previousGarageTab = career.garageTab;
   for (const button of byId('garage').querySelectorAll('nav [data-garage-tab]')) {
     if (button.dataset.garageTab === career.garageTab) button.setAttribute('aria-current', 'page');
     else button.removeAttribute('aria-current');
@@ -381,13 +388,25 @@ function pauseRace() {
   paused = true;
   const saved = saveActiveRace(true);
   updateHud();
+  renderPause(saved);
+  overlay.showModal();
+  playAudio();
+}
+
+function renderPause(saved) {
   overlay.innerHTML = `<h2>${t('paused')}</h2><p>${t(saved ? 'pauseSaved' : 'pauseUnsaved')}</p>
     <div class="dialog-actions">
       <button type="button" class="primary" data-action="resume">${t('resumeRace')}</button>
       <button type="button" class="secondary" data-action="save-exit">${t(saved ? 'saveExit' : 'backCalendar')}</button>
-    </div>`;
-  overlay.showModal();
-  playAudio();
+    </div>
+    <button type="button" class="dialog-link" data-action="restart">${t('restartRace')}</button>`;
+}
+
+function askRestart() {
+  overlay.innerHTML = `<h2>${t('restartRace')}</h2><p>${t('restartHint')}</p><div class="dialog-actions">
+    <button type="button" class="secondary" data-action="cancel-restart">${t('keepRace')}</button>
+    <button type="button" class="primary" data-action="confirm-restart">${t('restartRace')}</button></div>`;
+  overlay.querySelector('[data-action="cancel-restart"]').focus();
 }
 
 function resumeRace() {
@@ -433,6 +452,7 @@ function aimGarage(location) {
 
 function tune(key, value) {
   career = { ...career, setup: normalizeSetup({ ...career.setup, [key]: value }, career.upgrades.aero) };
+  pendingTuning = true;
   updateGaragePreview();
   const output = byId('garage-panel').querySelector(`[data-value="${key}"]`);
   const spec = sliders.find(item => item.id === key);
@@ -455,6 +475,8 @@ app.addEventListener('click', event => {
     persist();
     updateGarage();
     if (dataset.buy === 'aero') aimGarage('rear');
+    const samePart = byId('garage-panel').querySelector(`[data-buy="${dataset.buy}"]:not(:disabled)`);
+    (samePart ?? byId('garage').querySelector('nav [aria-current]'))?.focus();
   }
   if (dataset.team) {
     career = changeTeam(career, dataset.team);
@@ -479,6 +501,17 @@ app.addEventListener('click', event => {
     case 'race': startRace(); break;
     case 'pause': pauseRace(); break;
     case 'resume': resumeRace(); break;
+    case 'restart': askRestart(); break;
+    case 'cancel-restart':
+      renderPause(saveActiveRace(true));
+      overlay.querySelector('[data-action="resume"]').focus();
+      break;
+    case 'confirm-restart':
+      career = { ...career, activeRace: null };
+      overlay.close();
+      mode = 'menu';
+      startRace();
+      break;
     case 'save-exit': saveActiveRace(); showMenu('calendar'); break;
     case 'calendar': showMenu('calendar'); break;
     case 'garage': showMenu('garage'); break;
@@ -515,7 +548,10 @@ app.addEventListener('input', event => {
 app.addEventListener('change', event => {
   const field = event.target;
   if (field.form?.id === 'driver-form') {
-    if (field.name === 'team') draft.team = field.value;
+    if (field.name === 'team') {
+      draft.team = field.value;
+      if (race) race.player.color = teamById(draft.team).color;
+    }
     if (field.name === 'language') {
       draft.language = field.value;
       setLanguage(field.value);
@@ -600,8 +636,15 @@ window.addEventListener('keydown', event => {
 });
 window.addEventListener('keyup', event => keys.delete(event.code));
 window.addEventListener('blur', () => { keys.clear(); pauseRace(); });
-document.addEventListener('visibilitychange', () => { if (document.hidden) pauseRace(); });
-window.addEventListener('pagehide', () => { saveActiveRace(true); });
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) return;
+  if (mode === 'race') pauseRace();
+  else if (pendingTuning) persist(true);
+});
+window.addEventListener('pagehide', () => {
+  if (mode === 'race') saveActiveRace(true);
+  else if (pendingTuning) persist(true);
+});
 overlay.addEventListener('cancel', event => {
   event.preventDefault();
   if (paused) resumeRace();

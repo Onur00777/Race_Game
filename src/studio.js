@@ -47,18 +47,22 @@ export function createStudio(assets) {
   scene.add(model.root);
   const camera = new T.PerspectiveCamera(40, 1, 0.08, 55);
   const target = new T.Vector3();
-  const position = new T.Vector3();
-  let ready = false;
+  let displayed;
 
   function draw(renderer, car, orbit, aspect, dt) {
-    camera.aspect = aspect;
-    camera.updateProjectionMatrix();
-    const distance = Math.max(6.05, 5.7 / Math.min(1, aspect)) / orbit.zoom;
-    const flat = Math.cos(orbit.elevation) * distance;
-    position.set(Math.sin(orbit.azimuth) * flat, 0.53 + Math.sin(orbit.elevation) * distance, Math.cos(orbit.azimuth) * flat);
-    if (ready) camera.position.lerp(position, 1 - Math.exp(-dt * 13));
-    else camera.position.copy(position);
-    ready = true;
+    if (camera.aspect !== aspect) {
+      camera.aspect = aspect;
+      camera.updateProjectionMatrix();
+    }
+    displayed ??= { ...orbit };
+    const blend = 1 - Math.exp(-dt * 13);
+    const delta = Math.atan2(Math.sin(orbit.azimuth - displayed.azimuth), Math.cos(orbit.azimuth - displayed.azimuth));
+    displayed.azimuth += delta * blend;
+    displayed.elevation = T.MathUtils.lerp(displayed.elevation, orbit.elevation, blend);
+    displayed.zoom = T.MathUtils.lerp(displayed.zoom, orbit.zoom, blend);
+    const distance = Math.max(6.05, 5.7 / Math.min(1, aspect)) / displayed.zoom;
+    const flat = Math.cos(displayed.elevation) * distance;
+    camera.position.set(Math.sin(displayed.azimuth) * flat, 0.53 + Math.sin(displayed.elevation) * distance, Math.cos(displayed.azimuth) * flat);
     target.set(0, 0.56, 0);
     camera.lookAt(target);
     updateCarModel(model, car, dt, false);
