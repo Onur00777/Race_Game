@@ -1,7 +1,7 @@
 import { currentTeam, maxUpgrade, money, price, repairQuote, upgrades } from './career.js';
 import { escapeHtml, getLanguage, local, t, translatedField } from './i18n.js';
 import { compounds, decalSlots, sliders, sponsors, vehicleStats, wings } from './setup.js';
-import { integrity, vehicleCondition } from './vehicle-damage.js';
+import { damagePerformance, integrity, vehicleCondition } from './vehicle-damage.js';
 
 export const garageTabs = { parts: 'parts', tuning: 'tuning', aero: 'aero', sponsors: 'livery', service: 'service' };
 export const defaultOrbit = { azimuth: 0.96, elevation: 0.36, zoom: 1 };
@@ -114,15 +114,18 @@ export function garagePanel(career, saved) {
   return `<h3 class="work-title">${t(garageTabs[id])}</h3>${panels[id](career, saved)}`;
 }
 
-function telemetry(career) {
+function telemetry(career, condition) {
   const stats = vehicleStats(currentTeam(career), career.upgrades, career.setup);
-  const limit = stats.topSpeed + 8;
+  const performance = damagePerformance(condition);
+  const topSpeed = stats.topSpeed * performance.speed;
+  const limit = topSpeed + 8;
+  const acceleration = stats.acceleration * performance.power;
   return {
-    topSpeed: stats.topSpeed * 3.6,
-    acceleration: -limit / stats.acceleration * Math.log(1 - (100 / 3.6) / limit),
-    downforce: stats.load,
+    topSpeed: topSpeed * 3.6,
+    acceleration: topSpeed > 100 / 3.6 ? -limit / acceleration * Math.log(1 - (100 / 3.6) / limit) : Infinity,
+    downforce: stats.load * performance.aero,
     stopping: (100 / 3.6) ** 2 / (2 * stats.braking),
-    grip: stats.grip,
+    grip: stats.grip * performance.grip,
   };
 }
 
@@ -131,9 +134,10 @@ export function previewPart(career, id) {
   return { ...career, upgrades: { ...career.upgrades, [id]: career.upgrades[id] + 1 } };
 }
 
-export function garageStats(career, preview, applied = false) {
-  const baseline = telemetry(career);
-  const next = preview && telemetry(preview);
+export function garageStats(career, preview, applied = false, condition = vehicleCondition(career.condition)) {
+  const baseline = telemetry(career, condition);
+  const next = preview && telemetry(preview, condition);
+  const unavailable = integrity(condition) === 0;
   const metrics = [
     ['topSpeed', t('kmh'), 100, 260, false, 0],
     ['acceleration', 's', 1.8, 4.7, true, 2],
@@ -142,12 +146,15 @@ export function garageStats(career, preview, applied = false) {
     ['grip', '', 5, 15, false, 1],
   ];
   return metrics.map(([id, unit, min, max, reverse, precision]) => {
+    const compare = next?.[id] ?? baseline[id];
+    const value = applied ? compare : baseline[id];
+    if (unavailable || !Number.isFinite(value)) return `<div data-stat="${id}"><small>${t(id)}</small><b>—</b></div>`;
     const score = number => {
       const ratio = Math.max(0, Math.min(1, (number - min) / (max - min)));
       return (reverse ? 1 - ratio : ratio) * 100;
     };
-    const compare = next?.[id] ?? baseline[id];
-    const difference = Number((compare - baseline[id]).toFixed(precision));
+    const difference = Number.isFinite(compare) && Number.isFinite(baseline[id]) ?
+      Number((compare - baseline[id]).toFixed(precision)) : 0;
     const label = new Intl.NumberFormat(getLanguage(), { maximumFractionDigits: precision });
     const positive = reverse ? difference < 0 : difference > 0;
     const from = score(baseline[id]);
@@ -155,7 +162,7 @@ export function garageStats(career, preview, applied = false) {
     const delta = difference ? `<em class="stat-delta ${positive ? 'gain' : 'loss'}">${difference > 0 ? '+' : '−'}${label.format(Math.abs(difference))}</em>` : '';
     const segment = difference ? `<i class="stat-forecast ${positive ? 'gain' : 'loss'}" style="--left:${Math.min(from, to)}%;--length:${Math.max(1.6, Math.abs(to - from))}%"></i>` : '';
     return `<div data-stat="${id}"><small>${t(id)}</small>
-      <b>${label.format(applied ? compare : baseline[id])} <span>${unit}</span>${delta}</b>
+      <b>${label.format(value)} <span>${unit}</span>${delta}</b>
       <div class="stat-bar" aria-hidden="true"><span style="width:${from}%"></span>${segment}</div></div>`;
   }).join('');
 }

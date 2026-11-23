@@ -411,10 +411,10 @@ export function createCarModel(color) {
   mount(shell, cabinShape, [glass, paint]);
   const wing = addWing(shell);
   const decals = decalMounts.map(({ slot, geometry }) => {
-    const mesh = mount(shell, geometry, inset);
+    const mesh = mount(shell, geometry.clone(), inset);
     mesh.visible = false;
     mesh.renderOrder = 2;
-    return { slot, mesh };
+    return { slot, mesh, base: geometry.attributes.position.array };
   });
   const rear = new T.Group();
   const nose = new T.Group();
@@ -555,6 +555,7 @@ function deformBody(model, car) {
   const [front, rear, left, right, total] = damage;
   deformSurface(model.body.geometry, bodyShape.attributes.position.array, front, rear, left, right);
   model.body.geometry.computeVertexNormals();
+  for (const { mesh, base } of model.decals) deformSurface(mesh.geometry, base, front, rear, left, right);
   for (const { zone, mesh, base } of model.scuffs) {
     const opacity = Math.min(1, (car[zone] ?? 0) * 1.35 + Math.max(0, total - 28) * 0.003);
     mesh.visible = opacity > 0.025;
@@ -576,15 +577,19 @@ export function updateCarModel(model, car, dt, braking, fire = 0) {
   model.shell.rotation.z += (roll - model.shell.rotation.z) * (1 - Math.exp(-9 * dt));
   for (const light of model.lights) light.material = braking ? brakeLight : tailLight;
   model.lightClock += dt;
+  let litLamps = 0;
   for (const { side, lamps, crack } of model.headlights) {
     const strength = (car.frontDamage ?? 0) + (side > 0 ? (car.leftDamage ?? 0) : (car.rightDamage ?? 0)) * 0.24;
     crack.visible = strength > 0.51;
     const t = model.lightClock * (side > 0 ? 17 : 13);
     const flicker = !model.reducedMotion.matches && Math.sin(t) * Math.sin(t * 0.47 + side) > 0.34;
     lamps.forEach((lamp, index) => {
-      lamp.material = strength > 0.88 && (index > 1 || flicker) || strength > 0.63 && flicker ? brokenLamp : headlight;
+      const failed = (strength > 0.88 && index > 1) || (strength > 0.63 && flicker);
+      lamp.material = failed ? brokenLamp : headlight;
+      if (!failed) litLamps++;
     });
   }
+  model.headlightOutput = 0.14 + litLamps / 8 * 0.86;
   for (const [index, flame] of model.flames.entries()) {
     flame.visible = fire > 0;
     if (flame.visible) flame.scale.setScalar(fire * (index ? 0.84 : 1));

@@ -389,7 +389,7 @@ export function createView(canvas, quality) {
       model.lastSpeed = car.speed;
     }
     const { x, z, yaw } = cars[0];
-    updateLight(x, z, yaw);
+    updateLight(x, z, yaw, models[0].headlightOutput);
     const fx = Math.sin(yaw);
     const fz = Math.cos(yaw);
     if (mode === 'menu') {

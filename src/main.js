@@ -181,7 +181,8 @@ function updateSoundButton() {
 }
 
 function playAudio() {
-  updateAudio(audio, race, sound && mode === 'race' && !paused);
+  const driving = sound && mode === 'race' && !paused;
+  updateAudio(audio, race, driving, driving || sound && mode === 'result');
 }
 
 function enableAudio() {
@@ -334,7 +335,7 @@ function updateGaragePreview() {
 
 function showStats(before, after, applied = false) {
   clearTimeout(statTimer);
-  byId('garage-stats').innerHTML = garageStats(before, after, applied);
+  byId('garage-stats').innerHTML = garageStats(before, after, applied, garageCar);
   if (applied) statTimer = setTimeout(() => showStats(career), 1750);
 }
 

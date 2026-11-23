@@ -74,7 +74,7 @@ function nightLights(scene, track) {
   for (const light of floodlights) scene.add(light, light.target);
   const head = new T.SpotLight('#ddecff', 0, 78, 0.34, 0.61, 1.55);
   scene.add(head, head.target);
-  return (x, z, yaw) => {
+  return (x, z, yaw, headlightOutput) => {
     const nearest = posts.map(post => ({ post, distance: Math.hypot(x - post.point.x, z - post.point.z) }))
       .sort((a, b) => a.distance - b.distance);
     for (const [index, light] of floodlights.entries()) {
@@ -86,7 +86,7 @@ function nightLights(scene, track) {
     const fx = Math.sin(yaw), fz = Math.cos(yaw);
     head.position.set(x + fx * 1.89, 0.57, z + fz * 1.89);
     head.target.position.set(x + fx * 40, -0.45, z + fz * 40);
-    head.intensity = 205;
+    head.intensity = 205 * headlightOutput;
   };
 }
 
@@ -118,7 +118,7 @@ export function lightTrack(scene, track, assets) {
   scene.add(sun, sun.target, new T.HemisphereLight('#cadcf4', event.weather === 'night' ? '#485160' : '#615940', view.fill));
   const updateNight = event.weather === 'night' ? nightLights(scene, track) : null;
 
-  return (x, z, yaw) => {
+  return (x, z, yaw, headlightOutput) => {
     const size = 72 / sun.shadow.mapSize.x;
     const target = sun.target.position.set(x, 0, z);
     for (const axis of [right, vertical]) {
@@ -126,7 +126,7 @@ export function lightTrack(scene, track, assets) {
       target.addScaledVector(axis, Math.round(coordinate / size) * size - coordinate);
     }
     sun.position.copy(sun.target.position).addScaledVector(direction, 66);
-    updateNight?.(x, z, yaw);
+    updateNight?.(x, z, yaw, headlightOutput);
   };
 }
 

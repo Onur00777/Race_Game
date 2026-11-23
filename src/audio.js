@@ -87,7 +87,7 @@ function crashSound(impact, audio) {
   source.start();
 }
 
-export function updateAudio(audio, race, playing) {
+export function updateAudio(audio, race, playing, allowImpact = playing) {
   if (!audio) return;
   const speed = Math.abs(race?.player.speed ?? 0);
   const audible = playing && race.countdown === 0;
@@ -103,7 +103,7 @@ export function updateAudio(audio, race, playing) {
   updateScreech(audio, race, audible, now);
   if (race?.impact && race.impact !== audio.lastImpact) {
     audio.lastImpact = race.impact;
-    if (audible) crashSound(race.impact, audio);
+    if (allowImpact) crashSound(race.impact, audio);
   }
   if (race?.backfire && race.backfire !== audio.lastFire) {
     audio.lastFire = race.backfire;
