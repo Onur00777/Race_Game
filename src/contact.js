@@ -54,14 +54,15 @@ function collide(a, b, normal, point, depth, restitution, friction) {
 
   const closingSpeed = relativeVelocity(normal);
   if (closingSpeed <= 0) return null;
+  const tangent = across(normal);
+  const relativeSpeed = Math.hypot(closingSpeed, relativeVelocity(tangent));
   const bounce = closingSpeed > 2 ? restitution : 0;
   const impulse = (1 + bounce) * closingSpeed / effectiveMass(normal);
   apply(normal, impulse);
-  const tangent = across(normal);
   const sliding = relativeVelocity(tangent);
   const maxFriction = impulse * friction;
   apply(tangent, Math.max(-maxFriction, Math.min(maxFriction, sliding / effectiveMass(tangent))));
-  return { ...point, nx: normal.x, nz: normal.z, impulse, sliding };
+  return { ...point, nx: normal.x, nz: normal.z, impulse, sliding, normalSpeed: closingSpeed, relativeSpeed };
 }
 
 function extent(forward, side, axis) {

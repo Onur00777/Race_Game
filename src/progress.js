@@ -2,6 +2,7 @@ import { currentEvent, normalizeLoadout, teamById } from './career.js';
 import { createRace } from './race.js';
 import { legacyEvents } from './events.js';
 import { difficultyId } from './difficulty.js';
+import { vehicleCondition } from './vehicle-damage.js';
 
 const carFields = ['x', 'z', 'yaw', 'speed', 'lateral', 'spin', 'steer', 'station',
   'damage', 'frontDamage', 'rearDamage'];
@@ -21,6 +22,7 @@ export function raceCheckpoint(career, race, loadout, alternateCamera) {
     countdown: race.countdown,
     cars: race.cars.map((car, index) => ({
       ...Object.fromEntries(carFields.map(key => [key, car[key]])),
+      leftDamage: car.leftDamage, rightDamage: car.rightDamage,
       id: car.id, offset: car.offset, onRoad: car.onRoad,
       ...(index === 0
         ? { lap: car.lap, lapStarted: car.lapStarted, bestLap: car.bestLap }
@@ -62,6 +64,7 @@ export function restoreRace(career, track) {
     const state = save.cars[i];
     if (!state || car.id !== state.id || !carFields.every(key => Number.isFinite(state[key]))) return null;
     for (const key of carFields) car[key] = state[key];
+    Object.assign(car, vehicleCondition(state));
     const projection = track.project(car.x, car.z);
     car.offset = Number.isFinite(state.offset) ? state.offset : projection.offset;
     car.onRoad = typeof state.onRoad === 'boolean' ? state.onRoad : projection.distance <= event.width / 2 + 0.6;
@@ -78,5 +81,6 @@ export function restoreRace(career, track) {
   }
   race.elapsed = save.elapsed;
   race.countdown = save.countdown;
+  race.refreshHandling();
   return { race, loadout, alternateCamera: save.alternateCamera === true };
 }

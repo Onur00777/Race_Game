@@ -6,6 +6,7 @@ import { difficultyId } from './difficulty.js';
 import { advanceVehicle, angleBetween, clamp } from './vehicle-physics.js';
 import { createRaceIntel, wakeFactor } from './race-ai.js';
 import { createTires, updateTires } from './tires.js';
+import { applyImpact, damagePerformance, vehicleCondition } from './vehicle-damage.js';
 
 const wrap = (value, period) => ((value % period) + period) % period;
 export const raceStep = 1 / 120;
@@ -86,13 +87,13 @@ export function createTrack(event) {
   return { event, length, spacing, railOffset, samples, at, project };
 }
 
-const bodyState = () => ({ speed: 0, lateral: 0, spin: 0, steer: 0, damage: 0, frontDamage: 0, rearDamage: 0,
+const bodyState = condition => ({ speed: 0, lateral: 0, spin: 0, steer: 0, ...vehicleCondition(condition),
   wheels: createTires(), tireSlip: 0 });
 
 export function createRace(track, team, upgrades, setup, appearance, options = {}) {
   const finish = track.length * track.event.laps;
   const player = {
-    id: 'player', color: team.color, station: -18, ...track.at(-18, 2.5), ...bodyState(),
+    id: 'player', color: team.color, station: -18, ...track.at(-18, 2.5), ...bodyState(options.condition),
     onRoad: true, offset: 2.5, lap: 0, lapStarted: 0, bestLap: null, appearance,
   };
   const opponents = rivals.map((rival, index) => {
@@ -105,11 +106,18 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
   const cars = [player, ...opponents];
   const race = { track, player, opponents, cars, difficulty: difficultyId(options.difficulty),
     runId: options.runId ?? (globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)), previousPoses: cars.map(visualPose),
-    elapsed: 0, countdown: 3, order: null, impact: null, throttle: false, backfire: null, engineLevel: upgrades.engine };
+    elapsed: 0, countdown: 3, order: null, impact: null, impacts: [], retired: false, throttle: false, backfire: null, engineLevel: upgrades.engine };
   const surfaceGrip = track.event.surfaceGrip;
   const playerHandling = { ...vehicleStats(team, upgrades, setup), surfaceGrip };
   const { topSpeed, braking, grip, load } = playerHandling;
-  race.handling = { topSpeed, braking: braking * surfaceGrip, grip: (grip + load * 0.018) * surfaceGrip };
+  let impactSerial = 0;
+
+  function refreshHandling() {
+    const performance = damagePerformance(player);
+    race.handling = { topSpeed: topSpeed * performance.speed, braking: braking * surfaceGrip,
+      grip: (grip * performance.grip + load * 0.018 * performance.aero) * surfaceGrip };
+  }
+  refreshHandling();
 
   function relativeStation(station, reference) {
     return wrap(station - reference + track.length / 2, track.length) - track.length / 2;
@@ -125,21 +133,21 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
     race.previousPoses[cars.indexOf(car)] = visualPose(car);
   }
 
-  function damageAt(car, impact) {
-    if (!car || impact.impulse <= 2.6) return;
-    const amount = (impact.impulse - 2.6) * 1.65;
-    const along = (impact.x - car.x) * Math.sin(car.yaw) + (impact.z - car.z) * Math.cos(car.yaw);
-    car.damage = Math.min(100, car.damage + amount);
-    car.frontDamage = Math.min(1, car.frontDamage + amount * clamp(0.5 + along * 0.3, 0, 1) / 66);
-    car.rearDamage = Math.min(1, car.rearDamage + amount * clamp(0.5 - along * 0.3, 0, 1) / 66);
-  }
-
   function reportImpact(impact, first, second) {
     if (!impact) return;
-    damageAt(first, impact);
-    damageAt(second, impact);
-    if (impact.impulse > 1.1 && (first === player || second === player)) {
-      race.impact = { ...impact, kind: second ? 'vehicle' : 'rail', time: race.elapsed };
+    const primary = applyImpact(first, impact, false, Boolean(second));
+    const secondary = second && applyImpact(second, impact, true, true);
+    const own = first === player ? primary : second === player ? secondary : null;
+    if (own) refreshHandling();
+    if (impact.impulse < 1.15) return;
+    const event = { ...impact, kind: second ? 'vehicle' : 'rail', time: race.elapsed, serial: ++impactSerial };
+    if (impact.normalSpeed > 5.4 && impact.impulse > 2.7) {
+      race.impacts.push(event);
+      if (race.impacts.length > 32) race.impacts.shift();
+    }
+    if (first === player || second === player) {
+      const sign = first === player ? 1 : -1;
+      race.impact = { ...event, nx: event.nx * sign, nz: event.nz * sign, zone: own?.zone, loss: own?.amount ?? 0 };
     }
   }
 
@@ -160,9 +168,9 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
     // Reject projection jumps between different sections of a hairpin.
     const advance = Math.abs(delta) < 6 ? delta : 0;
     car.station += advance;
-    if (car.finishTime == null && car.station >= finish) car.finishTime = race.elapsed - dt + dt * (finish - previous) / advance;
+    if (car.finishTime == null && car.damage < 100 && car.station >= finish) car.finishTime = race.elapsed - dt + dt * (finish - previous) / advance;
     if (car === player) updateLap(previous);
-    else if (car.finishTime == null) {
+    else if (car.finishTime == null && car.damage < 100) {
       car.stuck = advance < dt * 0.25 ? car.stuck + dt : 0;
       if (car.stuck > 5.5) {
         car.rejoins = (car.rejoins ?? 0) + 1;
@@ -182,13 +190,21 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
     player.lapStarted = race.elapsed;
   }
 
-  function classify() {
-    race.order = [...cars].sort((a, b) =>
+  function classify(retired = false) {
+    race.retired = retired;
+    race.retiredDrivers = cars.filter(car => car.damage >= 100 && car.finishTime == null).map(car => car.id);
+    if (retired && !race.retiredDrivers.includes(player.id)) race.retiredDrivers.push(player.id);
+    const stopped = new Set(race.retiredDrivers);
+    race.order = [...cars].sort((a, b) => Number(stopped.has(a.id)) - Number(stopped.has(b.id)) ||
       (a.finishTime ?? Infinity) - (b.finishTime ?? Infinity) || b.station - a.station).map(car => car.id);
   }
 
   function update(dt, input) {
     if (race.order) return;
+    if (player.damage >= 100) {
+      classify(true);
+      return;
+    }
     if (race.countdown > 0) {
       race.countdown = Math.max(0, race.countdown - dt);
       return;
@@ -204,7 +220,7 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
     race.throttle = throttle;
     const active = cars.filter(car => car.finishTime == null || car.speed > 1);
     const controls = active.map(car => car === player ? { ...input, draft: wakeFactor(track, player, cars, relativeStation) } :
-      raceIntel.controls(car, cars, race.elapsed, dt));
+      car.damage >= 100 ? { gas: 0, brake: 0.34, steering: 0 } : raceIntel.controls(car, cars, race.elapsed, dt));
     active.forEach((car, index) => {
       advanceVehicle(car, controls[index], car === player ? playerHandling : raceIntel.handling, dt, car === player);
     });
@@ -216,13 +232,17 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
       }
     }
     active.forEach((car, index) => trackProgress(car, controls[index], car === player ? playerHandling : raceIntel.handling, dt));
-    if (player.finishTime != null) {
+    if (player.damage >= 100) {
+      classify(true);
+    } else if (player.finishTime != null) {
       race.elapsed = player.finishTime;
       classify();
     }
   }
 
   race.reset = () => rejoin(player);
+  race.retire = () => { if (!race.order) classify(true); };
+  race.refreshHandling = refreshHandling;
   race.update = update;
   race.position = () => race.order ? race.order.indexOf(player.id) + 1
     : 1 + opponents.filter(car => car.station > player.station).length;

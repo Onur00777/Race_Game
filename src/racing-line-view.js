@@ -54,13 +54,15 @@ export function createRacingLineView() {
   const shade = new T.Color();
   let session;
   let plan;
+  let handling;
 
   function update(race, car, visible) {
     mesh.visible = visible;
     if (!visible) return;
-    if (session !== race) {
+    if (session !== race || handling !== race.handling) {
       session = race;
-      plan = makeRacingLine(race.track, race.handling);
+      handling = race.handling;
+      plan = makeRacingLine(race.track, handling);
     }
     const speed = Math.max(0, car.speed);
     for (let i = 0; i <= segments; i++) {
