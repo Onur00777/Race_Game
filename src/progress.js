@@ -1,0 +1,58 @@
+import { currentEvent, normalizeLoadout, teamById } from './career.js';
+import { createRace } from './race.js';
+
+const carFields = ['x', 'z', 'yaw', 'speed', 'lateral', 'spin', 'steer', 'station',
+  'damage', 'frontDamage', 'rearDamage'];
+
+export function raceCheckpoint(career, race, loadout, alternateCamera) {
+  return {
+    version: 1,
+    season: career.season,
+    round: career.results.length,
+    loadout,
+    alternateCamera,
+    elapsed: race.elapsed,
+    countdown: race.countdown,
+    cars: race.cars.map((car, index) => ({
+      ...Object.fromEntries(carFields.map(key => [key, car[key]])),
+      id: car.id,
+      ...(index === 0
+        ? { lap: car.lap, lapStarted: car.lapStarted, bestLap: car.bestLap, onRoad: car.onRoad }
+        : { offset: car.offset, finishTime: car.finishTime }),
+    })),
+  };
+}
+
+export function hasSavedRace(career) {
+  const save = career.activeRace;
+  return Boolean(save?.version === 1 && save.season === career.season &&
+    save.round === career.results.length && currentEvent(career));
+}
+
+export function restoreRace(career, track) {
+  if (!hasSavedRace(career)) return null;
+  const save = career.activeRace;
+  const loadout = normalizeLoadout(save.loadout);
+  const race = createRace(track, teamById(loadout.team), loadout.upgrades, loadout.setup, loadout.appearance);
+  if (!Number.isFinite(save.elapsed) || save.elapsed < 0 ||
+      !Number.isFinite(save.countdown) || save.countdown < 0 || save.countdown > 3 ||
+      !Array.isArray(save.cars) || save.cars.length !== race.cars.length) return null;
+
+  for (const [i, car] of race.cars.entries()) {
+    const state = save.cars[i];
+    if (!state || car.id !== state.id || !carFields.every(key => Number.isFinite(state[key]))) return null;
+    for (const key of carFields) car[key] = state[key];
+    if (i === 0) {
+      if (!Number.isInteger(state.lap) || state.lap < 0 || state.lap >= track.event.laps ||
+          !Number.isFinite(state.lapStarted) || !(state.bestLap === null || Number.isFinite(state.bestLap))) return null;
+      Object.assign(car, { lap: state.lap, lapStarted: state.lapStarted, bestLap: state.bestLap, onRoad: state.onRoad !== false });
+    } else {
+      if (!Number.isFinite(state.offset) || !(state.finishTime === null || Number.isFinite(state.finishTime))) return null;
+      Object.assign(car, { offset: state.offset, finishTime: state.finishTime });
+    }
+    race.previousPoses[i] = { x: car.x, z: car.z, yaw: car.yaw, speed: car.speed, steer: car.steer };
+  }
+  race.elapsed = save.elapsed;
+  race.countdown = save.countdown;
+  return { race, loadout, alternateCamera: save.alternateCamera === true };
+}
