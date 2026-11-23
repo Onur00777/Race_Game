@@ -1,6 +1,7 @@
 import { CatmullRomCurve3, Vector3 } from 'three';
 import { rivals } from './career.js';
 import { railRunoff, resolveBarrierContact, resolveVehicleContact, velocity } from './contact.js';
+import { vehicleStats } from './setup.js';
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const wrap = (value, period) => ((value % period) + period) % period;
@@ -85,11 +86,11 @@ export function createTrack(event) {
 
 const bodyState = () => ({ speed: 0, lateral: 0, spin: 0, steer: 0, damage: 0, frontDamage: 0, rearDamage: 0 });
 
-export function createRace(track, team, upgrades) {
+export function createRace(track, team, upgrades, setup, appearance) {
   const finish = track.length * track.event.laps;
   const player = {
     id: 'player', color: team.color, station: -18, ...track.at(-18, 2.5), ...bodyState(),
-    onRoad: true, lap: 0, lapStarted: 0, bestLap: null,
+    onRoad: true, lap: 0, lapStarted: 0, bestLap: null, appearance,
   };
   const opponents = rivals.map((rival, index) => {
     const station = -2 - Math.floor(index / 2) * 8;
@@ -101,10 +102,7 @@ export function createRace(track, team, upgrades) {
   const cars = [player, ...opponents];
   const race = { track, player, opponents, cars, previousPoses: cars.map(visualPose),
     elapsed: 0, countdown: 3, order: null, impact: null };
-  const topSpeed = 54 + upgrades.engine * 3 + team.power;
-  const acceleration = 13 + upgrades.engine * 1.7 + team.power * 0.45;
-  const braking = 24 + upgrades.brakes * 4.5;
-  const grip = 8.8 + upgrades.tires * 0.85 + team.grip;
+  const { topSpeed, acceleration, braking, grip, turn: turnResponse, brakeStability, load } = vehicleStats(team, upgrades, setup);
 
   function relativeStation(station, reference) {
     return wrap(station - reference + track.length / 2, track.length) - track.length / 2;
@@ -195,12 +193,14 @@ export function createRace(track, team, upgrades) {
 
     const speed = Math.abs(player.speed);
     player.steer += (steering - player.steer) * (1 - Math.exp(-dt * 8));
-    const turn = player.steer * Math.min(speed / 5, 1) * (2.15 / (1 + speed * 0.027));
+    const turn = player.steer * turnResponse * Math.min(speed / 5, 1) * (2.15 / (1 + speed * 0.027));
     const rotation = -turn * Math.sign(player.speed) * dt;
     player.yaw += rotation * (handbrake ? 1.25 : 1) + player.spin * dt;
     player.spin *= Math.exp(-(player.onRoad ? 4.3 : 2.65) * dt);
     player.lateral -= player.speed * Math.sin(rotation) * (handbrake ? 1.08 : 0.52);
-    player.lateral *= Math.exp(-(handbrake ? 1.55 : grip * (1 - player.damage * 0.0019)) * (player.onRoad ? 1 : 0.56) * dt);
+    const aerodynamicGrip = load * 0.021 * (speed / 42) ** 2;
+    const damping = (grip + aerodynamicGrip + (brake ? brakeStability : 0)) * (1 - player.damage * 0.0019);
+    player.lateral *= Math.exp(-(handbrake ? 1.55 : damping) * (player.onRoad ? 1 : 0.56) * dt);
     const motion = velocity(player);
     player.x += motion.x * dt;
     player.z += motion.z * dt;

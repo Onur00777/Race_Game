@@ -1,9 +1,13 @@
+import { carAppearance, decalSlots, defaultSetup, normalizeSetup, sponsors } from './setup.js';
+
 export const gameName = 'Kırmızı Çizgi';
 
 export const events = [
   {
     name: 'Sedir Pisti',
+    nameEn: 'Cedar Circuit',
     date: '12 NİS',
+    dateEn: '12 APR',
     laps: 2,
     width: 15,
     rivalPace: [0.80, 0.75, 0.83, 0.81],
@@ -14,7 +18,9 @@ export const events = [
   },
   {
     name: 'Körfez Virajları',
+    nameEn: 'Bay Curves',
     date: '26 NİS',
+    dateEn: '26 APR',
     laps: 2,
     width: 14,
     rivalPace: [0.84, 0.93, 0.91, 0.88],
@@ -25,7 +31,9 @@ export const events = [
   },
   {
     name: 'Zirve Grand Prix',
+    nameEn: 'Summit Grand Prix',
     date: '10 MAY',
+    dateEn: '10 MAY',
     laps: 3,
     width: 16,
     rivalPace: [0.91, 0.98, 0.98, 0.93],
@@ -37,15 +45,16 @@ export const events = [
 ];
 
 export const teams = [
-  { id: 'apex', name: 'Kızıl Motor', color: '#f04b32', unlock: 0, payout: 1, power: 0, grip: 0, perk: 'Dengeli başlangıç' },
-  { id: 'volt', name: 'Volt Motorsport', color: '#42cbc1', unlock: 1, payout: 1, power: 2.2, grip: 0, perk: 'Daha yüksek motor gücü' },
-  { id: 'summit', name: 'Summit Racing', color: '#c7a5ff', unlock: 2, payout: 1.2, power: 0, grip: 0.3, perk: '+%20 ödül ve daha iyi tutuş' },
+  { id: 'apex', name: 'Kızıl Motor', color: '#f04b32', unlock: 0, payout: 1, power: 0, grip: 0, perk: 'Dengeli başlangıç', perkEn: 'Balanced setup' },
+  { id: 'volt', name: 'Volt Motorsport', color: '#42cbc1', unlock: 1, payout: 1, power: 2.2, grip: 0, perk: 'Daha yüksek motor gücü', perkEn: 'More engine power' },
+  { id: 'summit', name: 'Summit Racing', color: '#c7a5ff', unlock: 2, payout: 1.2, power: 0, grip: 0.3, perk: '+%20 ödül ve daha iyi tutuş', perkEn: '20% more prize money and extra grip' },
 ];
 
 export const upgrades = [
-  { id: 'engine', name: 'Motor', effect: 'Hızlanma ve son hız', baseCost: 850 },
-  { id: 'tires', name: 'Lastikler', effect: 'Viraj tutuşu', baseCost: 700 },
-  { id: 'brakes', name: 'Frenler', effect: 'Daha kısa fren mesafesi', baseCost: 650 },
+  { id: 'engine', name: 'Motor', nameEn: 'Engine', effect: 'Hızlanma ve son hız', effectEn: 'Acceleration and top speed', baseCost: 850 },
+  { id: 'tires', name: 'Lastikler', nameEn: 'Tires', effect: 'Viraj tutuşu', effectEn: 'Cornering grip', baseCost: 700 },
+  { id: 'brakes', name: 'Frenler', nameEn: 'Brakes', effect: 'Daha kısa fren mesafesi', effectEn: 'Shorter braking distance', baseCost: 650 },
+  { id: 'aero', name: 'Aerodinamik', nameEn: 'Aerodynamics', effect: 'Arka kanat ve yere basma kuvveti', effectEn: 'Rear wing and downforce', baseCost: 900 },
 ];
 
 export const rivals = [
@@ -60,19 +69,39 @@ const storageKey = 'apex-circuit-career-v1';
 const pointsByPlace = [25, 18, 15, 12, 10];
 const prizes = [1800, 1350, 1100, 950, 850];
 export const maxUpgrade = 3;
-export const money = amount => '₺' + new Intl.NumberFormat('tr-TR').format(amount);
+export const money = (amount, language = 'tr') => '₺' + new Intl.NumberFormat(language === 'en' ? 'en-US' : 'tr-TR').format(amount);
 export const price = (upgrade, level) => upgrade.baseCost * (level + 1);
-export const currentTeam = career => teams.find(team => team.id === career.team);
+export const teamById = id => teams.find(team => team.id === id);
+export const currentTeam = career => teamById(career.team);
 export const currentEvent = career => events[career.results.length];
 
 export function newCareer() {
-  return { cash: 400, team: teams[0].id, upgrades: { engine: 0, tires: 0, brakes: 0 }, completed: 0, season: 1, results: [] };
+  return {
+    cash: 400, team: teams[0].id, upgrades: { engine: 0, tires: 0, brakes: 0, aero: 0 },
+    setup: { ...defaultSetup }, sponsor: null, decals: [], completed: 0, season: 1, results: [],
+    profile: null, activeRace: null, screen: 'calendar', garageTab: 'parts',
+  };
+}
+
+export function normalizeLoadout(data) {
+  const team = teamById(data?.team) ?? teams[0];
+  const parts = Object.fromEntries(upgrades.map(({ id }) => {
+    const level = data?.upgrades?.[id];
+    return [id, Number.isInteger(level) ? Math.max(0, Math.min(maxUpgrade, level)) : 0];
+  }));
+  const sponsor = sponsors.find(offer => offer.id === data?.sponsor);
+  const decals = decalSlots.filter(slot => sponsor && Array.isArray(data?.decals) && data.decals.includes(slot.id)).map(slot => slot.id);
+  const loadout = { team: team.id, upgrades: parts, setup: normalizeSetup(data?.setup, parts.aero), sponsor: sponsor?.id ?? null, decals };
+  return { ...loadout, appearance: carAppearance(loadout) };
 }
 
 export function loadCareer(storage) {
   try {
     const career = JSON.parse(storage.getItem(storageKey));
-    if (career && currentTeam(career) && Array.isArray(career.results) && career.upgrades) return career;
+    if (career && currentTeam(career) && Array.isArray(career.results) && career.upgrades) {
+      const { team, upgrades: parts, setup, sponsor, decals } = normalizeLoadout(career);
+      return { ...newCareer(), ...career, team, upgrades: parts, setup, sponsor, decals };
+    }
   } catch {
     // The career still works for the current session when storage is unavailable.
   }
@@ -103,21 +132,45 @@ export function changeTeam(career, id) {
   return { ...career, team: team.id };
 }
 
-export function finishEvent(career, order, time, bestLap) {
+export function saveProfile(career, name, language, team) {
+  const cleaned = (typeof name === 'string' ? name : '').trim().replace(/\s+/g, ' ').slice(0, 24);
+  if (!cleaned) return career;
+  return {
+    ...career,
+    team: !career.profile && !career.activeRace && teamById(team) ? team : career.team,
+    profile: { name: cleaned, language: language === 'en' ? 'en' : 'tr' },
+  };
+}
+
+export function acceptSponsor(career, id) {
+  const offer = sponsors.find(sponsor => sponsor.id === id);
+  if (!offer || career.completed < offer.unlock) return career;
+  return { ...career, sponsor: id };
+}
+
+export function toggleDecal(career, slot) {
+  if (!career.sponsor || !decalSlots.some(item => item.id === slot)) return career;
+  const decals = career.decals.includes(slot) ? career.decals.filter(id => id !== slot) : [...career.decals, slot];
+  return { ...career, decals };
+}
+
+export function finishEvent(career, order, time, bestLap, loadout = normalizeLoadout(career)) {
   const place = order.indexOf('player') + 1;
   const points = pointsByPlace[place - 1];
-  const prize = Math.round(prizes[place - 1] * currentTeam(career).payout);
-  const result = { place, points, prize, time, bestLap, order };
+  const bonus = loadout.decals.length ? (sponsors.find(offer => offer.id === loadout.sponsor)?.payout ?? 0) : 0;
+  const prize = Math.round(prizes[place - 1] * teamById(loadout.team).payout) + bonus;
+  const result = { place, points, prize, bonus, time, bestLap, order };
   return {
     ...career,
     cash: career.cash + prize,
     completed: career.completed + 1,
+    activeRace: null,
     results: [...career.results, result],
   };
 }
 
 export function standings(career) {
-  const drivers = [{ id: 'player', name: 'Sen', color: currentTeam(career).color }, ...rivals];
+  const drivers = [{ id: 'player', name: career.profile?.name ?? 'Sen', color: currentTeam(career).color }, ...rivals];
   return drivers.map(driver => ({
     ...driver,
     points: career.results.reduce((sum, result) => sum + pointsByPlace[result.order.indexOf(driver.id)], 0),
