@@ -110,6 +110,13 @@ kbd { padding: 2px 4px; border: 1px solid #fff4; border-radius: 3px; font: 630 .
 .speed strong { display: inline-block; font: italic 850 clamp(38px, 6.7vw, 82px)/.89 var(--display); letter-spacing: -.09em; margin-right: .1em; }
 .speed > span { display: block; margin: 8px 0 0 auto; width: min(164px, 24vw); height: 4px; transform: skewX(-28deg); background: #ffede757; }
 .speed > span i { display: block; height: 100%; background: var(--orange); }
+.condition { display: flex; justify-content: flex-end; align-items: center; gap: 6px; margin-top: 7px; font-size: .72rem; }
+.condition small { font-size: .62rem; }
+.condition meter { width: clamp(21px, 4vw, 45px); height: 8px; }
+.condition meter::-webkit-meter-optimum-value { background: #a9cf9b; }
+.condition meter::-webkit-meter-suboptimum-value { background: #f8b56a; }
+.condition meter::-webkit-meter-even-less-good-value { background: #ff7953; }
+.condition b { min-width: 29px; font-variant-numeric: tabular-nums; }
 
 dialog { width: min(92vw, 460px); max-height: 89svh; color: var(--ink); background: #1a1c1b; border: 1px solid #e2c49b47; border-top: 3px solid var(--orange); border-radius: 8px; padding: clamp(20px, 4vw, 34px); }
 dialog::backdrop { background: #0d1010b5; }
@@ -145,6 +152,7 @@ dialog p { margin: 12px 0; color: #d7c9bb; }
   .mark { width: 18px; height: 15px; }
   .entry { gap: 6px; grid-template-columns: 43px minmax(0, 1fr) auto; }
   .speed { min-width: 75px; }
+  .condition { gap: 3px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

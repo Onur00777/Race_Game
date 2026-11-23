@@ -3,6 +3,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { gameName } from './career.js';
 import { addTerrain, addTrees, lightTrack, loadTrackAssets } from './environment.js';
 import { createCarModel, sharedCarResources, updateCarModel } from './car-model.js';
+import { createRaceEffects } from './race-effects.js';
 
 const standard = (color, roughness = 0.78, metalness = 0) => new T.MeshStandardMaterial({ color, roughness, metalness });
 const boxGeometry = new T.BoxGeometry(1, 1, 1);
@@ -215,11 +216,18 @@ export function createView(canvas) {
   const assets = loadTrackAssets(renderer);
   const camera = new T.PerspectiveCamera(48, 1, 0.1, 960);
   const aim = new T.Vector3();
+  const cameraBase = new T.Vector3();
   const cameraTarget = new T.Vector3();
   const target = new T.Vector3();
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   let scene;
   let models;
   let updateLight;
+  let effects;
+  let drawnRace;
+  let lastImpact;
+  let shake = 0;
+  let shakePhase = 0;
   let cameraReady = false;
   let width = 0;
   let height = 0;
@@ -246,6 +254,7 @@ export function createView(canvas) {
     addTerrain(scene, track, assets);
     addTrack(scene, track, assets);
     addTrees(scene, track);
+    effects = createRaceEffects(scene);
     models = cars.map(car => {
       const model = createCarModel(car.color);
       scene.add(model.root);
@@ -258,7 +267,7 @@ export function createView(canvas) {
     cameraReady = false;
   }
 
-  function draw(race, mode, dt, braking, alternateCamera) {
+  function draw(race, mode, dt, braking, alternateCamera, paused) {
     if (width !== canvas.clientWidth || height !== canvas.clientHeight) {
       width = canvas.clientWidth;
       height = canvas.clientHeight;
@@ -268,6 +277,21 @@ export function createView(canvas) {
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
     }
+    if (drawnRace !== race) {
+      drawnRace = race;
+      lastImpact = null;
+      shake = 0;
+      effects.reset();
+    }
+    if (race.impact && race.impact !== lastImpact && mode === 'race') {
+      lastImpact = race.impact;
+      effects.hit(lastImpact);
+      if (!reduceMotion.matches) {
+        shake = Math.min(0.43, lastImpact.impulse * 0.015);
+        shakePhase = 0;
+      }
+    }
+    effects.update(dt, mode === 'race' && !paused ? race.player : null, canvas.height);
     for (let i = 0; i < race.cars.length; i++) {
       const car = race.cars[i];
       const model = models[i];
@@ -291,8 +315,19 @@ export function createView(canvas) {
       target.set(x + fx * 7.2, 0.85, z + fz * 7.2);
     }
     const blend = cameraReady ? 1 - Math.exp(-dt * 8.5) : 1;
-    camera.position.lerp(cameraTarget, blend);
+    cameraBase.lerp(cameraTarget, blend);
+    camera.position.copy(cameraBase);
     aim.lerp(target, blend);
+    if (shake > 0.002 && lastImpact) {
+      if (!reduceMotion.matches) {
+        const wave = Math.sin(shakePhase);
+        camera.position.x += wave * shake * lastImpact.nx;
+        camera.position.y += Math.cos(shakePhase * 0.74) * shake * 0.42;
+        camera.position.z += wave * shake * lastImpact.nz;
+      }
+      shakePhase += dt * 46;
+      shake *= Math.exp(-dt * 13);
+    }
     camera.lookAt(aim);
     cameraReady = true;
     renderer.render(scene, camera);

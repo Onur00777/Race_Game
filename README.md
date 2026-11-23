@@ -25,6 +25,12 @@ Terminalde görünen yerel adresi aç. Dağıtıma hazır dosyaları oluşturmak
 
 Kariyer otomatik olarak aynı tarayıcıda kaydedilir. Yeni sezonda takvim ve puanlar sıfırlanır. Kazanç, takım erişimi ve yükseltmeler korunur.
 
+## Çarpışma ve hasar
+
+Rakipler darbenin yönüne ve hızına göre savrulur. Bordürün dışındaki çakıl hızını düşürür. Bariyer veya başka bir araçla sert temas, gövdeyi ezer ve yarış sonuna kadar hızlanmayı ve tutuşu azaltır. Gövde durumunu hız göstergesinin altında görebilirsin. Araba bir sonraki yarışa onarılmış olarak çıkar.
+
+Çarpışma testleri için `npm test` çalıştır.
+
 ## Görsel varlıklar
 
 Kloppenheim 06 panoraması ve HDR ışık haritası, Asphalt Track, Leafy Grass ve Gravel Floor 02 dokuları Poly Haven'dan alındı, tarayıcı için boyutları küçültüldü ve CC0 kapsamında dağıtılıyor. [Poly Haven lisansı](https://polyhaven.com/license)

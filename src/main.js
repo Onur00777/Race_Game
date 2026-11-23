@@ -33,8 +33,11 @@ app.innerHTML = `
       <div id="countdown" class="countdown" aria-live="polite"></div>
       <div class="race-bottom">
         <canvas id="map" width="180" height="156" aria-label="Pist haritası"></canvas>
-        <div class="drive-help"><span id="road-warning"></span><div>WASD Sürüş <i>·</i> SPACE El freni <i>·</i> R Piste dön <i>·</i> C Kamera</div></div>
-        <div class="speed"><strong id="speed"></strong><small>KM/S</small><span><i id="speed-bar"></i></span></div>
+        <div class="drive-help"><span id="road-warning" role="status"></span><div>WASD Sürüş <i>·</i> SPACE El freni <i>·</i> R Piste dön <i>·</i> C Kamera</div></div>
+        <div class="speed">
+          <strong id="speed"></strong><small>KM/SA</small><span><i id="speed-bar"></i></span>
+          <div class="condition"><small>Gövde</small><meter id="body-condition" min="0" max="100" low="42" high="77" optimum="100" aria-label="Gövde durumu" value="100"></meter><b id="condition-percent">100%</b></div>
+        </div>
       </div>
     </section>
     <dialog id="overlay"></dialog>
@@ -198,11 +201,16 @@ function updateHud() {
   byId('position').textContent = race.position();
   byId('speed').textContent = speed;
   byId('speed-bar').style.width = Math.min(100, speed / 2.35) + '%';
-  byId('road-warning').textContent = player.onRoad ? '' : 'Pist dışı';
+  const condition = 100 - Math.round(player.damage);
+  byId('body-condition').value = condition;
+  byId('condition-percent').textContent = condition + '%';
+  const recent = race.impact && race.impact.impulse > 2.6 && race.elapsed - race.impact.time < 1.45;
+  const message = recent ? (race.impact.kind === 'rail' ? 'Bariyer teması' : 'Araç teması') : player.onRoad ? '' : 'Pist dışı';
+  if (byId('road-warning').textContent !== message) byId('road-warning').textContent = message;
   byId('best-lap').textContent = player.bestLap ? `EN İYİ TUR  ${formatTime(player.bestLap)}` : '';
-  const message = race.countdown > 0 ? String(Math.ceil(race.countdown)) : race.elapsed < 0.8 ? 'BAŞLA!' : '';
+  const startMessage = race.countdown > 0 ? String(Math.ceil(race.countdown)) : race.elapsed < 0.8 ? 'BAŞLA!' : '';
   const countdown = byId('countdown');
-  if (countdown.textContent !== message) countdown.textContent = message;
+  if (countdown.textContent !== startMessage) countdown.textContent = startMessage;
   mapContext.clearRect(0, 0, map.width, map.height);
   mapContext.lineWidth = 8;
   mapContext.strokeStyle = '#121619';
@@ -274,6 +282,29 @@ function updateAudio() {
   const gearBand = speed % 10;
   audio.engine.frequency.setTargetAtTime(42 + gearBand * 6.8 + speed * 0.55, audio.context.currentTime, 0.075);
   audio.gain.gain.setTargetAtTime(audible ? 0.027 + Math.min(speed / 2500, 0.019) : 0, audio.context.currentTime, 0.08);
+  if (race?.impact && race.impact !== audio.lastImpact) {
+    audio.lastImpact = race.impact;
+    if (audible) crashSound(race.impact, audio);
+  }
+}
+
+function crashSound(impact, audio) {
+  const { context, crash } = audio;
+  const source = context.createBufferSource();
+  const filter = context.createBiquadFilter();
+  const gain = context.createGain();
+  filter.type = 'lowpass';
+  filter.frequency.value = impact.kind === 'rail' ? 980 : 570;
+  gain.gain.value = Math.min(0.26, impact.impulse * 0.008);
+  source.buffer = crash;
+  source.playbackRate.value = impact.kind === 'rail' ? 1.05 : 0.83;
+  source.connect(filter).connect(gain).connect(context.destination);
+  source.onended = () => {
+    source.disconnect();
+    filter.disconnect();
+    gain.disconnect();
+  };
+  source.start();
 }
 
 async function toggleSound(button) {
@@ -289,8 +320,14 @@ async function toggleSound(button) {
       gain.gain.value = 0;
       engine.connect(filter).connect(gain).connect(context.destination);
       engine.start();
+      const crash = context.createBuffer(1, Math.floor(context.sampleRate * 0.29), context.sampleRate);
+      const noise = crash.getChannelData(0);
+      for (let i = 0; i < noise.length; i++) {
+        const time = i / context.sampleRate;
+        noise[i] = ((Math.random() * 2 - 1) * 0.66 + Math.sin(2 * Math.PI * 57 * time) * 0.4) * Math.exp(-time * 16);
+      }
       await context.resume();
-      audio = { context, engine, gain };
+      audio = { context, engine, gain, crash, lastImpact: null };
     } catch {
       sound = false;
       notify('Tarayıcı ses çıkışını başlatamadı.');
@@ -396,7 +433,7 @@ function frame(now) {
   }
   if (mode === 'result') updateAudio();
   if (mode !== 'menu' || lastHudUpdate < 0 || lastRaceElapsed !== race.elapsed || now - lastHudUpdate >= 100) {
-    view.draw(race, mode, dt, braking, alternateCamera);
+    view.draw(race, mode, dt, braking, alternateCamera, paused);
     if (mode === 'menu') {
       lastHudUpdate = now;
       lastRaceElapsed = race.elapsed;
