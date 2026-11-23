@@ -12,6 +12,7 @@ import { circuitMap, drawBriefingMap } from './circuit-map.js';
 import { legacyEvents } from './events.js';
 import { difficultyId, purseFor } from './difficulty.js';
 import { difficultyBadge, difficultyControls, payoutBreakdown } from './race-ui.js';
+import { integrity } from './vehicle-damage.js';
 import './style.css';
 
 const app = document.querySelector('#app');
@@ -66,6 +67,7 @@ app.innerHTML = `
         <div class="position"><small data-text="rank"></small><div><b id="position"></b><span> / 5</span></div></div>
         <button type="button" class="secondary pause-button" data-action="pause" data-text="pause"></button>
       </div>
+      <div id="hit-vignette" class="hit-vignette" aria-hidden="true"></div>
       <div id="countdown" class="countdown" aria-live="polite"></div>
       <div class="race-bottom">
         <canvas id="map" width="180" height="156" data-label="minimap"></canvas>
@@ -115,6 +117,10 @@ let mapShape;
 let previousFrame;
 let accumulator = 0;
 let lastHudUpdate = -1;
+let lastHudHit;
+let hudFlash;
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+const impactZones = { frontDamage: 'zoneFront', rearDamage: 'zoneRear', leftDamage: 'zoneLeft', rightDamage: 'zoneRight' };
 let lastMenuDraw = -Infinity;
 let lastCheckpoint = -Infinity;
 let pendingTuning = false;
@@ -362,6 +368,8 @@ function startRace() {
   keys.clear();
   accumulator = 0;
   lastHudUpdate = lastCheckpoint = -Infinity;
+  lastHudHit = null;
+  hudFlash?.cancel();
   byId('menu').hidden = byId('garage').hidden = byId('topbar').hidden = true;
   byId('hud').hidden = false;
   document.body.classList.remove('in-garage');
@@ -382,11 +390,22 @@ function updateHud() {
   byId('position').textContent = race.position();
   byId('speed').textContent = speed;
   byId('speed-bar').style.width = Math.min(100, speed / 2.35) + '%';
-  const condition = 100 - Math.round(player.damage);
+  const condition = integrity(player);
   byId('body-condition').value = condition;
   byId('condition-percent').textContent = condition + '%';
-  const recent = race.impact && race.impact.impulse > 2.6 && race.elapsed - race.impact.time < 1.45;
-  const message = recent ? t(race.impact.kind === 'rail' ? 'railHit' : 'carHit') : player.onRoad ? '' : t('offTrack');
+  byId('body-condition').parentElement.dataset.level = condition < 40 ? 'critical' : condition < 70 ? 'damaged' : 'healthy';
+  const impact = race.impact;
+  const recent = impact && impact.impulse > 2.6 && race.elapsed - impact.time < 1.45;
+  if (recent && lastHudHit !== impact) {
+    lastHudHit = impact;
+    if (impact.loss >= 1 && !reducedMotion.matches) {
+      hudFlash?.cancel();
+      hudFlash = byId('hit-vignette').animate([{ opacity: Math.min(0.65, 0.13 + impact.loss * 0.022) }, { opacity: 0 }],
+        { duration: 550, easing: 'ease-out' });
+    }
+  }
+  const message = !recent ? (player.onRoad ? '' : t('offTrack')) : impact.loss >= 1
+    ? t('zoneImpact', t(impactZones[impact.zone]), Math.round(impact.loss)) : t(impact.kind === 'rail' ? 'railHit' : 'carHit');
   if (byId('road-warning').textContent !== message) byId('road-warning').textContent = message;
   byId('best-lap').textContent = player.bestLap ? `${upper(t('bestLap'))}  ${formatTime(player.bestLap)}` : '';
   const startMessage = race.countdown > 0 ? String(Math.ceil(race.countdown)) : race.elapsed < 0.8 ? t('go') : '';

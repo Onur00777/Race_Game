@@ -37,10 +37,10 @@ export function createRaceEffects(scene) {
       varying float vSeed;
       void main() {
         vec4 view = modelViewMatrix * vec4(position, 1.0);
-        opacity = sin(min(age * 5.0, 1.57)) * pow(1.0 - age, 1.7) * (kind > .5 ? .23 : .24);
+        opacity = sin(min(age * 5.0, 1.57)) * pow(1.0 - age, 1.7) * (kind > 1.5 ? .48 : .24);
         vKind = kind;
         vSeed = seed;
-        float spread = kind > .5 ? .31 + age * 2.5 : .23 + age * 1.9;
+        float spread = kind > 1.5 ? .26 + age * 1.5 : kind > .5 ? .31 + age * 2.5 : .23 + age * 1.9;
         gl_PointSize = clamp(resolution * spread / max(-view.z, 1.5), 1.0, 168.0);
         gl_Position = projectionMatrix * view;
       }
@@ -53,7 +53,7 @@ export function createRaceEffects(scene) {
         vec2 p = gl_PointCoord - 0.5;
         float noise = sin(p.x * 19.0 + p.y * 6.0 + vSeed) * sin(p.y * 15.0 - p.x * 4.0 + vSeed * 1.3) * 0.075;
         float cloud = (1.0 - smoothstep(0.05, 0.49, length(p) + noise)) * opacity;
-        vec3 color = vKind > .5 ? vec3(.70, .74, .77) : vec3(.47, .39, .28);
+        vec3 color = vKind > 1.5 ? vec3(.095, .109, .119) : vKind > .5 ? vec3(.70, .74, .77) : vec3(.47, .39, .28);
         gl_FragColor = vec4(color, cloud);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
@@ -70,17 +70,18 @@ export function createRaceEffects(scene) {
   scene.add(clouds);
   let dustTimer = 0;
   const smokeTimers = new Map();
+  const engineTimers = new Map();
 
   function hit(impact) {
-    const count = Math.min(31, Math.ceil(impact.impulse * 1.65));
+    const count = Math.min(42, Math.ceil(impact.impulse + impact.normalSpeed * 0.75));
     for (let i = 0; i < count && sparks.length < maxSparks; i++) {
       const side = (Math.random() - 0.5) * 11 + Math.max(-7, Math.min(7, impact.sliding * 0.24));
       const bounce = Math.random() * (1.3 + Math.min(impact.impulse, 26) * 0.17);
       const lifetime = 0.15 + Math.random() * 0.37;
       sparks.push({
-        x: impact.x - impact.nx * 0.055,
+        x: impact.x,
         y: 0.40 + Math.random() * 0.17,
-        z: impact.z - impact.nz * 0.055,
+        z: impact.z,
         vx: -impact.nx * bounce + impact.nz * side,
         vy: 0.9 + Math.random() * 4.9,
         vz: -impact.nz * bounce - impact.nx * side,
@@ -136,10 +137,33 @@ export function createRaceEffects(scene) {
     }
   }
 
-  function update(dt, race, height) {
+  function spawnEngineSmoke(car, dt) {
+    if (car.damage <= 65) return;
+    const severity = (car.damage - 65) / 35;
+    let pending = (engineTimers.get(car.id) ?? 0) + dt * (4 + severity * 16);
+    const forward = Math.sin(car.yaw), across = Math.cos(car.yaw);
+    while (pending >= 1 && dust.length < maxDust) {
+      pending--;
+      dust.push({
+        x: car.x + forward * 1.22 + across * (Math.random() - 0.5) * 0.35,
+        z: car.z + across * 1.22 + forward * (Math.random() - 0.5) * 0.35,
+        y: 0.67,
+        vx: forward * car.speed * 0.12 + (Math.random() - 0.5) * 0.7,
+        vz: across * car.speed * 0.12 + (Math.random() - 0.5) * 0.7,
+        lifetime: 0.8 + severity * 0.55 + Math.random() * 0.36,
+        age: 0, kind: 2, seed: Math.random() * 14,
+      });
+    }
+    engineTimers.set(car.id, pending % 1);
+  }
+
+  function update(dt, race, height, driving) {
     if (race) {
-      for (const car of race.cars) spawnTireSmoke(car, dt);
-      spawnDust(race.player, dt);
+      for (const car of race.cars) {
+        if (driving) spawnTireSmoke(car, dt);
+        spawnEngineSmoke(car, dt);
+      }
+      if (driving) spawnDust(race.player, dt);
     }
     let i = 0;
     for (const spark of sparks) {
@@ -167,7 +191,7 @@ export function createRaceEffects(scene) {
       cloud.x += cloud.vx * dt;
       cloud.vx *= Math.exp(-dt * 1.15);
       cloud.vz *= Math.exp(-dt * 1.15);
-      cloud.y += dt * (cloud.kind ? 0.60 : 0.39);
+      cloud.y += dt * (cloud.kind === 2 ? 1.16 : cloud.kind === 1 ? 0.60 : 0.39);
       cloud.z += cloud.vz * dt;
       dust[i] = cloud;
       dustPositions.set([cloud.x, cloud.y, cloud.z], i * 3);
@@ -186,6 +210,7 @@ export function createRaceEffects(scene) {
   function reset() {
     sparks.length = dust.length = dustTimer = 0;
     smokeTimers.clear();
+    engineTimers.clear();
   }
   return { update, hit, reset };
 }

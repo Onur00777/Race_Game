@@ -14,6 +14,12 @@ const caliper = new T.MeshStandardMaterial({ color: '#9e2920', roughness: 0.37, 
 const mirror = new T.MeshStandardMaterial({ color: '#bac4d1', roughness: 0.12, metalness: 0.92 });
 const glass = new T.MeshPhysicalMaterial({ color: '#18212b', roughness: 0.18, metalness: 0.19, clearcoat: 0.85, clearcoatRoughness: 0.11 });
 const headlight = new T.MeshStandardMaterial({ color: '#a9bdc8', emissive: '#d6ecff', emissiveIntensity: 2.75, roughness: 0.34 });
+const brokenLamp = new T.MeshStandardMaterial({ color: '#57626a', emissive: '#acc2ce', emissiveIntensity: 0.12, roughness: 0.55 });
+const crackedLens = new T.LineBasicMaterial({ color: '#d0dbe2', transparent: true, opacity: 0.72 });
+const cracks = new T.BufferGeometry().setFromPoints([
+  [-.065,.018],[-.022,.008], [-.022,.008],[0,-.003], [0,-.003],[.022,.010], [.022,.010],[.055,.024],
+  [0,-.003],[.009,-.021], [.009,-.021],[.047,-.026], [0,-.003],[-.043,-.019], [.022,.010],[.044,.002],
+].map(([x, y]) => new T.Vector3(x, y, 0)));
 const tailLight = new T.MeshStandardMaterial({ color: '#8f0d0a', emissive: '#f92010', emissiveIntensity: 1.86, roughness: 0.31 });
 const brakeLight = new T.MeshStandardMaterial({ color: '#b62117', emissive: '#ff3622', emissiveIntensity: 5.8, roughness: 0.29 });
 const lensHousing = new T.MeshPhysicalMaterial({ color: '#330e14', roughness: 0.20, clearcoat: 1, metalness: 0.14 });
@@ -173,18 +179,20 @@ spokeParts.forEach(part => part.dispose());
 export const sharedCarResources = new Set([box, rubber, carbon, inset, aluminum, rotor, caliper, mirror,
   glass, headlight, tailLight, brakeLight, lensHousing, tire, rimLip, brakeDisc, center, tailPipe, intake, shadowPlane, shadowMaterial,
   bodyShape, cabinShape, wingShape, diffuserPanel, grillPanel, tailHousing, tailStrip, headStrip, spokes,
-  splitterShape, sidewall, rotorFace, exhaustTube, flameShape, flameMaterial, flameCore]);
+  splitterShape, sidewall, rotorFace, exhaustTube, flameShape, flameMaterial, flameCore, brokenLamp, crackedLens, cracks]);
 
 const stockParts = { tires: 0, brakes: 0, aero: 0, engine: 0 };
 const defaultAppearance = { wing: 'touring', wingColor: '#21272d', wingAngle: 3, frontCamber: -1, rearCamber: -1, decals: [], parts: stockParts };
 const projector = new T.Mesh(bodyShape, carbon);
+const projectDecal = (center, rotation, size) =>
+  new DecalGeometry(projector, new T.Vector3(...center), new T.Euler(...rotation), new T.Vector3(...size));
 const decalMounts = [
   ['hood', [0, 0.66, 1.46], [-Math.PI / 2, 0, 0], [0.77, 0.32, 0.32]],
   ['doors', [0.89, 0.46, 0.02], [0, Math.PI / 2, 0], [0.76, 0.23, 0.33]],
   ['doors', [-0.89, 0.46, 0.02], [0, -Math.PI / 2, 0], [0.76, 0.23, 0.33]],
   ['rear', [0.37, 0.46, -2.13], [0, Math.PI, 0], [0.43, 0.12, 0.13]],
 ].map(([slot, center, rotation, size]) => {
-  const geometry = new DecalGeometry(projector, new T.Vector3(...center), new T.Euler(...rotation), new T.Vector3(...size));
+  const geometry = projectDecal(center, rotation, size);
   sharedCarResources.add(geometry);
   return { slot, geometry };
 });
@@ -201,6 +209,36 @@ function finishTexture(size, draw) {
   texture.anisotropy = 4;
   sharedCarResources.add(texture);
   return texture;
+}
+
+let scuffTexture;
+function scuffMeshes(parent) {
+  scuffTexture ??= finishTexture(128, ctx => {
+    for (let i = 0; i < 25; i++) {
+      const x = 10 + (i * 47) % 91;
+      const y = 22 + (i * 23) % 83;
+      const length = 8 + (i * 13) % 25;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + length * 0.38, y - length * 0.29);
+      ctx.lineTo(x + length, y - length * 0.44);
+      ctx.strokeStyle = i % 4 === 0 ? 'rgba(20,18,17,.66)' : 'rgba(207,198,178,.74)';
+      ctx.lineWidth = i % 5 === 0 ? 2.4 : 0.9;
+      ctx.stroke();
+    }
+  });
+  return [
+    ['frontDamage', [0.34, 0.59, 1.79], [-Math.PI / 2, 0, 0], [0.89, 0.60, 0.67]],
+    ['rearDamage', [-0.43, 0.52, -1.86], [-Math.PI / 2, 0, 0], [0.72, 0.52, 0.55]],
+    ['leftDamage', [0.89, 0.43, 0.20], [0, Math.PI / 2, 0], [1.32, 0.44, 0.54]],
+    ['rightDamage', [-0.89, 0.43, -0.21], [0, -Math.PI / 2, 0], [1.32, 0.44, 0.54]],
+  ].map(([zone, center, rotation, size]) => {
+    const material = new T.MeshBasicMaterial({ map: scuffTexture, transparent: true, depthWrite: false,
+      polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4, opacity: 0 });
+    const mesh = mount(parent, projectDecal(center, rotation, size), material);
+    mesh.visible = false;
+    return { zone, mesh, base: mesh.geometry.attributes.position.array.slice() };
+  });
 }
 
 function finishMaterials() {
@@ -398,6 +436,7 @@ export function createCarModel(color) {
   mount(splitter, splitterShape, composite);
   block(splitter, carbon, 1.43, 0.036, 0.051, 0, -0.015, 0.36);
   const lights = [];
+  const headlights = [];
   const exhausts = [];
   const flames = [];
   const skirts = [];
@@ -435,9 +474,15 @@ export function createCarModel(color) {
     const head = mount(nose, headStrip, headlight, side * 0.307, 0.448, 2.156);
     head.scale.x = side;
     head.rotation.y = side * 0.31;
+    const lamps = [head];
     for (let diode = 0; diode < 3; diode++) {
-      block(nose, headlight, 0.052, 0.012, 0.009, side * (0.395 + diode * 0.074), 0.438 + diode * 0.012, 2.145 - diode * 0.011);
+      lamps.push(block(nose, headlight, 0.052, 0.012, 0.009, side * (0.395 + diode * 0.074), 0.438 + diode * 0.012, 2.145 - diode * 0.011));
     }
+    const crack = new T.LineSegments(cracks, crackedLens);
+    crack.position.set(side * 0.47, 0.451, 2.160);
+    crack.rotation.y = side * 0.22;
+    nose.add(crack);
+    headlights.push({ side, lamps, crack });
   }
   block(rear, lensHousing, 0.27, 0.035, 0.02, 0, 0.669, -2.025);
   block(rear, aluminum, 0.22, 0.067, 0.018, 0, 0.444, -2.123);
@@ -448,8 +493,9 @@ export function createCarModel(color) {
   for (const { mesh } of decals) mesh.castShadow = mesh.receiveShadow = false;
   for (const { print, face } of wheels) print.castShadow = face.castShadow = false;
   for (const flame of flames) flame.traverse(object => { object.castShadow = object.receiveShadow = false; });
+  const scuffs = scuffMeshes(shell);
   return { root, shell, paint, body, rear, nose, wheels, lights, wing, decals, splitter, diffuser, fins, skirts, exhausts,
-    flames, frontDamage: 0, rearDamage: 0 };
+    flames, headlights, scuffs, lightClock: 0, reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)'), damage: [] };
 }
 
 function applyAppearance(model, appearance) {
@@ -487,24 +533,36 @@ function applyAppearance(model, appearance) {
   }
 }
 
-function deformBody(model, front, rear) {
-  if (model.frontDamage === front && model.rearDamage === rear) return;
-  model.frontDamage = front;
-  model.rearDamage = rear;
-  const original = bodyShape.getAttribute('position');
-  const mesh = model.body.geometry.getAttribute('position');
-  for (let i = 0; i < mesh.count; i++) {
-    const x = original.getX(i);
-    const y = original.getY(i);
-    const z = original.getZ(i);
+function deformSurface(geometry, original, front, rear, left, right) {
+  const mesh = geometry.attributes.position;
+  for (let i = 0, j = 0; i < mesh.count; i++, j += 3) {
+    const x = original[j], y = original[j + 1], z = original[j + 2];
     const noseWeight = T.MathUtils.smoothstep(z, 1.0, 2.14) * front;
     const tailWeight = T.MathUtils.smoothstep(-z, 0.94, 2.12) * rear;
-    mesh.setXYZ(i, x * (1 - (noseWeight + tailWeight) * 0.075),
-      y - (noseWeight * 0.13 + tailWeight * 0.082) * (0.5 + y * 0.5),
+    const flank = (x > 0 ? left : right) * T.MathUtils.smoothstep(Math.abs(x), 0.51, 0.93) *
+      (1 - T.MathUtils.smoothstep(Math.abs(z), 0.57, 1.66)) * (0.82 + 0.18 * Math.sin(z * 10));
+    mesh.setXYZ(i, x * (1 - (noseWeight + tailWeight) * 0.075 - flank * 0.16),
+      y - (noseWeight * 0.13 + tailWeight * 0.082 + flank * 0.044) * (0.5 + y * 0.5),
       z - noseWeight * 0.29 + tailWeight * 0.23);
   }
   mesh.needsUpdate = true;
+}
+
+function deformBody(model, car) {
+  const damage = [car.frontDamage ?? 0, car.rearDamage ?? 0, car.leftDamage ?? 0, car.rightDamage ?? 0, car.damage ?? 0];
+  if (damage.every((value, index) => value === model.damage[index])) return;
+  model.damage = damage;
+  const [front, rear, left, right, total] = damage;
+  deformSurface(model.body.geometry, bodyShape.attributes.position.array, front, rear, left, right);
   model.body.geometry.computeVertexNormals();
+  for (const { zone, mesh, base } of model.scuffs) {
+    const opacity = Math.min(1, (car[zone] ?? 0) * 1.35 + Math.max(0, total - 28) * 0.003);
+    mesh.visible = opacity > 0.025;
+    if (mesh.visible) {
+      mesh.material.opacity = opacity;
+      deformSurface(mesh.geometry, base, front, rear, left, right);
+    }
+  }
   model.nose.position.set(0, -front * 0.115, -front * 0.28);
   model.rear.position.set(0, -rear * 0.072, rear * 0.22);
 }
@@ -517,6 +575,16 @@ export function updateCarModel(model, car, dt, braking, fire = 0) {
   const roll = car.steer * Math.min(Math.abs(car.speed) / 1050, 0.026);
   model.shell.rotation.z += (roll - model.shell.rotation.z) * (1 - Math.exp(-9 * dt));
   for (const light of model.lights) light.material = braking ? brakeLight : tailLight;
+  model.lightClock += dt;
+  for (const { side, lamps, crack } of model.headlights) {
+    const strength = (car.frontDamage ?? 0) + (side > 0 ? (car.leftDamage ?? 0) : (car.rightDamage ?? 0)) * 0.24;
+    crack.visible = strength > 0.51;
+    const t = model.lightClock * (side > 0 ? 17 : 13);
+    const flicker = !model.reducedMotion.matches && Math.sin(t) * Math.sin(t * 0.47 + side) > 0.34;
+    lamps.forEach((lamp, index) => {
+      lamp.material = strength > 0.88 && (index > 1 || flicker) || strength > 0.63 && flicker ? brokenLamp : headlight;
+    });
+  }
   for (const [index, flame] of model.flames.entries()) {
     flame.visible = fire > 0;
     if (flame.visible) flame.scale.setScalar(fire * (index ? 0.84 : 1));
@@ -525,5 +593,5 @@ export function updateCarModel(model, car, dt, braking, fire = 0) {
     if (steering) holder.rotation.y = -car.steer * 0.30;
     wheel.rotation.x -= (car.wheels?.[index].rolling ?? car.speed) * dt / wheelRadius;
   }
-  deformBody(model, car.frontDamage, car.rearDamage);
+  deformBody(model, car);
 }

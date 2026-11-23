@@ -273,6 +273,7 @@ export function createView(canvas, quality) {
   let effects;
   let drawnRace;
   let lastImpact;
+  let lastSparkSerial = 0;
   let shake = 0;
   let shakePhase = 0;
   let cameraReady = false;
@@ -355,18 +356,25 @@ export function createView(canvas, quality) {
     if (drawnRace !== race) {
       drawnRace = race;
       lastImpact = null;
+      lastSparkSerial = 0;
       shake = 0;
       effects.reset();
     }
-    if (race.impact && race.impact !== lastImpact && mode === 'race') {
+    const onCircuit = mode === 'race' || mode === 'result';
+    if (onCircuit) for (const impact of race.impacts) {
+      if (impact.serial <= lastSparkSerial) continue;
+      effects.hit(impact);
+      lastSparkSerial = impact.serial;
+    }
+    if (race.impact && race.impact !== lastImpact && onCircuit) {
       lastImpact = race.impact;
-      effects.hit(lastImpact);
-      if (!reduceMotion.matches && lastImpact.impulse > 4.2 && shake < 0.035) {
-        shake = Math.min(0.18, lastImpact.impulse * 0.006);
+      if (!reduceMotion.matches && lastImpact.impulse > 4.2 && lastImpact.normalSpeed > 4) {
+        shake = Math.max(shake, Math.min(0.24, lastImpact.impulse * 0.005 + lastImpact.loss * 0.0015));
         shakePhase = 0;
       }
     }
-    effects.update(dt, mode === 'race' && !paused ? race : null, canvas.height);
+    const driving = mode === 'race' && !paused;
+    effects.update(dt, driving || mode === 'result' ? race : null, canvas.height, driving);
     skidMarks.update(race, mode === 'race' && !paused, mode === 'race' || mode === 'result');
     const cars = race.cars.map((car, index) => renderPose(car, race.previousPoses[index], fraction));
     racingLine.update(race, cars[0], mode === 'race' && guide);
@@ -400,7 +408,7 @@ export function createView(canvas, quality) {
     aim.lerp(target, blend);
     if (shake > 0.002 && lastImpact) {
       if (!reduceMotion.matches) {
-        const wave = Math.sin(shakePhase);
+        const wave = -Math.cos(shakePhase);
         camera.position.x += wave * shake * lastImpact.nx;
         camera.position.y += Math.cos(shakePhase * 0.74) * shake * 0.42;
         camera.position.z += wave * shake * lastImpact.nz;
