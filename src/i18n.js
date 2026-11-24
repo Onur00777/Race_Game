@@ -199,6 +199,7 @@ const messages = {
   pitEntry: ['PİT GİRİŞ', 'PIT ENTRY'],
   pitExit: ['PİT ÇIKIŞ', 'PIT EXIT'],
   pitBox: ['SERVİS ALANI', 'PIT BOX'],
+  pitYourBay: ['SENİN EKİBİN', 'YOUR TEAM'],
   nextCompound: ['Sonraki lastik', 'Next tire compound'],
   pitRepair: ['Gövdeyi onar', 'Repair body damage'],
   pitStopHint: ['Sarı servis alanında tamamen dur.', 'Stop inside the yellow pit box.'],

@@ -83,13 +83,13 @@ function addGuardrails(scene, track, material) {
   const post = new T.Object3D();
   post.scale.set(0.14, 0.89, 0.15);
   for (const [sideIndex, side] of [-1, 1].entries()) {
-    const offset = side * track.railOffset;
+    const offset = station => side * track.railAt(station, side);
     const vertices = [];
     const indices = [];
     const heights = [0.41, 0.50, 0.58, 0.69, 0.76];
     for (let i = 0; i <= track.samples.length; i++) {
       for (const [row, height] of heights.entries()) {
-        const point = track.at(i * track.spacing, offset + side * (row % 2 === 0 ? 0.12 : 0));
+        const point = track.at(i * track.spacing, offset(i * track.spacing) + side * (row % 2 === 0 ? 0.12 : 0));
         vertices.push(point.x, height, point.z);
         if (i === 0 || row === 0) continue;
         const vertex = i * heights.length + row;
@@ -104,13 +104,14 @@ function addGuardrails(scene, track, material) {
     rail.castShadow = rail.receiveShadow = true;
     scene.add(rail);
     for (let i = 0; i < count; i++) {
-      const point = track.at(i * track.length / count, offset + side * 0.20);
+      const station = i * track.length / count;
+      const point = track.at(station, offset(station) + side * 0.20);
       post.position.set(point.x, 0.39, point.z);
       post.rotation.y = point.yaw;
       post.updateMatrix();
       posts.setMatrixAt(sideIndex * count + i, post.matrix);
       if (i % 5 === 0) {
-        const face = track.at(i * track.length / count, offset - side * 0.032);
+        const face = track.at(station, offset(station) - side * 0.032);
         marker.position.set(face.x, 0.603, face.z);
         marker.rotation.y = face.yaw;
         marker.updateMatrix();
@@ -124,10 +125,11 @@ function addGuardrails(scene, track, material) {
 }
 
 function addGrandstand(scene, track, metal) {
-  const pose = track.at(30, track.railOffset + 4.7);
+  const side = -track.pit.side;
+  const pose = track.at(30, side * (track.railOffset + 4.7));
   const stand = new T.Group();
   stand.position.set(pose.x, 0, pose.z);
-  stand.rotation.y = pose.yaw + Math.PI / 2;
+  stand.rotation.y = pose.yaw + side * Math.PI / 2;
   scene.add(stand);
 
   const concrete = standard('#76716a');
@@ -209,13 +211,15 @@ function addTrack(scene, track, assets, label) {
   gantry.position.set(gate.x, 0, gate.z);
   gantry.rotation.y = gate.yaw;
   scene.add(gantry);
-  const pillar = track.railOffset + 0.55;
+  const left = track.railAt(0, 1) + 0.55, right = track.railAt(0, -1) + 0.55;
+  const span = left + right, middle = (right - left) / 2;
   for (const side of [-1, 1]) {
-    box(gantry, dark, 0.39, 5.5, 0.58, side * pillar, 2.75, 0).castShadow = true;
-    box(gantry, red, 0.74, 1.6, 0.77, side * pillar, 0.81, 0).castShadow = true;
+    const x = side < 0 ? -left : right;
+    box(gantry, dark, 0.39, 5.5, 0.58, x, 2.75, 0).castShadow = true;
+    box(gantry, red, 0.74, 1.6, 0.77, x, 0.81, 0).castShadow = true;
   }
-  box(gantry, dark, pillar * 2 + 0.45, 1.02, 0.68, 0, 5.3, 0).castShadow = true;
-  const sign = new T.Mesh(new T.PlaneGeometry(pillar * 2 - 0.8, 0.89), textPanel(gameName + '     /     ' + label));
+  box(gantry, dark, span + 0.45, 1.02, 0.68, middle, 5.3, 0).castShadow = true;
+  const sign = new T.Mesh(new T.PlaneGeometry(track.event.width + 1.4, 0.89), textPanel(gameName + '     /     ' + label));
   sign.position.set(0, 5.31, -0.35);
   sign.rotation.y = Math.PI;
   gantry.add(sign);

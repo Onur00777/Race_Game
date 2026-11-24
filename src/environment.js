@@ -63,7 +63,7 @@ export function circuitLamps(track) {
   return Array.from({ length: count }, (_, index) => {
     const station = index * track.length / count + 12;
     const side = index % 2 ? 1 : -1;
-    return { side, point: track.at(station, side * (track.railOffset + 0.9)),
+    return { side, point: track.at(station, side * (track.railAt(station, side) + 0.9)),
       aim: track.at(station + 8, side * 1.5), height: night ? 9.0 : 7 };
   });
 }
@@ -131,8 +131,9 @@ export function lightTrack(scene, track, assets) {
 }
 
 function terrainHeight(track, x, z) {
-  const distance = track.project(x, z).distance;
-  const rise = T.MathUtils.smoothstep(distance, track.railOffset + 1, track.railOffset + 32);
+  const { distance, station, offset } = track.project(x, z);
+  const rail = track.railAt(station, Math.sign(offset));
+  const rise = T.MathUtils.smoothstep(distance, rail + 1, rail + 32);
   const wave = Math.sin(x * 0.029 + z * 0.016) * Math.cos(z * 0.039) * 2.8
     + Math.sin(x * 0.088 - z * 0.063) * 0.7;
   return -0.045 + rise * wave;
@@ -207,11 +208,11 @@ function pineCrown(seed) {
 export function addTrees(scene, track) {
   const random = seeded(480);
   const stands = [[], [], []];
-  const minimum = track.railOffset + 3.7;
   for (let i = 0; i < 760; i++) {
     const x = (random() - 0.5) * 510;
     const z = (random() - 0.5) * 520;
-    const distance = track.project(x, z).distance;
+    const { distance, station, offset } = track.project(x, z);
+    const minimum = track.railAt(station, Math.sign(offset)) + 5;
     const cluster = Math.sin(x * 0.041 - z * 0.016) * Math.sin(z * 0.035);
     if (distance < minimum || (cluster < 0.04 && random() > 0.20)) continue;
     const stand = stands[i % stands.length];
