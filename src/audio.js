@@ -16,7 +16,19 @@ export async function createAudio() {
   const noise = crash.getChannelData(0);
   for (let i = 0; i < noise.length; i++) {
     const time = i / context.sampleRate;
-    noise[i] = ((Math.random() * 2 - 1) * 0.66 + Math.sin(2 * Math.PI * 57 * time) * 0.4) * Math.exp(-time * 16);
+    const metal = Math.sin(2 * Math.PI * 393 * time) * 0.14 + Math.sin(2 * Math.PI * 611 * time) * 0.09;
+    const fold = Math.sin(Math.PI * 2 * (54 * time + 112 * time ** 2)) * 0.32 + Math.sin(2 * Math.PI * 133 * time) * 0.20;
+    noise[i] = ((Math.random() * 2 - 1) * 0.56 + fold) * Math.exp(-time * 15) + metal * Math.exp(-time * 22);
+  }
+  const blowout = context.createBuffer(1, Math.floor(context.sampleRate * 0.46), context.sampleRate);
+  const rupture = blowout.getChannelData(0);
+  let pressure = 0;
+  for (let i = 0; i < rupture.length; i++) {
+    const time = i / context.sampleRate;
+    const grain = Math.random() * 2 - 1;
+    pressure = pressure * 0.72 + grain * 0.28;
+    rupture[i] = (grain * 0.28 + pressure * 0.43) * Math.exp(-time * 10) +
+      Math.sin(2 * Math.PI * (105 * time - 63 * time ** 2)) * Math.exp(-time * 24) * 0.43;
   }
   const skids = context.createBuffer(1, Math.floor(context.sampleRate * 1.4), context.sampleRate);
   const skidData = skids.getChannelData(0);
@@ -43,7 +55,8 @@ export async function createAudio() {
   skidSource.start();
   skidTone.start();
   await context.resume();
-  return { context, engine, sub, filter, gain, crash, skidSource, skidFilter, skidTone, skidGain, lastImpact: null, lastFire: null };
+  return { context, engine, sub, filter, gain, crash, blowout, skidSource, skidFilter, skidTone, skidGain,
+    lastImpact: null, lastFire: null, wheelRace: null, lastWheelSerial: 0 };
 }
 
 function updateScreech(audio, race, audible, time) {
@@ -68,16 +81,16 @@ function updateScreech(audio, race, audible, time) {
   audio.skidGain.gain.setTargetAtTime(strain ** 1.35 * 0.13, time, strain > 0 ? 0.068 : 0.045);
 }
 
-function crashSound(impact, audio) {
-  const { context, crash } = audio;
+function oneShot(audio, buffer, volume, band, pitch) {
+  const { context } = audio;
   const source = context.createBufferSource();
   const filter = context.createBiquadFilter();
   const gain = context.createGain();
   filter.type = 'lowpass';
-  filter.frequency.value = impact.kind === 'rail' ? 980 : 570;
-  gain.gain.value = Math.min(0.26, impact.impulse * 0.008);
-  source.buffer = crash;
-  source.playbackRate.value = impact.kind === 'rail' ? 1.05 : 0.83;
+  filter.frequency.value = band;
+  gain.gain.value = volume;
+  source.buffer = buffer;
+  source.playbackRate.value = pitch;
   source.connect(filter).connect(gain).connect(context.destination);
   source.onended = () => {
     source.disconnect();
@@ -85,6 +98,28 @@ function crashSound(impact, audio) {
     gain.disconnect();
   };
   source.start();
+}
+
+function crashSound(impact, audio) {
+  const concrete = impact.surface === 'concrete';
+  const sharpness = impact.kind === 'rail' ? (concrete ? 1560 : 2300) : 1170;
+  oneShot(audio, audio.crash, Math.min(0.46, impact.impulse * 0.011 + impact.normalSpeed * 0.003), sharpness,
+    concrete ? 0.77 : impact.kind === 'rail' ? 1.04 : 0.86);
+}
+
+function updateWheelSound(audio, race, allowed) {
+  if (race !== audio.wheelRace) {
+    audio.wheelRace = race;
+    audio.lastWheelSerial = 0;
+  }
+  for (const event of race?.wheelEvents ?? []) {
+    if (event.serial <= audio.lastWheelSerial) continue;
+    audio.lastWheelSerial = event.serial;
+    const distance = Math.hypot(event.x - race.player.x, event.z - race.player.z);
+    const proximity = event.carId === race.player.id ? 1 : Math.max(0, 1 - distance / 29) ** 2 * 0.76;
+    if (allowed && proximity > 0.05) oneShot(audio, audio.blowout, proximity * 0.81, 3570,
+      event.type === 'detached' ? 0.76 : 0.94);
+  }
 }
 
 export function updateAudio(audio, race, playing, allowImpact = playing) {
@@ -102,6 +137,7 @@ export function updateAudio(audio, race, playing, allowImpact = playing) {
   audio.filter.frequency.setTargetAtTime(179 + speed * 4.9 + level * 33 + load * 106, now, 0.083);
   audio.gain.gain.setTargetAtTime(audible || launchHold ? 0.015 + Math.min(speed / 4200, 0.012) + load * (0.007 + level * 0.002) : 0, now, 0.08);
   updateScreech(audio, race, audible, now);
+  updateWheelSound(audio, race, allowImpact);
   if (race?.impact && race.impact !== audio.lastImpact) {
     audio.lastImpact = race.impact;
     if (allowImpact) crashSound(race.impact, audio);

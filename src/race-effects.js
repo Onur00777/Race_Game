@@ -74,6 +74,11 @@ export function createRaceEffects(scene) {
   let dustTimer = 0;
   const smokeTimers = new Map();
   const engineTimers = new Map();
+  const rimTimers = new Map();
+
+  function wheelFailure(event) {
+    debris.burst(event, true);
+  }
 
   function hit(impact) {
     debris.burst(impact);
@@ -166,11 +171,35 @@ export function createRaceEffects(scene) {
     engineTimers.set(car.id, pending % 1);
   }
 
+  function scrapeRims(car, dt) {
+    if (!car.corners?.some(corner => corner.punctured)) return;
+    const timer = rimTimers.get(car.id) ?? new Float32Array(4);
+    rimTimers.set(car.id, timer);
+    for (const [i, corner] of car.corners.entries()) {
+      const wheel = car.wheels[i];
+      if (!corner.punctured || !wheel.onRoad || wheel.speed < 2.5) { timer[i] = 0; continue; }
+      timer[i] += dt * Math.min(46, wheel.speed * (corner.detached ? 3.1 : 1.75));
+      while (timer[i] >= 1 && sparks.length < maxSparks) {
+        timer[i]--;
+        const sides = (Math.random() - 0.5) * 2.2;
+        sparks.push({ x: wheel.x, y: 0.055, z: wheel.z,
+          vx: wheel.vx * (0.16 + Math.random() * 0.27) + sides,
+          vz: wheel.vz * (0.16 + Math.random() * 0.27) - sides,
+          vy: 0.75 + Math.random() * (corner.detached ? 2.9 : 1.6),
+          lifetime: 0.13 + Math.random() * 0.28, age: 0 });
+      }
+      timer[i] %= 1;
+    }
+  }
+
   function update(dt, race, height, driving) {
     debris.update(dt);
     if (race) {
       for (const car of race.cars) {
-        if (driving) spawnTireSmoke(car, dt, race.wetness);
+        if (driving) {
+          spawnTireSmoke(car, dt, race.wetness);
+          scrapeRims(car, dt);
+        }
         spawnEngineSmoke(car, dt);
       }
       if (driving) spawnDust(race.player, dt);
@@ -223,6 +252,7 @@ export function createRaceEffects(scene) {
     sparks.length = dust.length = dustTimer = 0;
     smokeTimers.clear();
     engineTimers.clear();
+    rimTimers.clear();
   }
-  return { update, hit, reset };
+  return { update, hit, wheelFailure, reset };
 }

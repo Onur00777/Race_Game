@@ -15,6 +15,7 @@ import { compoundControls, compoundOptions, difficultyBadge, difficultyControls,
 import { integrity, vehicleCondition } from './vehicle-damage.js';
 import { recommendedCompound } from './tire-strategy.js';
 import { createVehicleHud, vehicleHudMarkup } from './vehicle-hud.js';
+import { wheelLabel } from './wheel-damage.js';
 import './style.css';
 
 const app = document.querySelector('#app');
@@ -440,7 +441,9 @@ function updateHud() {
         { duration: 550, easing: 'ease-out' });
     }
   }
-  const message = !recent ? (player.onRoad ? '' : t('offTrack')) : impact.loss >= 1
+  const wheelFailure = race.wheelEvents.findLast(event => event.carId === player.id && race.elapsed - event.time < 2.0);
+  const message = wheelFailure ? `${wheelLabel(wheelFailure.index)} · ${t(wheelFailure.type === 'detached' ? 'wheelDetached' : 'wheelPunctured')}` :
+    !recent ? (player.onRoad ? '' : t('offTrack')) : impact.loss >= 1
     ? t('zoneImpact', t(impactZones[impact.zone]), Math.round(impact.loss)) : t(impact.kind === 'rail' ? 'railHit' : 'carHit');
   if (byId('road-warning').textContent !== message) byId('road-warning').textContent = message;
   byId('best-lap').textContent = player.bestLap ? `${upper(t('bestLap'))}  ${formatTime(player.bestLap)}` : '';

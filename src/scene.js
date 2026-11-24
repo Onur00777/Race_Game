@@ -289,6 +289,7 @@ export async function createView(canvas, quality) {
   let drawnRace;
   let lastImpact;
   let lastSparkSerial = 0;
+  let lastWheelSerial = 0;
   let shake = 0;
   let shakePhase = 0;
   let cameraReady = false;
@@ -380,6 +381,7 @@ export async function createView(canvas, quality) {
       drawnRace = race;
       lastImpact = null;
       lastSparkSerial = 0;
+      lastWheelSerial = 0;
       shake = 0;
       effects.reset();
     }
@@ -389,10 +391,15 @@ export async function createView(canvas, quality) {
       effects.hit(impact);
       lastSparkSerial = impact.serial;
     }
+    if (onCircuit) for (const event of race.wheelEvents) {
+      if (event.serial <= lastWheelSerial) continue;
+      effects.wheelFailure(event);
+      lastWheelSerial = event.serial;
+    }
     if (race.impact && race.impact !== lastImpact && onCircuit) {
       lastImpact = race.impact;
       if (!reduceMotion.matches && lastImpact.impulse > 4.2 && lastImpact.normalSpeed > 4) {
-        shake = Math.max(shake, Math.min(0.24, lastImpact.impulse * 0.005 + lastImpact.loss * 0.0015));
+        shake = Math.max(shake, Math.min(0.35, lastImpact.impulse * 0.006 + lastImpact.loss * 0.0024));
         shakePhase = 0;
       }
     }

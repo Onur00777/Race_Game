@@ -745,8 +745,18 @@ export function updateCarModel(model, car, dt, braking, fire = 0) {
   const brakeEnergy = braking ? T.MathUtils.clamp(deceleration / 26, 0, 1) * speed / 33 : 0;
   model.brakeHeat = Math.min(1.6, model.brakeHeat * Math.exp(-dt * 0.22) + brakeEnergy * dt * 0.93);
   const glow = T.MathUtils.smoothstep(model.brakeHeat, 0.26, 1.32) * 1.85;
-  for (const [index, { holder, wheel, steering, disk, face }] of model.wheels.entries()) {
-    if (steering) holder.rotation.y = -car.steer * 0.30;
+  for (const [index, { holder, wheel, side, steering, disk, face, tyre, print, compoundRing }] of model.wheels.entries()) {
+    const corner = car.corners?.[index];
+    const flat = corner?.punctured === true;
+    const bent = Math.max(0, (corner?.damage ?? 0) - 0.30);
+    const camber = steering ? model.appearance.frontCamber : model.appearance.rearCamber;
+    holder.rotation.z = -side * (T.MathUtils.degToRad(camber) - bent * 0.72);
+    holder.rotation.y = (steering ? -car.steer * 0.30 : 0) - side * bent * 0.15;
+    holder.position.y = wheelRadius - (flat ? 0.083 : 0) - bent * 0.025;
+    tyre.scale.y = tyre.scale.z = flat ? 0.79 : 1;
+    tyre.visible = !flat || (corner?.damage ?? 0) < 0.83;
+    print.visible = !flat && (model.appearance.parts?.tires ?? 0) > 0;
+    compoundRing.visible = !flat;
     wheel.rotation.x -= (car.wheels?.[index].rolling ?? car.speed) * dt / wheelRadius;
     face.material.emissiveIntensity = glow * (steering ? 1 : 0.68);
     disk.material.emissiveIntensity = face.material.emissiveIntensity * 0.48;

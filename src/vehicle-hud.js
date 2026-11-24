@@ -12,7 +12,7 @@ const panels = [
   ['rear', 'conditionRear', 'M29 94L40 98H56L67 94 73 113 65 123H31L23 113Z'],
   ['engine', 'engineTemp', 'M35 44L40 41H56L61 44V85L55 94H41L35 85Z'],
 ];
-const healthy = condition => condition <= 30 ? 'healthy' : condition <= 59 ? 'warn' : condition <= 79 ? 'damaged' : 'critical';
+const healthy = condition => condition < 15 ? 'healthy' : condition < 48 ? 'warn' : condition < 76 ? 'damaged' : 'critical';
 const thermal = (temp, min, max) => temp < min ? 'cold' : temp <= max ? 'optimal' : temp <= max + 13 ? 'warm' : 'critical';
 
 export function vehicleHudMarkup() {
