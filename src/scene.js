@@ -11,6 +11,7 @@ import { qualityMode } from './graphics-settings.js';
 import { createRacingLineView } from './racing-line-view.js';
 import { addTrackDetails } from './track-details.js';
 import { createSkidMarks } from './skid-marks.js';
+import { loadCarAsset } from './car-asset.js';
 
 const standard = (color, roughness = 0.78, metalness = 0) => new T.MeshStandardMaterial({ color, roughness, metalness });
 const boxGeometry = new T.BoxGeometry(1, 1, 1);
@@ -253,7 +254,8 @@ function addTrack(scene, track, assets, label) {
   addGrandstand(scene, track, metal);
 }
 
-export function createView(canvas, quality) {
+export async function createView(canvas, quality) {
+  const carAsset = await loadCarAsset(import.meta.env.BASE_URL);
   const renderer = new T.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
   renderer.toneMapping = T.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.12;
@@ -313,7 +315,7 @@ export function createView(canvas, quality) {
     skidMarks = createSkidMarks();
     scene.add(racingLine.mesh, skidMarks.mesh);
     models = cars.map(car => {
-      const model = createCarModel(car.color);
+      const model = createCarModel(car.color, carAsset);
       scene.add(model.root);
       return model;
     });
@@ -338,7 +340,7 @@ export function createView(canvas, quality) {
 
   function drawGarage(car, orbit, dt) {
     if (!resize()) return;
-    if (!studio) studio = createStudio(assets, pipeline.shadowSize());
+    if (!studio) studio = createStudio(pipeline.shadowSize(), carAsset);
     studio.draw(pipeline.render, car, orbit, width / height, dt);
   }
 

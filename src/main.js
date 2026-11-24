@@ -43,7 +43,9 @@ app.innerHTML = `
       </div>
     </section>
     <section id="garage" class="garage-screen" hidden>
-      <header class="garage-heading"><div><h1 data-text="garage"></h1><p id="garage-team"></p></div><div id="garage-resume"></div></header>
+      <header class="garage-heading"><div><h1 data-text="garage"></h1><p id="garage-team"></p></div>
+        <div class="garage-heading-actions"><label><span data-text="graphics"></span><select id="studio-quality" data-graphics data-label="graphics"></select></label>
+        <div id="garage-resume"></div></div></header>
       <div class="garage-layout">
         <section class="garage-stage">
           <div id="garage-preview" class="garage-preview" data-label="preview"></div>
@@ -344,6 +346,7 @@ function updateGarage() {
   const saved = hasSavedRace(career);
   byId('garage-team').textContent = team.name;
   byId('garage-resume').innerHTML = saved ? raceButton(true) : '';
+  byId('studio-quality').innerHTML = graphicsOptions();
   const panel = byId('garage-panel');
   panel.innerHTML = (saved && career.garageTab !== 'service' ? `<p class="pending-setup">${t('nextRaceSetup')}</p>` : '') + garagePanel(career, saved);
   if (career.garageTab !== previousGarageTab) panel.scrollTop = 0;
@@ -476,8 +479,7 @@ function pauseRace() {
 
 function renderPause(saved) {
   overlay.innerHTML = `<h2>${t('paused')}</h2><p>${t(saved ? 'pauseSaved' : 'pauseUnsaved')}</p>
-    <label class="pause-setting"><span>${t('graphics')}</span><select data-graphics>${Object.keys(graphicsModes).map(mode =>
-      `<option value="${mode}" ${mode === qualityMode(career.graphics) ? 'selected' : ''}>${t(mode)}</option>`).join('')}</select></label>
+    <label class="pause-setting"><span>${t('graphics')}</span><select data-graphics>${graphicsOptions()}</select></label>
     <label class="pause-setting"><span>${t('racingLine')} <kbd>L</kbd></span><input type="checkbox" data-racing-line ${career.racingLine !== false ? 'checked' : ''}></label>
     <div class="dialog-actions">
       <button type="button" class="primary" data-action="resume">${t('resumeRace')}</button>
@@ -487,6 +489,11 @@ function renderPause(saved) {
       <button type="button" class="dialog-link" data-action="restart">${t('restartRace')}</button>
       <button type="button" class="dialog-link" data-action="retire">${t('retireRace')}</button>
     </div>`;
+}
+
+function graphicsOptions() {
+  return Object.keys(graphicsModes).map(mode =>
+    `<option value="${mode}" ${mode === qualityMode(career.graphics) ? 'selected' : ''}>${t(mode)}</option>`).join('');
 }
 
 function confirmRaceAction(action) {
@@ -858,7 +865,7 @@ async function startGame() {
   setLanguage(career.profile?.language);
   try {
     const { createView } = await import('./scene.js');
-    view = createView(circuit, career.graphics);
+    view = await createView(circuit, career.graphics);
     circuit.tabIndex = -1;
     showMenu();
     requestAnimationFrame(frame);

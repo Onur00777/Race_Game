@@ -3,6 +3,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { DecalGeometry } from 'three/addons/geometries/DecalGeometry.js';
 import { sponsors } from './setup.js';
 import { axles, wheelRadius, wheelTrack } from './tires.js';
+import { carSurfaceMaps } from './car-materials.js';
 
 const box = new T.BoxGeometry(1, 1, 1);
 const rubber = new T.MeshStandardMaterial({ color: '#141515', roughness: 0.86 });
@@ -233,19 +234,31 @@ export const sharedCarResources = new Set([box, rubber, carbon, inset, aluminum,
 
 const stockParts = { tires: 0, brakes: 0, aero: 0, engine: 0 };
 const defaultAppearance = { wing: 'touring', wingColor: '#21272d', wingAngle: 3, frontCamber: -1, rearCamber: -1, decals: [], parts: stockParts };
-const projector = new T.Mesh(bodyShape, carbon);
-const projectDecal = (center, rotation, size) =>
+const projectDecal = (projector, center, rotation, size) =>
   new DecalGeometry(projector, new T.Vector3(...center), new T.Euler(...rotation), new T.Vector3(...size));
+const projectedDecals = new WeakMap();
 const decalMounts = [
   ['hood', [0, 0.66, 1.46], [-Math.PI / 2, 0, 0], [0.77, 0.32, 0.32]],
   ['doors', [0.89, 0.46, 0.02], [0, Math.PI / 2, 0], [0.76, 0.23, 0.33]],
   ['doors', [-0.89, 0.46, 0.02], [0, -Math.PI / 2, 0], [0.76, 0.23, 0.33]],
   ['rear', [0.37, 0.46, -2.13], [0, Math.PI, 0], [0.43, 0.12, 0.13]],
-].map(([slot, center, rotation, size]) => {
-  const geometry = projectDecal(center, rotation, size);
-  sharedCarResources.add(geometry);
-  return { slot, geometry };
-});
+];
+const scuffMounts = [
+  ['frontDamage', [0.34, 0.59, 1.79], [-Math.PI / 2, 0, 0], [0.89, 0.60, 0.67]],
+  ['rearDamage', [-0.43, 0.52, -1.86], [-Math.PI / 2, 0, 0], [0.72, 0.52, 0.55]],
+  ['leftDamage', [0.89, 0.43, 0.20], [0, Math.PI / 2, 0], [1.32, 0.44, 0.54]],
+  ['rightDamage', [-0.89, 0.43, -0.21], [0, -Math.PI / 2, 0], [1.32, 0.44, 0.54]],
+];
+
+function bodyDecals(body) {
+  if (!projectedDecals.has(body)) {
+    const projector = new T.Mesh(body, carbon);
+    const project = layouts => layouts.map(([slot, center, rotation, size]) =>
+      ({ slot, geometry: projectDecal(projector, center, rotation, size) }));
+    projectedDecals.set(body, { sponsors: project(decalMounts), scuffs: project(scuffMounts) });
+  }
+  return projectedDecals.get(body);
+}
 
 const logos = new Map();
 let finish;
@@ -262,8 +275,7 @@ function finishTexture(size, draw) {
 }
 
 let scuffTexture;
-let scuffProjections;
-function scuffMeshes(parent) {
+function scuffMeshes(parent, projections) {
   scuffTexture ??= finishTexture(128, ctx => {
     for (let i = 0; i < 25; i++) {
       const x = 10 + (i * 47) % 91;
@@ -278,13 +290,7 @@ function scuffMeshes(parent) {
       ctx.stroke();
     }
   });
-  scuffProjections ??= [
-    ['frontDamage', [0.34, 0.59, 1.79], [-Math.PI / 2, 0, 0], [0.89, 0.60, 0.67]],
-    ['rearDamage', [-0.43, 0.52, -1.86], [-Math.PI / 2, 0, 0], [0.72, 0.52, 0.55]],
-    ['leftDamage', [0.89, 0.43, 0.20], [0, Math.PI / 2, 0], [1.32, 0.44, 0.54]],
-    ['rightDamage', [-0.89, 0.43, -0.21], [0, -Math.PI / 2, 0], [1.32, 0.44, 0.54]],
-  ].map(([zone, center, rotation, size]) => ({ zone, geometry: projectDecal(center, rotation, size) }));
-  return scuffProjections.map(({ zone, geometry }) => {
+  return projections.map(({ slot: zone, geometry }) => {
     const material = new T.MeshBasicMaterial({ map: scuffTexture, transparent: true, depthWrite: false,
       polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4, opacity: 0 });
     const mesh = mount(parent, geometry.clone(), material);
@@ -351,12 +357,15 @@ function finishMaterials() {
       }
     }
   });
-  const composite = new T.MeshPhysicalMaterial({ color: '#363e47', map: weave, roughness: 0.38, metalness: 0.42,
-    clearcoat: 0.52, side: T.DoubleSide });
+  const detail = carSurfaceMaps();
+  const composite = new T.MeshPhysicalMaterial({ ...detail.carbon, color: '#333943', map: weave, roughness: 0.54, metalness: 0.47,
+    clearcoat: 0.58, clearcoatRoughness: 0.15, side: T.DoubleSide });
+  Object.assign(rubber, detail.rubber);
   const lettering = new T.MeshStandardMaterial({ map: tirePrint, transparent: true, depthWrite: false, roughness: 0.88 });
   const steel = new T.MeshStandardMaterial({ map: drilling, metalness: 0.70, roughness: 0.37 });
-  finish = { weave, composite, lettering, steel };
+  finish = { weave, detail, composite, lettering, steel };
   for (const material of [composite, lettering, steel]) sharedCarResources.add(material);
+  for (const pair of Object.values(detail)) for (const map of Object.values(pair)) sharedCarResources.add(map);
   return finish;
 }
 function sponsorMaterial(id) {
@@ -389,8 +398,9 @@ function sponsorMaterial(id) {
   return material;
 }
 
-function addWing(shell) {
-  const paint = new T.MeshPhysicalMaterial({ color: defaultAppearance.wingColor, map: finishMaterials().weave,
+function addWing(shell, mountPoint) {
+  const { weave, detail } = finishMaterials();
+  const paint = new T.MeshPhysicalMaterial({ ...detail.carbon, color: defaultAppearance.wingColor, map: weave,
     roughness: 0.32, metalness: 0.36, clearcoat: 0.78 });
   const options = {};
   for (const [id, height, width, depth] of [
@@ -398,6 +408,7 @@ function addWing(shell) {
   ]) {
     const frame = new T.Group();
     frame.position.set(0, height, -1.84);
+    if (mountPoint) frame.position.set(mountPoint.x, frame.position.y + mountPoint.y - 0.74, mountPoint.z);
     shell.add(frame);
     const blade = new T.Group();
     frame.add(blade);
@@ -440,8 +451,11 @@ function addWheels(root) {
       mount(wheel, center, aluminum, side * 0.141);
       const print = mount(wheel, sidewall, lettering);
       print.rotation.y = side * Math.PI / 2;
-      const disk = mount(wheel, brakeDisc, rotor, side * 0.089);
-      const face = mount(wheel, rotorFace, steel, side * 0.103);
+      const disk = mount(wheel, brakeDisc, rotor.clone(), side * 0.089);
+      const face = mount(wheel, rotorFace, steel.clone(), side * 0.103);
+      disk.material.emissive.set('#fa4614');
+      face.material.emissive.set('#ff4b14');
+      disk.material.emissiveIntensity = face.material.emissiveIntensity = 0;
       face.rotation.y = side * Math.PI / 2;
       const calliper = block(holder, performanceCaliper, 0.044, 0.113, 0.094, side * 0.108, 0.057, -0.16);
       calliper.rotation.x = 0.34;
@@ -463,20 +477,38 @@ function addInterior(shell) {
   mount(shell, rimLip, inset, 0.27, 0.863, 0.22).rotation.set(-0.24, Math.PI / 2, 0);
 }
 
-export function createCarModel(color) {
+export function createCarModel(color, asset) {
   const root = new T.Group();
   const shadow = mount(root, shadowPlane, shadowMaterial, 0, 0.025, 0);
   shadow.rotation.x = -Math.PI / 2;
   shadow.scale.set(3.2, 5.6, 1);
   const shell = new T.Group();
   root.add(shell);
-  const paint = new T.MeshPhysicalMaterial({ color, metalness: 0.27, roughness: 0.34,
-    clearcoat: 0.92, clearcoatRoughness: 0.15, envMapIntensity: 1.35 });
-  const body = mount(shell, bodyShape.clone(), paint);
-  addInterior(shell);
-  const enclosure = mount(shell, cabinShape, [glass, paint]);
-  const wing = addWing(shell);
-  const decals = decalMounts.map(({ slot, geometry }) => {
+  const { detail } = finishMaterials();
+  const paint = new T.MeshPhysicalMaterial({ ...detail.paint, color, metalness: 0.49, roughness: 0.33,
+    clearcoat: 1, clearcoatRoughness: 0.085, envMapIntensity: 1.12 });
+  paint.normalScale.set(0.31, 0.31);
+  const bodyTemplate = asset?.body ?? bodyShape;
+  const projections = bodyDecals(bodyTemplate);
+  const body = mount(shell, bodyTemplate.clone(), paint);
+  let enclosure;
+  if (asset?.cabin) {
+    enclosure = asset.cabin.clone(true);
+    enclosure.traverse(node => {
+      if (!node.isMesh) return;
+      sharedCarResources.add(node.geometry);
+      for (const material of Array.isArray(node.material) ? node.material : [node.material]) {
+        sharedCarResources.add(material);
+        for (const property of Object.values(material)) if (property?.isTexture) sharedCarResources.add(property);
+      }
+    });
+    shell.add(enclosure);
+  } else {
+    addInterior(shell);
+    enclosure = mount(shell, cabinShape, [glass, paint]);
+  }
+  const wing = addWing(shell, asset?.sockets.WingMount);
+  const decals = projections.sponsors.map(({ slot, geometry }) => {
     const mesh = mount(shell, geometry.clone(), inset);
     mesh.visible = false;
     mesh.renderOrder = 2;
@@ -484,6 +516,12 @@ export function createCarModel(color) {
   });
   const rear = new T.Group();
   const nose = new T.Group();
+  const noseBase = asset?.sockets.FrontMount?.clone() ?? new T.Vector3(0, 0, 2.14);
+  const rearBase = asset?.sockets.RearMount?.clone() ?? new T.Vector3(0, 0, -2.14);
+  noseBase.z -= 2.14;
+  rearBase.z += 2.14;
+  nose.position.copy(noseBase);
+  rear.position.copy(rearBase);
   shell.add(rear, nose);
   const { composite } = finishMaterials();
   const diffuser = new T.Group();
@@ -567,9 +605,10 @@ export function createCarModel(color) {
   for (const { mesh } of decals) mesh.castShadow = mesh.receiveShadow = false;
   for (const { print, face } of wheels) print.castShadow = face.castShadow = false;
   for (const flame of flames) flame.traverse(object => { object.castShadow = object.receiveShadow = false; });
-  const scuffs = scuffMeshes(shell);
+  const scuffs = scuffMeshes(shell, projections.scuffs);
   return { root, shell, paint, body, rear, nose, wheels, lights, wing, decals, splitter, diffuser, fins, skirts, exhausts,
-    flames, headlights, scuffs, lightClock: 0, reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)'), damage: [] };
+    flames, headlights, scuffs, noseBase, rearBase, bodyTemplate, lightClock: 0, brakeHeat: 0,
+    reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)'), damage: [0, 0, 0, 0, 0] };
 }
 
 function applyAppearance(model, appearance) {
@@ -600,7 +639,6 @@ function applyAppearance(model, appearance) {
     print.visible = tires > 0;
     disk.scale.set(1, 0.87 + brakes * 0.076, 0.87 + brakes * 0.076);
     face.scale.setScalar(0.87 + brakes * 0.076);
-    face.visible = brakes > 0;
     calliper.material.color.set(['#5e6870', '#e23c29', '#fbb63e', '#ffc750'][brakes]);
     calliper.position.z = -0.137 - brakes * 0.013;
     calliper.scale.y = 0.093 + brakes * 0.018;
@@ -627,7 +665,7 @@ function deformBody(model, car) {
   if (damage.every((value, index) => value === model.damage[index])) return;
   model.damage = damage;
   const [front, rear, left, right, total] = damage;
-  deformSurface(model.body.geometry, bodyShape.attributes.position.array, front, rear, left, right);
+  deformSurface(model.body.geometry, model.bodyTemplate.attributes.position.array, front, rear, left, right);
   model.body.geometry.computeVertexNormals();
   for (const { mesh, base } of model.decals) deformSurface(mesh.geometry, base, front, rear, left, right);
   for (const { zone, mesh, base } of model.scuffs) {
@@ -638,8 +676,12 @@ function deformBody(model, car) {
       deformSurface(mesh.geometry, base, front, rear, left, right);
     }
   }
-  model.nose.position.set(0, -front * 0.115, -front * 0.28);
-  model.rear.position.set(0, -rear * 0.072, rear * 0.22);
+  model.nose.position.copy(model.noseBase);
+  model.nose.position.y -= front * 0.115;
+  model.nose.position.z -= front * 0.28;
+  model.rear.position.copy(model.rearBase);
+  model.rear.position.y -= rear * 0.072;
+  model.rear.position.z += rear * 0.22;
 }
 
 export function updateCarModel(model, car, dt, braking, fire = 0) {
@@ -668,9 +710,17 @@ export function updateCarModel(model, car, dt, braking, fire = 0) {
     flame.visible = fire > 0;
     if (flame.visible) flame.scale.setScalar(fire * (index ? 0.84 : 1));
   }
-  for (const [index, { holder, wheel, steering }] of model.wheels.entries()) {
+  const speed = Math.max(0, car.speed);
+  const deceleration = Math.max(0, ((model.brakeSpeed ?? speed) - speed) / Math.max(0.001, dt));
+  model.brakeSpeed = speed;
+  const brakeEnergy = braking ? T.MathUtils.clamp(deceleration / 26, 0, 1) * speed / 33 : 0;
+  model.brakeHeat = Math.min(1.6, model.brakeHeat * Math.exp(-dt * 0.22) + brakeEnergy * dt * 0.93);
+  const glow = T.MathUtils.smoothstep(model.brakeHeat, 0.26, 1.32) * 1.85;
+  for (const [index, { holder, wheel, steering, disk, face }] of model.wheels.entries()) {
     if (steering) holder.rotation.y = -car.steer * 0.30;
     wheel.rotation.x -= (car.wheels?.[index].rolling ?? car.speed) * dt / wheelRadius;
+    face.material.emissiveIntensity = glow * (steering ? 1 : 0.68);
+    disk.material.emissiveIntensity = face.material.emissiveIntensity * 0.48;
   }
   deformBody(model, car);
 }

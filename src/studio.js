@@ -1,14 +1,15 @@
 import * as T from 'three';
 import { createCarModel, updateCarModel } from './car-model.js';
 import { fitShadowResolution } from './render-pipeline.js';
+import { createStudioHDR } from './car-materials.js';
 
-export function createStudio(assets, shadowSize) {
+export function createStudio(shadowSize, carAsset) {
   const scene = new T.Scene();
   scene.background = new T.Color('#11171d');
   scene.fog = new T.Fog('#11171d', 9, 23);
-  scene.environmentIntensity = 0.52;
-  assets.panorama('sky').reflections.then(texture => { if (texture) scene.environment = texture; });
-  const stageMaterial = new T.MeshStandardMaterial({ color: '#323943', roughness: 0.65, metalness: 0.24 });
+  scene.environmentIntensity = 0.84;
+  scene.environment = createStudioHDR();
+  const stageMaterial = new T.MeshStandardMaterial({ color: '#252c37', roughness: 0.43, metalness: 0.39 });
   const floorMaterial = new T.MeshStandardMaterial({ color: '#202730', roughness: 0.8 });
   const floor = new T.Mesh(new T.PlaneGeometry(72, 72), floorMaterial);
   floor.rotation.x = -Math.PI / 2;
@@ -27,21 +28,21 @@ export function createStudio(assets, shadowSize) {
   grid.position.y = -0.14;
   scene.add(grid);
 
-  const key = new T.DirectionalLight('#fff0dc', 3.05);
+  const key = new T.DirectionalLight('#fff0dc', 2.2);
   key.position.set(2.5, 6, 4.5);
   key.castShadow = true;
   key.shadow.mapSize.set(Math.min(2048, shadowSize), Math.min(2048, shadowSize));
   Object.assign(key.shadow.camera, { left: -4.4, right: 4.4, top: 4.4, bottom: -4.4, near: 0.1, far: 17 });
   key.shadow.camera.updateProjectionMatrix();
-  key.shadow.normalBias = 0.022;
+  key.shadow.normalBias = 0.014;
   key.shadow.bias = -0.00012;
   key.shadow.radius = 2;
-  const fill = new T.DirectionalLight('#b7defe', 2.05);
+  const fill = new T.DirectionalLight('#b7defe', 1.55);
   fill.position.set(-5, 3, -2);
-  const rim = new T.DirectionalLight('#ffe0bd', 1.4);
+  const rim = new T.DirectionalLight('#ffe0bd', 1.5);
   rim.position.set(3, 3.5, -4);
   scene.add(key, fill, rim, new T.HemisphereLight('#cfdeee', '#443632', 0.66));
-  const model = createCarModel('#f04b32');
+  const model = createCarModel('#f04b32', carAsset);
   scene.add(model.root);
   const camera = new T.PerspectiveCamera(40, 1, 0.08, 55);
   const target = new T.Vector3();
