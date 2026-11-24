@@ -1,4 +1,6 @@
 import { tractionMode } from './ecu.js';
+import { compoundId, compoundSpec } from './tire-strategy.js';
+export { compounds } from './tire-strategy.js';
 
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 const number = (value, fallback, low, high) => Number.isFinite(value) ? clamp(value, low, high) : fallback;
@@ -7,12 +9,6 @@ export const wings = [
   { id: 'touring', level: 1, name: ['Touring', 'Touring'], load: 26, drag: 0.52 },
   { id: 'swan', level: 2, name: ['Kuğu boynu', 'Swan neck'], load: 43, drag: 0.88 },
   { id: 'twin', level: 3, name: ['Çift katlı', 'Twin element'], load: 61, drag: 1.42 },
-];
-
-export const compounds = [
-  { id: 'medium', name: ['Orta', 'Medium'], grip: 0, rolling: 0 },
-  { id: 'soft', name: ['Yumuşak', 'Soft'], grip: 0.83, rolling: -1.05 },
-  { id: 'hard', name: ['Sert', 'Hard'], grip: -0.61, rolling: 1.12 },
 ];
 
 export const sponsors = [
@@ -46,7 +42,7 @@ export function normalizeSetup(input, aeroLevel) {
     const value = number(input?.[id], defaultSetup[id], min, max);
     setup[id] = Math.round(value / step) * step;
   }
-  if (compounds.some(compound => compound.id === input?.compound)) setup.compound = input.compound;
+  setup.compound = compoundId(input?.compound);
   if (wings.some(wing => wing.id === input?.wing && wing.level <= aeroLevel)) setup.wing = input.wing;
   if (/^#[\da-f]{6}$/i.test(input?.wingColor ?? '')) setup.wingColor = input.wingColor;
   setup.tcMode = tractionMode(input?.tcMode);
@@ -60,7 +56,7 @@ export function activeWing(setup, level) {
 export function vehicleStats(team, parts, input) {
   const setup = normalizeSetup(input, parts.aero);
   const wing = activeWing(setup, parts.aero);
-  const compound = compounds.find(item => item.id === setup.compound);
+  const compound = compoundSpec(setup.compound);
   const load = wing ? wing.load + setup.downforce * (3.1 + parts.aero * 0.25) + (parts.aero - wing.level) * 7 : 0;
   const drag = wing ? wing.drag + setup.downforce * 0.16 + (parts.aero - wing.level) * 0.20 : 0;
   const rearBalance = 1.18 - Math.abs(setup.rearCamber + 1.5) * 0.43;
@@ -79,5 +75,5 @@ export function carAppearance(loadout) {
   const { setup, upgrades, sponsor, decals } = loadout;
   const wing = activeWing(setup, upgrades.aero);
   return { wing: wing?.id ?? 'stock', wingColor: setup.wingColor, wingAngle: setup.downforce,
-    frontCamber: setup.frontCamber, rearCamber: setup.rearCamber, sponsor, decals, parts: upgrades };
+    frontCamber: setup.frontCamber, rearCamber: setup.rearCamber, sponsor, decals, parts: upgrades, compound: setup.compound };
 }

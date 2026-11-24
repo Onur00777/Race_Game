@@ -109,7 +109,8 @@ export function createRaceIntel(track, difficulty, rivals, gapBetween) {
     const steering = clamp(headingError * (3.85 + settings.apex * 0.45), -1, 1);
     const recovering = Math.abs(headingError) > 0.74;
     const draft = !closing && settings.draft ? wakeFactor(track, car, cars, gapBetween) : 0;
-    const envelope = Math.min(now.targetSpeed + draft * 1.4, traffic.speed);
+    const wetGrip = clamp(Math.sqrt(car.tireGrip ?? 1), 0.65, 1.07);
+    const envelope = Math.min(now.targetSpeed * wetGrip + draft * 1.4, traffic.speed);
     const bend = Math.min(1, Math.abs(reference.curvature) * 33);
     const targetSpeed = recovering ? Math.min(envelope, 8.4) : envelope;
     const difference = targetSpeed - speed;

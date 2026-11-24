@@ -19,6 +19,7 @@ export const events = [
   {
     id: 'summit', name: 'Zirve Grand Prix', nameEn: 'Summit Grand Prix', date: '10 MAY', dateEn: '10 MAY',
     format: 'endurance', weather: 'cloud', time: '16:30', laps: 6, width: 16,
+    wetness: 0, forecast: [{ lap: 2, wetness: 0.68 }, { lap: 5, wetness: 0.16 }],
     rivalPace: [0.91, 0.98, 0.98, 0.93], aggression: 0.47, surfaceGrip: 0.88,
     prizes: [4200, 3400, 2800, 2350, 2050], pointsByPlace: [32, 24, 19, 15, 12], skyYaw: 3.16,
     points: [[-62, 61], [-62, -34], [-36, -99], [26, -133], [83, -107], [86, -61], [55, -25], [81, 11], [88, 65], [48, 120], [-17, 122]],

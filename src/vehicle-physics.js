@@ -14,7 +14,7 @@ export function advanceVehicle(car, controls, handling, dt, canReverse = false) 
   const draft = controls.draft ?? 0;
   const { topSpeed, acceleration, braking, surfaceGrip, grip, turn, brakeStability, load } = handling;
   const condition = damagePerformance(car);
-  const maximum = topSpeed * condition.speed + draft * 2.4;
+  const maximum = (topSpeed + (car.tireSpeedDelta ?? 0)) * condition.speed + draft * 2.4;
   const roadGrip = surfaceGrip * (car.tireGrip ?? 1);
   const effectiveBrake = braking * roadGrip * (1 - (car.tireSlip ?? 0) * 0.11);
   if (gas) {

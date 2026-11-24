@@ -8,6 +8,7 @@ import { createRaceIntel, wakeFactor } from './race-ai.js';
 import { createTires, updateTires } from './tires.js';
 import { applyImpact, damagePerformance, vehicleCondition } from './vehicle-damage.js';
 import { launchRPM, normalizeElectronics, tractionMode, tractionModes } from './ecu.js';
+import { applyTireGrip, fitTires, recommendedCompound, wearTires, weatherTarget } from './tire-strategy.js';
 
 const wrap = (value, period) => ((value % period) + period) % period;
 export const raceStep = 1 / 120;
@@ -108,9 +109,16 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
   const race = { track, player, opponents, cars, difficulty: difficultyId(options.difficulty),
     runId: options.runId ?? (globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)), previousPoses: cars.map(visualPose),
     elapsed: 0, countdown: 3, order: null, impact: null, impacts: [], retired: false, throttle: false, backfire: null, engineLevel: upgrades.engine };
+  race.dynamicWeather = options.dynamicWeather !== false;
+  race.wetness = Number.isFinite(options.wetness) ? clamp(options.wetness, 0, 1) : weatherTarget(track.event, 0);
+  fitTires(player, setup?.compound);
+  opponents.forEach((car, index) => fitTires(car, race.wetness >= 0.37 ? 'rain' :
+    index === 0 ? recommendedCompound(race.wetness, track.event.laps) : index === 3 && track.event.laps > 3 ? 'hard' : 'medium'));
+  cars.forEach(car => applyTireGrip(car, race.wetness));
   const surfaceGrip = track.event.surfaceGrip;
   const electronics = normalizeElectronics(options.electronics);
-  const playerHandling = { ...vehicleStats(team, upgrades, setup), surfaceGrip, ecu: electronics, tcMode: tractionMode(setup?.tcMode) };
+  const playerHandling = { ...vehicleStats(team, upgrades, { ...setup, compound: 'medium' }),
+    surfaceGrip, ecu: electronics, tcMode: tractionMode(setup?.tcMode) };
   race.electronics = electronics;
   race.tcMode = tractionMode(options.tcMode ?? setup?.tcMode);
   race.launchHold = 0;
@@ -119,11 +127,15 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
   };
   const { topSpeed, braking, grip, load } = playerHandling;
   let impactSerial = 0;
+  let handlingUpdated = 0;
 
   function refreshHandling() {
     const performance = damagePerformance(player);
-    race.handling = { topSpeed: topSpeed * performance.speed, braking: braking * surfaceGrip,
-      grip: (grip * performance.grip + load * 0.018 * performance.aero) * surfaceGrip };
+    const tyre = (player.tireGrip ?? 1) * surfaceGrip;
+    const next = { topSpeed: (topSpeed + (player.tireSpeedDelta ?? 0)) * performance.speed,
+      braking: braking * tyre, grip: (grip * performance.grip + load * 0.018 * performance.aero) * tyre };
+    if (!race.handling || Object.keys(next).some(stat => Math.abs(next[stat] - race.handling[stat]) > 0.04)) race.handling = next;
+    handlingUpdated = race.elapsed;
   }
   refreshHandling();
 
@@ -171,6 +183,7 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
     car.offset = projection.offset;
     car.onRoad = projection.distance <= track.event.width / 2 + 0.6;
     updateTires(car, controls, handling, projection, track.event.width / 2, dt);
+    wearTires(car, race.wetness, dt);
     const delta = relativeStation(projection.station, car.station);
     const previous = car.station;
     // Reject projection jumps between different sections of a hairpin.
@@ -220,6 +233,11 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
     }
     race.previousPoses = cars.map(visualPose);
     race.elapsed += dt;
+    if (race.dynamicWeather) {
+      const leadingLap = Math.floor(Math.max(...cars.map(car => car.station)) / track.length);
+      const target = weatherTarget(track.event, leadingLap);
+      race.wetness += clamp(target - race.wetness, -dt * 0.012, dt * 0.032);
+    }
     const { gas, brake } = input;
     const throttle = gas && !brake;
     if (race.throttle && !throttle && upgrades.engine > 0 && player.speed > 13 &&
@@ -228,6 +246,8 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
     }
     race.throttle = throttle;
     const active = cars.filter(car => car.finishTime == null || car.speed > 1);
+    active.forEach(car => applyTireGrip(car, race.wetness));
+    if (race.elapsed - handlingUpdated > 0.9) refreshHandling();
     race.launchHold = 0;
     const controls = active.map(car => car === player ? { ...input, launch: race.elapsed < 3.6, tcMode: race.tcMode,
       draft: wakeFactor(track, player, cars, relativeStation) } :
@@ -254,6 +274,11 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
   race.reset = () => rejoin(player);
   race.retire = () => { if (!race.order) classify(true); };
   race.refreshHandling = refreshHandling;
+  race.fitTires = (car, compound) => {
+    fitTires(car, compound);
+    applyTireGrip(car, race.wetness);
+    if (car === player) refreshHandling();
+  };
   race.update = update;
   race.position = () => race.order ? race.order.indexOf(player.id) + 1
     : 1 + opponents.filter(car => car.station > player.station).length;

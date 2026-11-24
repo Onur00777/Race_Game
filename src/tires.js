@@ -40,7 +40,8 @@ export function updateTires(car, controls, handling, road, halfWidth, dt) {
     const along = longitudinal * Math.cos(angle) + sideways * Math.sin(angle);
     const slipAngle = Math.atan2(across, Math.max(2.5, Math.abs(along)));
     const transfer = mount.front ? frontBias * 1.55 : (1 - frontBias) * 2.18;
-    const localGrip = treadGrip * (wheel.onRoad ? 1 : 0.57);
+    const wheelGrip = wheel.grip === undefined ? treadGrip : treadGrip * wheel.grip / car.tireGrip;
+    const localGrip = wheelGrip * (wheel.onRoad ? 1 : 0.57);
     const capacity = Math.max(0.40, 0.79 * localGrip - Math.abs(slipAngle) * 0.48);
     const brakeLock = car.actuation?.locks[index] ?? clamp((brake * transfer - capacity) * 2.17, 0, 0.89);
     const lock = controls.handbrake && !mount.front ? 0.98 : brakeLock;

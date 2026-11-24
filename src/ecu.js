@@ -47,7 +47,7 @@ export function regulateVehicle(car, controls, handling) {
       const wheel = car.wheels?.[index];
       const front = index % 2 === 1;
       const transfer = front ? bias * 1.55 : (1 - bias) * 2.18;
-      const grip = tyreGrip * (0.92 + (handling.grip - 8.8) * 0.026);
+      const grip = (wheel?.grip ?? car.tireGrip ?? 1) * handling.surfaceGrip * (0.92 + (handling.grip - 8.8) * 0.026);
       const limit = Math.max(0.28, 0.79 * grip * (wheel?.onRoad || !wheel?.speed ? 1 : 0.57) -
         (Math.abs(wheel?.angle ?? 0) * 0.48));
       const requested = brake * transfer;

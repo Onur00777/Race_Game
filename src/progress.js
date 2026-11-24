@@ -3,6 +3,7 @@ import { createRace } from './race.js';
 import { legacyEvents } from './events.js';
 import { difficultyId } from './difficulty.js';
 import { vehicleCondition } from './vehicle-damage.js';
+import { applyTireGrip, fitTires } from './tire-strategy.js';
 
 const carFields = ['x', 'z', 'yaw', 'speed', 'lateral', 'spin', 'steer', 'station',
   'damage', 'frontDamage', 'rearDamage'];
@@ -17,6 +18,7 @@ export function raceCheckpoint(career, race, loadout, alternateCamera) {
     round: career.results.length,
     difficulty: race.difficulty,
     tcMode: race.tcMode,
+    weather: { wetness: race.wetness, dynamic: race.dynamicWeather },
     loadout,
     alternateCamera,
     elapsed: race.elapsed,
@@ -24,6 +26,7 @@ export function raceCheckpoint(career, race, loadout, alternateCamera) {
     cars: race.cars.map((car, index) => ({
       ...Object.fromEntries(carFields.map(key => [key, car[key]])),
       leftDamage: car.leftDamage, rightDamage: car.rightDamage,
+      compound: car.compound, tireLife: car.tireLife, tireTemperature: car.tireTemperature,
       id: car.id, offset: car.offset, onRoad: car.onRoad,
       ...(index === 0
         ? { lap: car.lap, lapStarted: car.lapStarted, bestLap: car.bestLap }
@@ -57,7 +60,8 @@ export function restoreRace(career, track) {
   const loadout = normalizeLoadout(save.loadout);
   const race = createRace(track, teamById(loadout.team), loadout.upgrades, loadout.setup, loadout.appearance,
     { difficulty: eventDifficulty(career), runId: typeof save.runId === 'string' ? save.runId : undefined,
-      electronics: loadout.electronics, tcMode: save.tcMode });
+      electronics: loadout.electronics, tcMode: save.tcMode,
+      wetness: save.weather?.wetness, dynamicWeather: save.weather ? save.weather.dynamic !== false : false });
   if (!Number.isFinite(save.elapsed) || save.elapsed < 0 ||
       !Number.isFinite(save.countdown) || save.countdown < 0 || save.countdown > 3 ||
       !Array.isArray(save.cars) || save.cars.length !== race.cars.length) return null;
@@ -67,6 +71,8 @@ export function restoreRace(career, track) {
     if (!state || car.id !== state.id || !carFields.every(key => Number.isFinite(state[key]))) return null;
     for (const key of carFields) car[key] = state[key];
     Object.assign(car, vehicleCondition(state));
+    fitTires(car, state.compound ?? car.compound, state.tireLife, state.tireTemperature);
+    applyTireGrip(car, race.wetness);
     const projection = track.project(car.x, car.z);
     car.offset = Number.isFinite(state.offset) ? state.offset : projection.offset;
     car.onRoad = typeof state.onRoad === 'boolean' ? state.onRoad : projection.distance <= event.width / 2 + 0.6;
