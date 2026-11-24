@@ -1,10 +1,12 @@
 import * as T from 'three';
 import { engineWarning } from './thermals.js';
+import { createCrashDebris } from './crash-debris.js';
 
 const maxSparks = 64;
 const maxDust = 156;
 
 export function createRaceEffects(scene) {
+  const debris = createCrashDebris(scene);
   const sparks = [];
   const sparkPositions = new Float32Array(maxSparks * 6);
   const sparkColors = new Float32Array(maxSparks * 6);
@@ -74,6 +76,7 @@ export function createRaceEffects(scene) {
   const engineTimers = new Map();
 
   function hit(impact) {
+    debris.burst(impact);
     const count = Math.min(42, Math.ceil(impact.impulse + impact.normalSpeed * 0.75));
     for (let i = 0; i < count && sparks.length < maxSparks; i++) {
       const side = (Math.random() - 0.5) * 11 + Math.max(-7, Math.min(7, impact.sliding * 0.24));
@@ -164,6 +167,7 @@ export function createRaceEffects(scene) {
   }
 
   function update(dt, race, height, driving) {
+    debris.update(dt);
     if (race) {
       for (const car of race.cars) {
         if (driving) spawnTireSmoke(car, dt, race.wetness);
@@ -215,6 +219,7 @@ export function createRaceEffects(scene) {
   }
 
   function reset() {
+    debris.reset();
     sparks.length = dust.length = dustTimer = 0;
     smokeTimers.clear();
     engineTimers.clear();

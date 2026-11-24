@@ -173,7 +173,8 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
     const own = first === player ? primary : second === player ? secondary : null;
     if (own) refreshHandling();
     if (impact.impulse < 1.15) return;
-    const event = { ...impact, kind: second ? 'vehicle' : 'rail', time: race.elapsed, serial: ++impactSerial };
+    const event = { ...impact, kind: second ? 'vehicle' : 'rail', time: race.elapsed, serial: ++impactSerial,
+      color: first.color, zone: primary?.zone, parts: [...(primary?.parts ?? []), ...(secondary?.parts ?? [])] };
     raceControl.report(event, first, second);
     if (impact.normalSpeed > 5.4 && impact.impulse > 2.7) {
       race.impacts.push(event);

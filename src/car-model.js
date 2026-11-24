@@ -654,7 +654,7 @@ function applyAppearance(model, appearance) {
   }
 }
 
-function deformSurface(geometry, original, front, rear, left, right) {
+function deformSurface(geometry, original, front, rear, left, right, hood) {
   const mesh = geometry.attributes.position;
   for (let i = 0, j = 0; i < mesh.count; i++, j += 3) {
     const x = original[j], y = original[j + 1], z = original[j + 2];
@@ -662,27 +662,32 @@ function deformSurface(geometry, original, front, rear, left, right) {
     const tailWeight = T.MathUtils.smoothstep(-z, 0.94, 2.12) * rear;
     const flank = (x > 0 ? left : right) * T.MathUtils.smoothstep(Math.abs(x), 0.51, 0.93) *
       (1 - T.MathUtils.smoothstep(Math.abs(z), 0.57, 1.66)) * (0.82 + 0.18 * Math.sin(z * 10));
+    const bonnet = hood * T.MathUtils.smoothstep(z, 0.79, 1.22) * (1 - T.MathUtils.smoothstep(z, 1.96, 2.14)) *
+      T.MathUtils.smoothstep(y, 0.46, 0.61) * (1 - T.MathUtils.smoothstep(Math.abs(x), 0.53, 0.86));
+    const crease = Math.exp(-(((z - 1.58 - x * 0.19) / 0.147) ** 2)) -
+      0.54 * Math.exp(-(((z - 1.85 + x * 0.19) / 0.12) ** 2));
     mesh.setXYZ(i, x * (1 - (noseWeight + tailWeight) * 0.075 - flank * 0.16),
-      y - (noseWeight * 0.13 + tailWeight * 0.082 + flank * 0.044) * (0.5 + y * 0.5),
-      z - noseWeight * 0.29 + tailWeight * 0.23);
+      y - (noseWeight * 0.13 + tailWeight * 0.105 + flank * 0.044) * (0.5 + y * 0.5) + bonnet * (0.105 + crease * 0.235),
+      z - noseWeight * 0.29 + tailWeight * (0.23 + Math.sin(x * 8) * 0.055) - bonnet * 0.08);
   }
   mesh.needsUpdate = true;
 }
 
 function deformBody(model, car) {
-  const damage = [car.frontDamage ?? 0, car.rearDamage ?? 0, car.leftDamage ?? 0, car.rightDamage ?? 0, car.damage ?? 0];
+  const damage = [car.frontDamage ?? 0, car.rearDamage ?? 0, car.leftDamage ?? 0, car.rightDamage ?? 0,
+    car.damage ?? 0, car.hoodDamage ?? 0];
   if (damage.every((value, index) => value === model.damage[index])) return;
   model.damage = damage;
-  const [front, rear, left, right, total] = damage;
-  deformSurface(model.body.geometry, model.bodyTemplate.attributes.position.array, front, rear, left, right);
+  const [front, rear, left, right, total, hood] = damage;
+  deformSurface(model.body.geometry, model.bodyTemplate.attributes.position.array, front, rear, left, right, hood);
   model.body.geometry.computeVertexNormals();
-  for (const { mesh, base } of model.decals) deformSurface(mesh.geometry, base, front, rear, left, right);
+  for (const { mesh, base } of model.decals) deformSurface(mesh.geometry, base, front, rear, left, right, hood);
   for (const { zone, mesh, base } of model.scuffs) {
     const opacity = Math.min(1, (car[zone] ?? 0) * 1.35 + Math.max(0, total - 28) * 0.003);
     mesh.visible = opacity > 0.025;
     if (mesh.visible) {
       mesh.material.opacity = opacity;
-      deformSurface(mesh.geometry, base, front, rear, left, right);
+      deformSurface(mesh.geometry, base, front, rear, left, right, hood);
     }
   }
   model.nose.position.copy(model.noseBase);
@@ -695,6 +700,13 @@ function deformBody(model, car) {
 
 export function updateCarModel(model, car, dt, braking, fire = 0) {
   applyAppearance(model, car.appearance ?? defaultAppearance);
+  const biasDamage = (car.leftDamage ?? 0) >= (car.rightDamage ?? 0) ? 1 : -1;
+  const wing = model.wing.options[model.appearance.wing];
+  const wingDamage = car.wingDamage ?? 0, splitterDamage = car.splitterDamage ?? 0;
+  wing.frame.visible = wingDamage < 1;
+  wing.frame.rotation.set(wingDamage * 0.23, biasDamage * wingDamage * 0.16, biasDamage * wingDamage * 0.26);
+  model.splitter.visible = splitterDamage < 1;
+  model.splitter.rotation.set(-splitterDamage * 0.23, biasDamage * splitterDamage * 0.06, biasDamage * splitterDamage * 0.16);
   const compound = compoundId(car.compound ?? car.appearance?.compound);
   if (compound !== model.compound) {
     model.compound = compound;

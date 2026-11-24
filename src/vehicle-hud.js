@@ -80,6 +80,8 @@ export function createVehicleHud(root) {
       right: { damage: Math.round((car.rightDamage ?? 0) * 100) },
       engine: { damage: hotEngine ? 100 : hood * 0.69, status: `${temperature}°C`, heat: hotEngine ? 'critical' : thermal(temperature, 70, 103) },
     };
+    current.front.damage = Math.max(current.front.damage, Math.round((car.splitterDamage ?? 0) * 100));
+    current.rear.damage = Math.max(current.rear.damage, Math.round((car.wingDamage ?? 0) * 100));
     const [min, max] = tireTemperatureWindow(car.compound);
     for (const [id, index] of tires) {
       const life = Math.round((car.tireLife?.[index] ?? 1) * 100);

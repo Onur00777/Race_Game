@@ -161,7 +161,10 @@ export function createRaceControl(race, saved) {
       if ((car === player ? plan?.repair : true) && car.damage > 0) {
         const fraction = Math.max(0, car.damage - 18) / car.damage;
         car.damage *= fraction;
-        for (const zone of damageZones) car[zone] *= fraction;
+        for (const zone of [...damageZones, 'hoodDamage', 'splitterDamage', 'wingDamage']) {
+          if ((zone === 'splitterDamage' || zone === 'wingDamage') && car[zone] === 1) continue;
+          car[zone] *= fraction;
+        }
       }
     });
     player.lapStarted = race.elapsed;
