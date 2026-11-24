@@ -31,7 +31,7 @@ export function updateTires(car, controls, handling, road, halfWidth, dt, pitSur
     wheel.z = car.z + armZ;
     const offset = road.offset - road.dz * armX + road.dx * armZ;
     wheel.onRoad = Math.abs(offset) <= halfWidth + 0.08 ||
-      (Math.abs(offset) < halfWidth + 5.5 && Boolean(pitSurface?.(road.station + road.dx * armX + road.dz * armZ, offset)));
+      Boolean(pitSurface?.(road.station + road.dx * armX + road.dz * armZ, offset));
     const longitudinal = car.speed - yawRate * mount.x;
     const sideways = car.lateral + yawRate * mount.z;
     wheel.vx = fx * longitudinal + fz * sideways;

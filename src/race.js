@@ -1,6 +1,6 @@
 import { CatmullRomCurve3, Vector3 } from 'three';
 import { rivals } from './career.js';
-import { railRunoff, resolveBarrierContact, resolveVehicleContact } from './contact.js';
+import { railRunoff, resolveBarrierContact, resolvePitWallContact, resolveVehicleContact } from './contact.js';
 import { vehicleStats } from './setup.js';
 import { difficultyId } from './difficulty.js';
 import { advanceVehicle, angleBetween, clamp } from './vehicle-physics.js';
@@ -91,6 +91,7 @@ export function createTrack(event) {
 
   const track = { event, length, spacing, railOffset, samples, at, project };
   track.pit = buildPitLane(track);
+  track.railAt = (station, side) => side === track.pit.side ? track.pit.railAt(station) : railOffset;
   return track;
 }
 
@@ -186,12 +187,16 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
 
   function trackProgress(car, controls, handling, dt) {
     let projection = track.project(car.x, car.z);
-    if (projection.distance > track.railOffset + 8) {
+    const rail = track.railAt(projection.station, Math.sign(projection.offset));
+    if (projection.distance > rail + 8) {
       rejoin(car);
       return;
     }
     const { x, z } = car;
-    reportImpact(resolveBarrierContact(car, projection, track.railOffset), car);
+    const wall = resolvePitWallContact(car, projection, track.pit, race.previousPoses[cars.indexOf(car)]);
+    if (wall) reportImpact({ ...wall, surface: 'concrete' }, car);
+    if (car.x !== x || car.z !== z) projection = track.project(car.x, car.z);
+    reportImpact(resolveBarrierContact(car, projection, rail), car);
     if (car.x !== x || car.z !== z) projection = track.project(car.x, car.z);
     car.offset = projection.offset;
     pitControl.update(car, projection, dt);

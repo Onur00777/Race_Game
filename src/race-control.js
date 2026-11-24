@@ -65,7 +65,7 @@ export function createRaceControl(race, saved) {
   }
 
   function recover(car) {
-    const offset = track.railOffset - 1.36;
+    const offset = -track.pit.side * (track.railOffset - 1.36);
     Object.assign(car, track.at(car.station, offset), { offset, speed: 0, lateral: 0, spin: 0,
       onRoad: false, recovered: car.damage >= 100, stuck: 0 });
   }

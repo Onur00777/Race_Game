@@ -4,7 +4,7 @@ import { legacyEvents } from './events.js';
 import { difficultyId } from './difficulty.js';
 import { vehicleCondition } from './vehicle-damage.js';
 import { applyTireGrip, fitTires } from './tire-strategy.js';
-import { normalizePitPlan, restorePitCar } from './pit-lane.js';
+import { migratePitPosition, normalizePitPlan, pitLayoutVersion, restorePitCar } from './pit-lane.js';
 import { restoreEngineTemperature } from './thermals.js';
 
 const carFields = ['x', 'z', 'yaw', 'speed', 'lateral', 'spin', 'steer', 'station',
@@ -22,6 +22,7 @@ export function raceCheckpoint(career, race, loadout, alternateCamera) {
     tcMode: race.tcMode,
     weather: { wetness: race.wetness, dynamic: race.dynamicWeather },
     pitPlan: race.pit.plan,
+    pitLayout: pitLayoutVersion,
     raceControl: race.control,
     redPlan: race.redPlan,
     restartLaunchUntil: race.restartLaunchUntil,
@@ -90,6 +91,7 @@ export function restoreRace(career, track) {
     const projection = track.project(car.x, car.z);
     car.offset = Number.isFinite(state.offset) ? state.offset : projection.offset;
     car.onRoad = typeof state.onRoad === 'boolean' ? state.onRoad : projection.distance <= event.width / 2 + 0.6;
+    if (save.pitLayout !== pitLayoutVersion && car.pit.lane) migratePitPosition(track, car, i);
     if (i === 0) {
       const finished = Number.isFinite(state.finishTime) && state.finishTime <= save.elapsed;
       if (!Number.isInteger(state.lap) || state.lap < 0 || state.lap > track.event.laps || (state.lap === track.event.laps && !finished) ||

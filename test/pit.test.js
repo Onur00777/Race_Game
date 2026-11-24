@@ -12,6 +12,35 @@ const tick = (race, seconds, input = { gas: 0, brake: 0, steering: 0 }) => {
   for (let step = 0; step < seconds / raceStep; step++) race.update(raceStep, input);
 };
 
+test('the continuous pit wall keeps a car on its original side and produces a concrete impact', () => {
+  const track = createTrack(events[0]);
+  const race = createRace(track, currentTeam(career), career.upgrades, career.setup);
+  race.countdown = 0;
+  const { wallOffset, side, wallAt, entry, exit } = track.pit;
+  assert.ok(!wallAt(entry) && !wallAt(exit));
+  const offset = wallOffset - side * 2.85;
+  const position = track.at(39, offset);
+  Object.assign(race.player, position, { station: 39, offset, speed: 22, yaw: position.yaw - side * Math.PI / 2 });
+  tick(race, 0.13);
+  assert.equal(race.impact?.surface, 'concrete');
+  assert.ok(race.player.damage > 5);
+  assert.ok((race.player.offset - wallOffset) * side < 0);
+  assert.equal(race.player.pit.lane, false);
+});
+
+test('legacy pit checkpoints migrate the serviced car to its new garage bay', () => {
+  const track = createTrack(events[0]);
+  const race = createRace(track, currentTeam(career), career.upgrades, career.setup);
+  Object.assign(race.player, track.at(18, -(track.event.width / 2 + 3.38)), { station: 18, offset: -(track.event.width / 2 + 3.38) });
+  Object.assign(race.player.pit, { lane: true, remaining: 1.1, duration: 2.25, service: { compound: 'hard', repair: false } });
+  const activeRace = JSON.parse(JSON.stringify(raceCheckpoint(career, race, loadout, false)));
+  delete activeRace.pitLayout;
+  const { race: restored } = restoreRace({ ...career, activeRace }, track);
+  assert.ok(restored.player.pit.lane);
+  assert.equal(restored.player.offset, track.pit.stallCenter);
+  assert.equal(restored.player.pit.remaining, 1.1);
+});
+
 test('limiter activates on pit pavement and a saved pit stop restores tires and body', () => {
   const track = createTrack(events[0]);
   const race = createRace(track, currentTeam(career), career.upgrades, career.setup);

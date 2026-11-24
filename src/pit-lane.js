@@ -3,27 +3,55 @@ import { compoundId, recommendedCompound, tireHealth } from './tire-strategy.js'
 import { vehicleCondition } from './vehicle-damage.js';
 
 export const pitSpeed = 80 / 3.6;
+export const pitLayoutVersion = 2;
 const smooth = value => { const x = clamp(value, 0, 1); return x * x * (3 - 2 * x); };
 
 export function buildPitLane(track) {
-  const entry = -43, laneStart = -15, box = 18, laneEnd = 48, exit = 76;
+  const entry = -88, laneStart = -33, box = 19, laneEnd = 68, exit = 113;
+  const wallStart = -24, wallEnd = 59, speedLine = -50;
   const side = track.event.pitSide ?? -1;
   const edge = track.event.width / 2;
-  const center = side * (edge + 2.38);
-  const stallCenter = side * (edge + 3.38);
-  const fastCenter = side * (edge + 1.12);
-  const halfWidth = 1.94;
-  const wrap = station => ((station - entry + track.length * 0.5) % track.length + track.length) % track.length -
-    track.length * 0.5 + entry;
+  const center = side * (edge + 6.15);
+  const stallCenter = side * (edge + 7.23);
+  const fastCenter = side * (edge + 3.55);
+  const halfWidth = 4.15;
+  const wallOffset = side * (edge + 1.9);
+  const wallWidth = 0.48;
+  const wrap = station => ((station + track.length * 0.5) % track.length + track.length) % track.length - track.length * 0.5;
+  const taper = station => smooth((station - entry) / (laneStart - entry)) * smooth((exit - station) / (exit - laneEnd));
   const offsetAt = station => {
-    const path = smooth((station - entry) / (laneStart - entry)) * smooth((exit - station) / (exit - laneEnd));
-    return side * (edge - 2.05) + (center - side * (edge - 2.05)) * path;
+    return side * (edge - 1.85) + (center - side * (edge - 1.85)) * taper(station);
+  };
+  const widthAt = station => 1.68 + (halfWidth - 1.68) * taper(station);
+  const railAt = station => {
+    const local = wrap(station);
+    const verge = smooth((local - entry + 18) / 38) * smooth((exit + 13 - local) / 28);
+    return track.railOffset + (edge + 11 - track.railOffset) * verge;
+  };
+  const wallAt = station => {
+    const local = wrap(station);
+    return local >= wallStart && local <= wallEnd;
   };
   const contains = (station, offset) => {
     const local = wrap(station);
-    return local > entry && local < exit && side * offset > edge + 0.12 && Math.abs(offset - offsetAt(local)) < halfWidth + 0.18;
+    return local > speedLine && local < exit && side * offset > (wallAt(station) ? Math.abs(wallOffset) : edge + 0.10) &&
+      Math.abs(offset - offsetAt(local)) < widthAt(local) + 0.18;
   };
-  return { entry, laneStart, box, laneEnd, exit, side, center, stallCenter, fastCenter, halfWidth, edge, wrap, offsetAt, contains };
+  return { entry, laneStart, box, laneEnd, exit, wallStart, wallEnd, wallOffset, wallWidth, speedLine,
+    side, center, stallCenter, fastCenter, halfWidth, edge, wrap, offsetAt, widthAt, taper, railAt, wallAt, contains };
+}
+
+export const pitStall = (lane, index) => lane.box + (index < 0 ? 0 : [-12, -6, 6, 12][index]);
+
+export function migratePitPosition(track, car, index) {
+  const lane = track.pit;
+  const local = lane.wrap(car.station);
+  const box = pitStall(lane, index - 1);
+  const offset = car.pit.remaining > 0 ? lane.stallCenter :
+    lane.offsetAt(local) + (lane.fastCenter - lane.center) * lane.taper(local);
+  const station = car.pit.remaining > 0 ? car.station - local + box : car.station;
+  Object.assign(car, track.at(station, offset), { station, offset, onRoad: true });
+  car.pit.lane = lane.contains(station, offset);
 }
 
 const stateFor = car => ({
@@ -57,7 +85,7 @@ export function createPitControl(race, plan) {
   const pit = { plan: normalizePitPlan(plan, player.compound) };
 
   const lapAt = car => Math.round((car.station - lane.wrap(car.station)) / track.length);
-  const boxFor = car => lane.box + (car === player ? 0 : [-12, -6, 6, 12][opponents.indexOf(car)]);
+  const boxFor = car => pitStall(lane, opponents.indexOf(car));
 
   function aiRoute(car, controls) {
     if (car === player || car.damage >= 100 || car.finishTime != null) return controls;
@@ -72,7 +100,7 @@ export function createPitControl(race, plan) {
     const wetChange = race.wetness > 0.40 && car.compound !== 'rain';
     const drying = race.wetness < 0.20 && car.compound === 'rain';
     if (state.routeLap === null && lap > 0 && lapsLeft > 0 && lap - state.servicedLap >= 1 &&
-        local > lane.entry - 146 && local < lane.entry - 120 && (wetChange || drying || tireHealth(car) < 0.23)) {
+        local > lane.entry - 107 && local < lane.entry - 79 && (wetChange || drying || tireHealth(car) < 0.23)) {
       state.routeLap = lap;
       state.plan = { compound: recommendedCompound(race.wetness, lapsLeft), repair: car.damage > 39 };
     }
@@ -84,8 +112,8 @@ export function createPitControl(race, plan) {
     const look = Math.min(stillNeedsBox ? Math.max(2, distance + 1) : 13, 4 + Math.max(0, car.speed) * 0.40);
     const ahead = local + look;
     const baseOffset = lane.offsetAt(ahead);
-    const laneBlend = smooth((ahead - lane.entry) / 21) * smooth((lane.exit - ahead) / 23);
-    const moveToStall = stillNeedsBox ? smooth((19 - distance + look) / 15) : 0;
+    const laneBlend = lane.taper(ahead);
+    const moveToStall = stillNeedsBox ? smooth((24 - distance + look) / 19) : 0;
     const targetOffset = baseOffset + (lane.fastCenter - lane.center + (lane.stallCenter - lane.fastCenter) * moveToStall) * laneBlend;
     const target = track.at(car.station + look, targetOffset);
     const yaw = Math.atan2(target.x - car.x, target.z - car.z);

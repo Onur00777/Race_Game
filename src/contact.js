@@ -115,3 +115,22 @@ export function resolveBarrierContact(car, projection, railOffset) {
   };
   return collide(car, null, normal, point, depth, 0.24, 0.43);
 }
+
+export function resolvePitWallContact(car, projection, pit, before) {
+  if (!pit.wallAt(projection.station)) return null;
+  const acrossTrack = { x: -projection.dz, z: projection.dx };
+  const prior = projection.offset - ((car.x - before.x) * acrossTrack.x + (car.z - before.z) * acrossTrack.z);
+  const side = prior < pit.wallOffset ? 1 : -1;
+  const normal = { x: acrossTrack.x * side, z: acrossTrack.z * side };
+  const forward = direction(car);
+  const acrossCar = across(forward);
+  const distance = (projection.offset - pit.wallOffset) * side;
+  const depth = distance + extent(forward, acrossCar, normal) + pit.wallWidth / 2;
+  if (depth <= 0) return null;
+  const onWall = axis => Math.abs(dot(axis, normal)) < 0.06 ? 0 : Math.sign(dot(axis, normal));
+  const along = halfLength * onWall(forward);
+  const lateral = halfWidth * onWall(acrossCar);
+  const point = { x: car.x + forward.x * along + acrossCar.x * lateral - depth * normal.x,
+    z: car.z + forward.z * along + acrossCar.z * lateral - depth * normal.z };
+  return collide(car, null, normal, point, depth, 0.17, 0.55);
+}
