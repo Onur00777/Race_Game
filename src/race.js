@@ -13,6 +13,7 @@ import { buildPitLane, createPitControl } from './pit-lane.js';
 import { createRaceControl } from './race-control.js';
 import { restoreEngineTemperature, updateEngineTemperature } from './thermals.js';
 import { cornerContact, inspectWheelImpact, puncture, suspensionEffects } from './wheel-damage.js';
+import { advanceLooseWheels, launchWheel } from './loose-wheel.js';
 
 const wrap = (value, period) => ((value % period) + period) % period;
 export const raceStep = 1 / 120;
@@ -140,6 +141,7 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
   let impactSerial = 0;
   let wheelSerial = 0;
   race.wheelEvents = [];
+  race.looseWheels = [];
   let handlingUpdated = 0;
 
   function refreshHandling() {
@@ -170,12 +172,16 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
     race.previousPoses[cars.indexOf(car)] = visualPose(car);
   }
 
-  function newPuncture(car, index, impact) {
+  function wheelIncident(car, index, impact, detached = false) {
     const contact = cornerContact(car, index);
     const motion = velocity(car);
-    race.wheelEvents.push({ ...contact, index, carId: car.id, type: 'puncture', serial: ++wheelSerial, color: car.color,
+    race.wheelEvents.push({ ...contact, index, carId: car.id, type: detached ? 'detached' : 'puncture', serial: ++wheelSerial, color: car.color,
       time: race.elapsed, vx: motion.x, vz: motion.z, normalSpeed: impact?.normalSpeed ?? Math.abs(car.speed) * 0.35 });
     if (race.wheelEvents.length > 28) race.wheelEvents.shift();
+    if (detached) {
+      race.looseWheels.push(launchWheel(car, index, impact));
+      if (car !== player) raceControl.reportDetached(car);
+    }
     if (car === player) {
       applyTireGrip(player, race.wetness);
       refreshHandling();
@@ -188,8 +194,8 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
     const secondary = second && applyImpact(second, impact, true, true);
     const firstWheel = inspectWheelImpact(first, impact, Boolean(second));
     const secondWheel = second && inspectWheelImpact(second, impact, true);
-    if (firstWheel?.flat) newPuncture(first, firstWheel.index, impact);
-    if (secondWheel?.flat) newPuncture(second, secondWheel.index, impact);
+    if (firstWheel?.flat || firstWheel?.detached) wheelIncident(first, firstWheel.index, impact, firstWheel.detached);
+    if (secondWheel?.flat || secondWheel?.detached) wheelIncident(second, secondWheel.index, impact, secondWheel.detached);
     const own = first === player ? primary : second === player ? secondary : null;
     if (own) refreshHandling();
     if (impact.impulse < 1.15) return;
@@ -226,7 +232,7 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
       (station, offset) => track.pit.contains(station, offset));
     wearTires(car, race.wetness, dt);
     for (let index = 0; index < car.tireLife.length; index++) {
-      if (car.tireLife[index] === 0 && puncture(car, index)) newPuncture(car, index);
+      if (car.tireLife[index] === 0 && puncture(car, index)) wheelIncident(car, index);
     }
     updateEngineTemperature(car, controls.draft ?? 0, race.wetness, dt);
     const delta = relativeStation(projection.station, car.station);
@@ -310,6 +316,7 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
       }
     }
     active.forEach((car, index) => trackProgress(car, controls[index], car === player ? playerHandling : raceIntel.handling, dt));
+    advanceLooseWheels(race.looseWheels, track, dt);
     if (player.damage >= 100 && player.finishTime == null) {
       classify(true);
     } else if (player.finishTime != null) {
@@ -324,10 +331,34 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
   race.reset = () => rejoin(player);
   race.restartAfterRed = plan => {
     if (!raceControl.restart(plan)) return false;
+    race.looseWheels.length = 0;
     race.previousPoses = cars.map(visualPose);
     return true;
   };
   race.retire = () => { if (!race.order) classify(true); };
+  race.updateAftermath = dt => {
+    const steps = Math.max(1, Math.ceil(dt / raceStep));
+    const step = dt / steps;
+    for (let i = 0; i < steps; i++) {
+      advanceLooseWheels(race.looseWheels, track, step);
+      if (!race.retired || !player.corners.some(corner => corner.detached) || Math.hypot(player.speed, player.lateral) < 0.15) continue;
+      const before = { x: player.x, z: player.z };
+      const inertia = Math.exp(-step * (player.onRoad ? 0.94 : 2.7));
+      player.speed *= inertia;
+      player.lateral *= inertia;
+      player.spin *= Math.exp(-step * 1.7);
+      player.yawRate = player.spin;
+      player.yaw += player.spin * step;
+      const motion = velocity(player);
+      player.x += motion.x * step;
+      player.z += motion.z * step;
+      let road = track.project(player.x, player.z);
+      resolvePitWallContact(player, road, track.pit, before);
+      road = track.project(player.x, player.z);
+      resolveBarrierContact(player, road, track.railAt(road.station, Math.sign(road.offset)));
+      updateTires(player, {}, playerHandling, road, track.event.width / 2, step, track.pit.contains);
+    }
+  };
   race.refreshHandling = refreshHandling;
   race.fitTires = (car, compound) => {
     fitTires(car, compound);

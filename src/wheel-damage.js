@@ -49,6 +49,14 @@ export function inspectWheelImpact(car, impact, anotherCar) {
   if (force < 0.015) return null;
   const corner = car.corners[index];
   corner.damage = clamp(corner.damage + force, 0, 1);
+  const catastrophic = !anotherCar && impact.normalSpeed >= 31 &&
+    (force >= 0.97 || (impact.normalSpeed >= 36 && load >= 0.38 && corner.damage >= 0.86));
+  if (catastrophic) {
+    Object.assign(corner, { damage: 1, punctured: true, detached: true });
+    car.tireLife[index] = 0;
+    car.damage = 100;
+    return { index, detached: true, load, force };
+  }
   const flat = (force >= (anotherCar ? 0.53 : 0.47) || corner.damage >= 0.70 && force >= 0.07) && puncture(car, index);
   return { index, flat, load, force };
 }

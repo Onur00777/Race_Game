@@ -473,6 +473,22 @@ function addWheels(root) {
   return wheels;
 }
 
+export function createRollingWheel(compound) {
+  const root = new T.Group();
+  const hub = new T.Group();
+  root.add(hub);
+  mount(hub, tire, compound === 'rain' ? wetRubber : rubber);
+  for (const side of [-1, 1]) {
+    const ring = mount(hub, stripe, sidewallColors[compound] ?? sidewallColors.medium, side * 0.15);
+    ring.rotation.y = side * Math.PI / 2;
+    mount(hub, rimLip, aluminum, side * 0.14);
+    mount(hub, spokes, aluminum, side * 0.128);
+    mount(hub, center, aluminum, side * 0.144);
+  }
+  root.traverse(node => { if (node.isMesh) node.castShadow = node.receiveShadow = true; });
+  return { root, hub };
+}
+
 function addInterior(shell) {
   mount(shell, cage, aluminum);
   for (const side of [-1, 1]) {
@@ -718,8 +734,20 @@ export function updateCarModel(model, car, dt, braking, fire = 0) {
   model.root.position.set(car.x, 0, car.z);
   model.root.rotation.y = car.yaw;
   model.paint.color.set(car.color);
-  const roll = car.steer * Math.min(Math.abs(car.speed) / 1050, 0.026);
-  model.shell.rotation.z += (roll - model.shell.rotation.z) * (1 - Math.exp(-9 * dt));
+  let pitch = 0, drop = 0, tilt = 0;
+  for (const [index, corner] of (car.corners ?? []).entries()) {
+    if (!corner.punctured) continue;
+    const wheel = model.wheels[index];
+    const severity = corner.detached ? 1 : 0.24;
+    drop = Math.max(drop, severity * 0.121);
+    pitch += (wheel.steering ? 1 : -1) * severity * 0.048;
+    tilt -= wheel.side * severity * 0.093;
+  }
+  const roll = car.steer * Math.min(Math.abs(car.speed) / 1050, 0.026) + tilt;
+  const settle = 1 - Math.exp(-dt * (drop ? 22 : 9));
+  model.shell.rotation.z += (roll - model.shell.rotation.z) * settle;
+  model.shell.rotation.x += (pitch - model.shell.rotation.x) * settle;
+  model.shell.position.y += (-drop - model.shell.position.y) * settle;
   for (const light of model.lights) light.material = braking ? brakeLight : tailLight;
   model.lightClock += dt;
   let litLamps = 0;
@@ -747,6 +775,7 @@ export function updateCarModel(model, car, dt, braking, fire = 0) {
   const glow = T.MathUtils.smoothstep(model.brakeHeat, 0.26, 1.32) * 1.85;
   for (const [index, { holder, wheel, side, steering, disk, face, tyre, print, compoundRing }] of model.wheels.entries()) {
     const corner = car.corners?.[index];
+    holder.visible = !corner?.detached;
     const flat = corner?.punctured === true;
     const bent = Math.max(0, (corner?.damage ?? 0) - 0.30);
     const camber = steering ? model.appearance.frontCamber : model.appearance.rearCamber;

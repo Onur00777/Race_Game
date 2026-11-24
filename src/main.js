@@ -442,8 +442,9 @@ function updateHud() {
     }
   }
   const wheelFailure = race.wheelEvents.findLast(event => event.carId === player.id && race.elapsed - event.time < 2.0);
+  const flat = player.corners.findIndex(corner => corner.punctured && !corner.detached);
   const message = wheelFailure ? `${wheelLabel(wheelFailure.index)} · ${t(wheelFailure.type === 'detached' ? 'wheelDetached' : 'wheelPunctured')}` :
-    !recent ? (player.onRoad ? '' : t('offTrack')) : impact.loss >= 1
+    !recent ? (flat >= 0 ? t('limpToPit', wheelLabel(flat)) : player.onRoad ? '' : t('offTrack')) : impact.loss >= 1
     ? t('zoneImpact', t(impactZones[impact.zone]), Math.round(impact.loss)) : t(impact.kind === 'rail' ? 'railHit' : 'carHit');
   if (byId('road-warning').textContent !== message) byId('road-warning').textContent = message;
   byId('best-lap').textContent = player.bestLap ? `${upper(t('bestLap'))}  ${formatTime(player.bestLap)}` : '';
@@ -606,12 +607,15 @@ function finishRace() {
   if (persist()) clearSkidSave();
   const result = career.results.at(-1);
   const condition = integrity(result.condition);
+  const detached = result.condition.corners.findIndex(corner => corner.detached);
+  const failure = detached >= 0 ? t('wheelRetirement', wheelLabel(detached)) :
+    t(condition === 0 ? 'mechanicalFailure' : 'driverRetired');
   const unlocked = !result.retired && teams.find(team => team.unlock === career.completed);
   delete overlay.dataset.kind;
   overlay.innerHTML = `
     <div class="result-heading"><div class="hero-meta"><span></span> ${translatedField(track.event)}</div>${difficultyBadge(result.difficulty)}</div>
     <h2>${result.retired ? 'DNF' : t('raceResult', result.place)}</h2>
-    ${result.retired ? `<p class="retirement-reason">${t(condition === 0 ? 'mechanicalFailure' : 'driverRetired')}</p>` : ''}
+    ${result.retired ? `<p class="retirement-reason">${failure}</p>` : ''}
     <div class="result-grid">
       <div class="result-payout"><small>${upper(t('prize'))}</small><b id="result-prize" aria-label="${garageMoney(result.prize)}">${garageMoney(0)}</b></div>
       <div><small>${upper(t('seasonPoints'))}</small><b>+${result.points}</b></div>
@@ -1003,6 +1007,7 @@ function frame(now) {
     playAudio();
   }
   if (mode !== 'menu' || now - lastMenuDraw >= 100) {
+    if (mode === 'result') race.updateAftermath(dt);
     const fraction = mode === 'race' && !paused && race.control.flag !== 'red' ? accumulator / raceStep : 1;
     view.draw(race, mode, dt, braking, alternateCamera, paused, fraction, career.racingLine !== false);
     if (mode === 'menu') lastMenuDraw = now;

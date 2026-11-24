@@ -21,7 +21,14 @@ export function createRaceControl(race, saved) {
   };
   const stall = new Map();
   const severe = [];
+  const disabledByWheel = new Map();
   let focus;
+  let debrisFocus;
+
+  function reportDetached(car) {
+    disabledByWheel.set(car.id, race.elapsed + 6.2);
+    debrisFocus ??= car.station;
+  }
 
   function inSector(station) {
     const period = track.length;
@@ -72,12 +79,13 @@ export function createRaceControl(race, saved) {
 
   function update(dt) {
     while (severe.length && race.elapsed - severe[0].time > 2.7) severe.shift();
-    if (race.elapsed < Math.max(5.2, state.graceUntil)) {
+    if (race.elapsed < Math.max(5.2, state.graceUntil) && !disabledByWheel.size) {
       focus = undefined;
       severe.length = 0;
       return;
     }
-    let hazards = cars.filter(car => danger(car, dt));
+    for (const [id, expiry] of disabledByWheel) if (expiry < race.elapsed) disabledByWheel.delete(id);
+    let hazards = cars.filter(car => disabledByWheel.has(car.id) || danger(car, dt));
     if (state.flag === 'yellow' && race.elapsed - state.changed >= 18) {
       for (const car of hazards) {
         if (!inSector(car.station) || car === player) continue;
@@ -96,11 +104,12 @@ export function createRaceControl(race, saved) {
       announce('red', crowded?.station ?? hotspot, hazards);
       return;
     }
-    if (state.flag !== 'yellow' && (hazards.length || Number.isFinite(focus))) {
-      const center = hazards[0]?.station ?? focus;
+    if (state.flag !== 'yellow' && (hazards.length || Number.isFinite(focus) || Number.isFinite(debrisFocus))) {
+      const center = debrisFocus ?? hazards[0]?.station ?? focus;
       announce('yellow', center, hazards.filter(car => Math.abs(car.station - center) <= halfSector));
     }
     focus = undefined;
+    debrisFocus = undefined;
     if (state.flag !== 'yellow') return;
     const live = hazards.filter(car => inSector(car.station));
     if (live.length) {
@@ -176,11 +185,12 @@ export function createRaceControl(race, saved) {
     announce('green');
     state.graceUntil = race.elapsed + 5.2;
     severe.length = 0;
+    disabledByWheel.clear();
     stall.clear();
     focus = undefined;
     race.refreshHandling();
     return true;
   }
 
-  return { state, report, update, limit, restart };
+  return { state, report, reportDetached, update, limit, restart };
 }

@@ -2,7 +2,7 @@ import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { gameName } from './career.js';
 import { addTerrain, addTrees, circuitLamps, lightTrack, loadTrackAssets } from './environment.js';
-import { createCarModel, sharedCarResources, updateCarModel } from './car-model.js';
+import { createCarModel, createRollingWheel, sharedCarResources, updateCarModel } from './car-model.js';
 import { createRaceEffects } from './race-effects.js';
 import { renderPose } from './race.js';
 import { createStudio } from './studio.js';
@@ -284,6 +284,7 @@ export async function createView(canvas, quality) {
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   let scene;
   let models;
+  let rollingWheels;
   let updateLight;
   let effects;
   let drawnRace;
@@ -323,6 +324,7 @@ export async function createView(canvas, quality) {
       for (const item of resources) if (!shared.has(item)) item.dispose();
     }
     scene = new T.Scene();
+    rollingWheels = new Map();
     updateLight = lightTrack(scene, track, assets);
     fitShadowResolution(scene, pipeline.shadowSize());
     addTerrain(scene, track, assets);
@@ -386,6 +388,19 @@ export async function createView(canvas, quality) {
       effects.reset();
     }
     const onCircuit = mode === 'race' || mode === 'result';
+    for (const model of rollingWheels.values()) model.root.visible = false;
+    if (onCircuit) for (const part of race.looseWheels) {
+      if (!rollingWheels.has(part.id)) {
+        const model = createRollingWheel(part.compound);
+        scene.add(model.root);
+        rollingWheels.set(part.id, model);
+      }
+      const { root, hub } = rollingWheels.get(part.id);
+      root.visible = true;
+      root.position.set(part.x, part.y, part.z);
+      root.rotation.set(0, part.yaw, part.lean, 'YXZ');
+      hub.rotation.x = -part.roll;
+    }
     if (onCircuit) for (const impact of race.impacts) {
       if (impact.serial <= lastSparkSerial) continue;
       effects.hit(impact);
@@ -406,7 +421,7 @@ export async function createView(canvas, quality) {
     const driving = mode === 'race' && !paused && race.control.flag !== 'red';
     marshalClock += dt;
     setMarshalLights(race.control, race.elapsed, marshalClock, reduceMotion.matches);
-    effects.update(dt, driving || mode === 'result' ? race : null, canvas.height, driving);
+    effects.update(dt, driving || mode === 'result' ? race : null, canvas.height, driving, mode === 'result');
     skidMarks.update(race, mode === 'race' && !paused, mode === 'race' || mode === 'result');
     const cars = race.cars.map((car, index) => renderPose(car, race.previousPoses[index], fraction));
     racingLine.update(race, cars[0], mode === 'race' && guide && !race.player.pit.lane);

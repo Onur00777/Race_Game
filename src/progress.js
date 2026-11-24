@@ -6,6 +6,7 @@ import { vehicleCondition } from './vehicle-damage.js';
 import { applyTireGrip, fitTires } from './tire-strategy.js';
 import { migratePitPosition, normalizePitPlan, pitLayoutVersion, restorePitCar } from './pit-lane.js';
 import { restoreEngineTemperature } from './thermals.js';
+import { restoreLooseWheels } from './loose-wheel.js';
 
 const carFields = ['x', 'z', 'yaw', 'speed', 'lateral', 'spin', 'steer', 'station',
   'damage', 'frontDamage', 'rearDamage'];
@@ -24,6 +25,7 @@ export function raceCheckpoint(career, race, loadout, alternateCamera) {
     pitPlan: race.pit.plan,
     pitLayout: pitLayoutVersion,
     raceControl: race.control,
+    looseWheels: race.looseWheels,
     redPlan: race.redPlan,
     restartLaunchUntil: race.restartLaunchUntil,
     loadout,
@@ -109,6 +111,7 @@ export function restoreRace(career, track) {
     race.previousPoses[i] = { x: car.x, z: car.z, yaw: car.yaw, speed: car.speed, steer: car.steer, station: car.station };
   }
   race.elapsed = save.elapsed;
+  race.looseWheels = restoreLooseWheels(save.looseWheels, race.cars.map(car => car.id));
   race.countdown = save.countdown;
   if (save.redPlan) race.redPlan = normalizePitPlan(save.redPlan, race.player.compound);
   if (Number.isFinite(save.restartLaunchUntil)) race.restartLaunchUntil = Math.max(0, Math.min(race.elapsed + 3.6, save.restartLaunchUntil));

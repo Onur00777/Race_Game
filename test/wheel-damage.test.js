@@ -51,3 +51,51 @@ test('a worn tire emits a single blowout, restores from checkpoint and is replac
   assert.equal(restored.player.tireLife[1], 1);
   assert.deepEqual(restored.player.corners[1], { damage: 0.54, punctured: false, detached: false });
 });
+
+function pitWallCrash(race, car, speed) {
+  const { pit } = race.track;
+  const offset = pit.wallOffset - pit.side * 2.60;
+  const pose = race.track.at(40, offset);
+  Object.assign(car, pose, { station: 40, offset, speed, yaw: pose.yaw - pit.side * 0.84 });
+  race.countdown = 0;
+  race.elapsed = 14;
+  for (let i = 0; i < 24 && !race.looseWheels.length; i++) race.update(raceStep, { gas: 0, steering: 0 });
+}
+
+test('a high-energy pit wall strike detaches a wheel, causes DNF and leaves a bouncing rigid body', () => {
+  const track = createTrack(events[0]);
+  const race = createRace(track, currentTeam(career), career.upgrades, career.setup);
+  pitWallCrash(race, race.player, 55);
+  assert.equal(race.retired, true);
+  assert.equal(race.order.at(-1), 'player');
+  assert.equal(race.wheelEvents[0].type, 'detached');
+  const corner = race.wheelEvents[0].index;
+  assert.equal(race.player.corners[corner].detached, true);
+  assert.equal(race.player.damage, 100);
+  const wheel = race.looseWheels[0];
+  const initial = { x: wheel.x, y: wheel.y, z: wheel.z };
+  const time = race.elapsed;
+  let high = initial.y;
+  for (let i = 0; i < 140; i++) {
+    race.updateAftermath(1 / 60);
+    high = Math.max(high, wheel.y);
+  }
+  assert.equal(race.elapsed, time);
+  assert.ok(high > initial.y + 0.6);
+  assert.ok(Math.hypot(wheel.x - initial.x, wheel.z - initial.z) > 3);
+  assert.ok(wheel.bounces >= 1 && wheel.roll !== 0);
+});
+
+test('an AI wheel detachment opens a yellow sector and restores the obstacle from a saved race', () => {
+  const track = createTrack(events[0]);
+  const race = createRace(track, currentTeam(career), career.upgrades, career.setup);
+  pitWallCrash(race, race.opponents[0], 55);
+  assert.equal(race.control.flag, 'yellow');
+  assert.ok(race.control.hazards.includes(race.opponents[0].id));
+  assert.equal(race.retired, false);
+  const activeRace = JSON.parse(JSON.stringify(raceCheckpoint(career, race, loadout, false)));
+  const { race: restored } = restoreRace({ ...career, activeRace }, track);
+  assert.equal(restored.control.flag, 'yellow');
+  assert.equal(restored.looseWheels[0].id, race.looseWheels[0].id);
+  assert.ok(restored.opponents[0].corners.some(wheel => wheel.detached));
+});
