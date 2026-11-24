@@ -141,15 +141,17 @@ export function addPitView(scene, track, assets, label) {
   const steel = new T.MeshStandardMaterial({ color: '#66747c', roughness: 0.68, metalness: 0.48 });
   const post = new T.MeshStandardMaterial({ color: '#f27536', roughness: 0.78 });
   const boxGeometry = new T.BoxGeometry(1, 1, 1);
+  const blocks = new Map();
+  const blockTransform = new T.Object3D();
   function block(material, station, offset, height, width, size, depth, rotation = 0) {
     const point = track.at(station, offset);
-    const mesh = new T.Mesh(boxGeometry, material);
-    mesh.position.set(point.x, height, point.z);
-    mesh.rotation.y = point.yaw + rotation;
-    mesh.scale.set(width, size, depth);
-    mesh.castShadow = depth > 0.08 && height > 0.08;
-    mesh.receiveShadow = true;
-    scene.add(mesh);
+    blockTransform.position.set(point.x, height, point.z);
+    blockTransform.rotation.y = point.yaw + rotation;
+    blockTransform.scale.set(width, size, depth);
+    blockTransform.updateMatrix();
+    if (!blocks.has(material)) blocks.set(material, [[], []]);
+    const castsShadow = depth > 0.08 && height > 0.08;
+    blocks.get(material)[Number(castsShadow)].push(blockTransform.matrix.clone());
   }
   const outside = station => lane.offsetAt(station) + lane.side * (lane.widthAt(station) - 0.04);
   const inside = station => lane.offsetAt(station) - lane.side * (lane.widthAt(station) - 0.04);
@@ -178,6 +180,14 @@ export function addPitView(scene, track, assets, label) {
   pitSign(scene, track, lane.speedLine, outside(lane.speedLine) + lane.side * 0.38, '80 km/h', '#66e0ee');
   pitSign(scene, track, lane.box + 2, lane.stallCenter + lane.side * 2.03, label('pitBox'), '#ffcb74');
   pitSign(scene, track, lane.exit - 9, outside(lane.exit - 9) + lane.side * 0.38, label('pitExit'), '#66e0ee');
+  for (const [material, groups] of blocks) for (const [shadow, matrices] of groups.entries()) {
+    if (!matrices.length) continue;
+    const mesh = new T.InstancedMesh(boxGeometry, material, matrices.length);
+    matrices.forEach((matrix, index) => mesh.setMatrixAt(index, matrix));
+    mesh.castShadow = Boolean(shadow);
+    mesh.receiveShadow = true;
+    scene.add(mesh);
+  }
   return wetness => {
     pavement.roughness = 0.88 - wetness * 0.64;
     pavement.envMapIntensity = 1 + wetness;
