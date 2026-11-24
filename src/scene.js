@@ -78,12 +78,13 @@ function addGuardrails(scene, track, material) {
   const reflectors = new T.InstancedMesh(boxGeometry, new T.MeshBasicMaterial({ color: '#ffffff' }), Math.ceil(count / 5) * 2);
   const marker = new T.Object3D();
   const tint = new T.Color();
-  let reflector = 0;
+  let reflector = 0, postIndex = 0;
   marker.scale.set(0.08, 0.064, 0.18);
   const post = new T.Object3D();
   post.scale.set(0.14, 0.89, 0.15);
-  for (const [sideIndex, side] of [-1, 1].entries()) {
+  for (const side of [-1, 1]) {
     const offset = station => side * track.railAt(station, side);
+    const gap = station => side === track.pit.side && track.pit.garageAt(station);
     const vertices = [];
     const indices = [];
     const heights = [0.41, 0.50, 0.58, 0.69, 0.76];
@@ -91,7 +92,7 @@ function addGuardrails(scene, track, material) {
       for (const [row, height] of heights.entries()) {
         const point = track.at(i * track.spacing, offset(i * track.spacing) + side * (row % 2 === 0 ? 0.12 : 0));
         vertices.push(point.x, height, point.z);
-        if (i === 0 || row === 0) continue;
+        if (i === 0 || row === 0 || gap((i - 0.5) * track.spacing)) continue;
         const vertex = i * heights.length + row;
         indices.push(vertex, vertex - 1, vertex - heights.length, vertex - 1, vertex - heights.length - 1, vertex - heights.length);
       }
@@ -105,11 +106,12 @@ function addGuardrails(scene, track, material) {
     scene.add(rail);
     for (let i = 0; i < count; i++) {
       const station = i * track.length / count;
+      if (gap(station)) continue;
       const point = track.at(station, offset(station) + side * 0.20);
       post.position.set(point.x, 0.39, point.z);
       post.rotation.y = point.yaw;
       post.updateMatrix();
-      posts.setMatrixAt(sideIndex * count + i, post.matrix);
+      posts.setMatrixAt(postIndex++, post.matrix);
       if (i % 5 === 0) {
         const face = track.at(station, offset(station) - side * 0.032);
         marker.position.set(face.x, 0.603, face.z);
@@ -120,6 +122,8 @@ function addGuardrails(scene, track, material) {
       }
     }
   }
+  posts.count = postIndex;
+  reflectors.count = reflector;
   posts.castShadow = true;
   scene.add(posts, reflectors);
 }

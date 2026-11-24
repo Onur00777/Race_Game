@@ -32,13 +32,14 @@ export function buildPitLane(track) {
     const local = wrap(station);
     return local >= wallStart && local <= wallEnd;
   };
+  const garageAt = station => Math.abs(wrap(station) - box) < 15.1;
   const contains = (station, offset) => {
     const local = wrap(station);
     return local > speedLine && local < exit && side * offset > (wallAt(station) ? Math.abs(wallOffset) : edge + 0.10) &&
       Math.abs(offset - offsetAt(local)) < widthAt(local) + 0.18;
   };
   return { entry, laneStart, box, laneEnd, exit, wallStart, wallEnd, wallOffset, wallWidth, speedLine,
-    side, center, stallCenter, fastCenter, halfWidth, edge, wrap, offsetAt, widthAt, taper, railAt, wallAt, contains };
+    side, center, stallCenter, fastCenter, halfWidth, edge, wrap, offsetAt, widthAt, taper, railAt, wallAt, garageAt, contains };
 }
 
 export const pitStall = (lane, index) => lane.box + (index < 0 ? 0 : [-12, -6, 6, 12][index]);

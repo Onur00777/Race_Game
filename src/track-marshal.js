@@ -12,7 +12,9 @@ export function addMarshalLights(scene, track) {
   const lights = [];
   for (let station = 10; station < track.length; station += 38) {
     const side = lights.length % 2 ? 1 : -1;
-    const point = track.at(station, side * (track.railOffset - 0.16));
+    const offset = side === track.pit.side && track.pit.wallAt(station) ?
+      track.pit.wallOffset : side * (track.railAt(station, side) - 0.16);
+    const point = track.at(station, offset);
     const group = new T.Group();
     group.position.set(point.x, 0, point.z);
     group.rotation.y = point.yaw;

@@ -40,7 +40,7 @@ function pitSign(scene, track, station, offset, text, color, height = 1.54, angl
   const texture = new T.CanvasTexture(canvas);
   texture.colorSpace = T.SRGBColorSpace;
   texture.anisotropy = 4;
-  const sign = new T.Mesh(new T.PlaneGeometry(2.35, 0.70), new T.MeshBasicMaterial({ map: texture, side: T.DoubleSide }));
+  const sign = new T.Mesh(new T.PlaneGeometry(2.35, 0.70), new T.MeshBasicMaterial({ map: texture }));
   const point = track.at(station, offset);
   sign.position.set(point.x, height, point.z);
   sign.rotation.y = point.yaw + angle;
@@ -154,6 +154,7 @@ export function addPitView(scene, track, assets, label) {
   const outside = station => lane.offsetAt(station) + lane.side * (lane.widthAt(station) - 0.04);
   const inside = station => lane.offsetAt(station) - lane.side * (lane.widthAt(station) - 0.04);
   scene.add(ribbon(track, lane.entry, lane.exit, lane.offsetAt, station => lane.widthAt(station) * 2, 0.010, pavement));
+  scene.add(ribbon(track, lane.box - 15.1, lane.box + 15.1, () => lane.side * (lane.edge + 11.1), 2.08, 0.012, pavement));
   scene.add(ribbon(track, lane.entry, lane.exit, outside, 0.115, 0.021, blue));
   scene.add(ribbon(track, lane.laneEnd, lane.exit + 9, inside, 0.13, 0.023, white));
   for (let s = lane.entry + 4; s < lane.wallStart - 4; s += 4.9) {
