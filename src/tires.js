@@ -15,7 +15,7 @@ export function createTires() {
   return wheelMounts.map(() => ({ x: 0, z: 0, vx: 0, vz: 0, speed: 0, rolling: null, ratio: 0, angle: 0, slip: 0, onRoad: false }));
 }
 
-export function updateTires(car, controls, handling, road, halfWidth, dt) {
+export function updateTires(car, controls, handling, road, halfWidth, dt, pitSurface) {
   const fx = Math.sin(car.yaw);
   const fz = Math.cos(car.yaw);
   const brake = clamp(Number(controls.brake) || 0, 0, 1);
@@ -29,7 +29,9 @@ export function updateTires(car, controls, handling, road, halfWidth, dt) {
     const armZ = fz * mount.z - fx * mount.x;
     wheel.x = car.x + armX;
     wheel.z = car.z + armZ;
-    wheel.onRoad = Math.abs(road.offset - road.dz * armX + road.dx * armZ) <= halfWidth + 0.08;
+    const offset = road.offset - road.dz * armX + road.dx * armZ;
+    wheel.onRoad = Math.abs(offset) <= halfWidth + 0.08 ||
+      (Math.abs(offset) < halfWidth + 5.5 && Boolean(pitSurface?.(road.station + road.dx * armX + road.dz * armZ, offset)));
     const longitudinal = car.speed - yawRate * mount.x;
     const sideways = car.lateral + yawRate * mount.z;
     wheel.vx = fx * longitudinal + fz * sideways;

@@ -9,6 +9,7 @@ import { createTires, updateTires } from './tires.js';
 import { applyImpact, damagePerformance, vehicleCondition } from './vehicle-damage.js';
 import { launchRPM, normalizeElectronics, tractionMode, tractionModes } from './ecu.js';
 import { applyTireGrip, fitTires, recommendedCompound, wearTires, weatherTarget } from './tire-strategy.js';
+import { buildPitLane, createPitControl } from './pit-lane.js';
 
 const wrap = (value, period) => ((value % period) + period) % period;
 export const raceStep = 1 / 120;
@@ -86,7 +87,9 @@ export function createTrack(event) {
     return { station, distance: Math.sqrt(nearest), offset, dx, dz };
   }
 
-  return { event, length, spacing, railOffset, samples, at, project };
+  const track = { event, length, spacing, railOffset, samples, at, project };
+  track.pit = buildPitLane(track);
+  return track;
 }
 
 const bodyState = condition => ({ speed: 0, lateral: 0, spin: 0, steer: 0, ...vehicleCondition(condition),
@@ -144,6 +147,8 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
   }
 
   const raceIntel = createRaceIntel(track, race.difficulty, opponents, relativeStation);
+  const pitControl = createPitControl(race, options.pitPlan);
+  race.pit = pitControl.pit;
 
   function rejoin(car) {
     const nearby = cars.filter(other => other !== car && Math.abs(relativeStation(other.station, car.station)) < 5.5);
@@ -181,8 +186,10 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
     reportImpact(resolveBarrierContact(car, projection, track.railOffset), car);
     if (car.x !== x || car.z !== z) projection = track.project(car.x, car.z);
     car.offset = projection.offset;
-    car.onRoad = projection.distance <= track.event.width / 2 + 0.6;
-    updateTires(car, controls, handling, projection, track.event.width / 2, dt);
+    pitControl.update(car, projection, dt);
+    car.onRoad = car.pit.lane || projection.distance <= track.event.width / 2 + 0.6;
+    updateTires(car, controls, handling, projection, track.event.width / 2, dt,
+      (station, offset) => track.pit.contains(station, offset));
     wearTires(car, race.wetness, dt);
     const delta = relativeStation(projection.station, car.station);
     const previous = car.station;
@@ -192,7 +199,7 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
     if (car.finishTime == null && car.damage < 100 && car.station >= finish) car.finishTime = race.elapsed - dt + dt * (finish - previous) / advance;
     if (car === player) updateLap(previous);
     else if (car.finishTime == null && car.damage < 100) {
-      car.stuck = advance < dt * 0.25 ? car.stuck + dt : 0;
+      car.stuck = advance < dt * 0.25 && !car.pit.remaining ? car.stuck + dt : 0;
       if (car.stuck > 5.5) {
         car.rejoins = (car.rejoins ?? 0) + 1;
         rejoin(car);
@@ -253,6 +260,7 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
       draft: wakeFactor(track, player, cars, relativeStation) } :
       car.damage >= 100 ? { gas: 0, brake: 0.34, steering: 0 } : raceIntel.controls(car, cars, race.elapsed, dt));
     active.forEach((car, index) => {
+      controls[index] = pitControl.controlsFor(car, controls[index]);
       advanceVehicle(car, controls[index], car === player ? playerHandling : raceIntel.handling, dt, car === player);
     });
     for (let i = 0; i < active.length; i++) {

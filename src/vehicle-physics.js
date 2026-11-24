@@ -7,6 +7,11 @@ export const approach = (value, target, amount) => value + clamp(target - value,
 export const angleBetween = (a, b) => Math.atan2(Math.sin(b - a), Math.cos(b - a));
 
 export function advanceVehicle(car, controls, handling, dt, canReverse = false) {
+  if (controls.holdPosition) {
+    car.speed = car.lateral = car.spin = car.yawRate = 0;
+    car.actuation = null;
+    return;
+  }
   const actuation = regulateVehicle(car, controls, handling);
   car.actuation = actuation;
   const { gas, brake, brakeForce, driveGrip, vector } = actuation;
@@ -14,7 +19,8 @@ export function advanceVehicle(car, controls, handling, dt, canReverse = false) 
   const draft = controls.draft ?? 0;
   const { topSpeed, acceleration, braking, surfaceGrip, grip, turn, brakeStability, load } = handling;
   const condition = damagePerformance(car);
-  const maximum = (topSpeed + (car.tireSpeedDelta ?? 0)) * condition.speed + draft * 2.4;
+  const capped = Number.isFinite(controls.speedLimit);
+  const maximum = Math.min((topSpeed + (car.tireSpeedDelta ?? 0)) * condition.speed + draft * 2.4, controls.speedLimit ?? Infinity);
   const roadGrip = surfaceGrip * (car.tireGrip ?? 1);
   const effectiveBrake = braking * roadGrip * (1 - (car.tireSlip ?? 0) * 0.11);
   if (gas) {
@@ -26,7 +32,7 @@ export function advanceVehicle(car, controls, handling, dt, canReverse = false) 
     else if (canReverse && car.speed > -8) car.speed = Math.max(-8, car.speed - brake * 7 * dt);
   }
   const limit = car.onRoad ? maximum : 12;
-  if (car.speed > limit) car.speed = approach(car.speed, limit, (car.onRoad ? 13 : 32) * dt);
+  if (car.speed > limit) car.speed = approach(car.speed, limit, (capped ? 34 : car.onRoad ? 13 : 32) * dt);
   if ((!gas && !brake) || handbrake) car.speed = approach(car.speed, 0, (handbrake ? 14 : 2.8) * dt);
   car.speed = approach(car.speed, 0, condition.drag * (car.speed / 34) ** 2 * dt);
 
