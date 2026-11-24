@@ -12,6 +12,8 @@ import { createRacingLineView } from './racing-line-view.js';
 import { addTrackDetails } from './track-details.js';
 import { createSkidMarks } from './skid-marks.js';
 import { loadCarAsset } from './car-asset.js';
+import { addPitView } from './pit-view.js';
+import { t } from './i18n.js';
 
 const standard = (color, roughness = 0.78, metalness = 0) => new T.MeshStandardMaterial({ color, roughness, metalness });
 const boxGeometry = new T.BoxGeometry(1, 1, 1);
@@ -289,6 +291,7 @@ export async function createView(canvas, quality) {
   let height = 0;
   let studio;
   let setWetAsphalt;
+  let setWetPitLane;
   let racingLine;
   let skidMarks;
 
@@ -316,6 +319,7 @@ export async function createView(canvas, quality) {
     fitShadowResolution(scene, pipeline.shadowSize());
     addTerrain(scene, track, assets);
     setWetAsphalt = addTrack(scene, track, assets, label);
+    setWetPitLane = addPitView(scene, track, assets, t);
     addTrees(scene, track);
     effects = createRaceEffects(scene);
     racingLine = createRacingLineView();
@@ -363,6 +367,7 @@ export async function createView(canvas, quality) {
   function draw(race, mode, dt, braking, alternateCamera, paused, fraction = 1, guide = false) {
     if (!resize()) return;
     setWetAsphalt(race.wetness);
+    setWetPitLane(race.wetness);
     if (drawnRace !== race) {
       drawnRace = race;
       lastImpact = null;
@@ -387,7 +392,7 @@ export async function createView(canvas, quality) {
     effects.update(dt, driving || mode === 'result' ? race : null, canvas.height, driving);
     skidMarks.update(race, mode === 'race' && !paused, mode === 'race' || mode === 'result');
     const cars = race.cars.map((car, index) => renderPose(car, race.previousPoses[index], fraction));
-    racingLine.update(race, cars[0], mode === 'race' && guide);
+    racingLine.update(race, cars[0], mode === 'race' && guide && !race.player.pit.lane);
     const burstAge = mode === 'race' && !paused && race.backfire ? race.elapsed - race.backfire.time : Infinity;
     const fire = burstAge < 0.15 ? race.backfire.intensity * (1 - burstAge / 0.15) * (0.90 + 0.2 * Math.sin(burstAge * 120)) : 0;
     for (let i = 0; i < cars.length; i++) {

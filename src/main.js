@@ -11,7 +11,7 @@ import { graphicsModes, qualityMode } from './graphics-settings.js';
 import { circuitMap, drawBriefingMap } from './circuit-map.js';
 import { legacyEvents } from './events.js';
 import { difficultyId, purseFor } from './difficulty.js';
-import { compoundBadge, compoundControls, difficultyBadge, difficultyControls, payoutBreakdown } from './race-ui.js';
+import { compoundBadge, compoundControls, compoundOptions, difficultyBadge, difficultyControls, payoutBreakdown } from './race-ui.js';
 import { integrity, vehicleCondition } from './vehicle-damage.js';
 import { tireHealth } from './tire-strategy.js';
 import './style.css';
@@ -68,8 +68,13 @@ app.innerHTML = `
       <div class="race-top">
         <div class="timing"><small id="race-title"></small><div><b id="laps"></b><span id="clock"></span></div><span id="best-lap"></span></div>
         <div class="position"><small data-text="rank"></small><div><b id="position"></b><span> / 5</span></div></div>
-        <button type="button" class="secondary pause-button" data-action="pause" data-text="pause"></button>
+        <div class="race-actions"><button type="button" class="secondary pause-button" data-action="pause" data-text="pause"></button>
+          <button type="button" class="secondary" data-action="pit-menu" aria-controls="pit-menu" aria-expanded="false"><kbd>P</kbd> <span data-text="pitStrategy"></span></button></div>
       </div>
+      <div id="pit-menu" class="pit-menu" hidden><label><span data-text="nextCompound"></span><select id="pit-compound" data-pit-compound></select></label>
+        <label><span data-text="pitRepair"></span><input id="pit-repair" type="checkbox" data-pit-repair></label>
+        <small data-text="pitStopHint"></small></div>
+      <div id="pit-status" class="pit-status" hidden></div>
       <div id="hit-vignette" class="hit-vignette" aria-hidden="true"></div>
       <div id="countdown" class="countdown" aria-live="polite"></div>
       <div class="race-bottom">
@@ -395,6 +400,7 @@ function startRace(restart = false) {
   hudFlash?.cancel();
   byId('menu').hidden = byId('garage').hidden = byId('topbar').hidden = true;
   byId('hud').hidden = false;
+  setPitMenu(false);
   document.body.classList.remove('in-garage');
   document.body.classList.add('driving');
   byId('race-title').textContent = translatedField(event);
@@ -424,6 +430,7 @@ function updateHud() {
   widget.dataset.worn = String(tyreLife < 23);
   byId('tire-meter').value = tyreLife;
   byId('tire-life').textContent = tyreLife + '%';
+  updatePitStatus(player);
   const rpm = race.launchHold || player.actuation?.rpm || 0;
   setEcuIndicator('tc', race.electronics.traction, player.actuation?.tc, t('tc_' + race.tcMode));
   setEcuIndicator('abs', race.electronics.abs, player.actuation?.abs);
@@ -470,6 +477,23 @@ function setEcuIndicator(id, installed, active, detail) {
   if (detail !== undefined && badge.lastElementChild.textContent !== detail) badge.lastElementChild.textContent = detail;
 }
 
+function setPitMenu(open) {
+  const menu = byId('pit-menu');
+  app.querySelector('[data-action="pit-menu"]').setAttribute('aria-expanded', String(open));
+  menu.hidden = !open;
+  if (!open) return;
+  byId('pit-compound').innerHTML = compoundOptions(race.pit.plan.compound);
+  byId('pit-repair').checked = race.pit.plan.repair;
+}
+
+function updatePitStatus(player) {
+  const status = byId('pit-status');
+  const { lane, remaining } = player.pit;
+  status.hidden = !lane && !remaining;
+  const message = remaining ? t('pitServiceTimer', remaining.toFixed(1)) : lane ? t('pitLimiter') : '';
+  if (message !== status.textContent) status.textContent = message;
+}
+
 function saveActiveRace(quiet = false) {
   if (mode !== 'race' || race.order) return false;
   career = { ...career, screen: 'calendar', activeRace: raceCheckpoint(career, race, activeLoadout, alternateCamera) };
@@ -499,6 +523,7 @@ function pauseRace() {
   if (mode !== 'race' || paused) return;
   keys.clear();
   paused = true;
+  setPitMenu(false);
   const saved = saveActiveRace(true);
   if (saved) saveSkids();
   updateHud();
@@ -550,6 +575,7 @@ function finishRace() {
   mode = 'result';
   paused = false;
   keys.clear();
+  setPitMenu(false);
   updateHud();
   if (persist()) clearSkidSave();
   const result = career.results.at(-1);
@@ -654,6 +680,7 @@ app.addEventListener('click', event => {
   switch (dataset.action) {
     case 'race': startRace(); break;
     case 'pause': pauseRace(); break;
+    case 'pit-menu': if (mode === 'race' && !paused) setPitMenu(byId('pit-menu').hidden); break;
     case 'resume': resumeRace(); break;
     case 'restart':
     case 'retire':
@@ -741,6 +768,10 @@ app.addEventListener('input', event => {
 
 app.addEventListener('change', event => {
   const field = event.target;
+  if (mode === 'race' && (field.hasAttribute('data-pit-compound') || field.hasAttribute('data-pit-repair'))) {
+    race.pit.plan = { compound: byId('pit-compound').value, repair: byId('pit-repair').checked };
+    saveActiveRace(true);
+  }
   if (field.hasAttribute('data-race-compound') && !hasSavedRace(career)) {
     career = { ...career, setup: normalizeSetup({ ...career.setup, compound: field.value }, career.upgrades.aero) };
     persist();
@@ -820,6 +851,11 @@ garagePreview.addEventListener('wheel', event => {
 }, { passive: false });
 
 window.addEventListener('keydown', event => {
+  if (mode === 'race' && !paused && event.code === 'KeyP' && !event.target.closest?.('select,input,textarea')) {
+    event.preventDefault();
+    if (!event.repeat) setPitMenu(byId('pit-menu').hidden);
+    return;
+  }
   if (mode === 'race' && event.code === 'KeyT' && race.electronics.traction && !event.target.closest?.('select,input,textarea')) {
     event.preventDefault();
     if (!event.repeat) {

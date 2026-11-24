@@ -186,6 +186,15 @@ const messages = {
   forecastWet: ['Başlangıçta pist ıslak', 'Wet track at the start'],
   forecastRainAt: ['{0}. tur civarında yağmur', 'Rain expected around lap {0}'],
   tireLife: ['Lastik ömrü', 'Tire life'],
+  pitStrategy: ['Pit stratejisi', 'Pit strategy'],
+  pitEntry: ['PİT GİRİŞ', 'PIT ENTRY'],
+  pitExit: ['PİT ÇIKIŞ', 'PIT EXIT'],
+  pitBox: ['SERVİS ALANI', 'PIT BOX'],
+  nextCompound: ['Sonraki lastik', 'Next tire compound'],
+  pitRepair: ['Gövdeyi onar', 'Repair body damage'],
+  pitStopHint: ['Sarı servis alanında tamamen dur.', 'Stop inside the yellow pit box.'],
+  pitServiceTimer: ['PİT SERVİSİ · {0} sn', 'PIT SERVICE · {0}s'],
+  pitLimiter: ['PİT LİMİTİ · 80 km/sa', 'PIT LIMITER · 80 km/h'],
 };
 
 let language = 'tr';

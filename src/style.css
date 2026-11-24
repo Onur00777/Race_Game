@@ -85,6 +85,17 @@ nav button[aria-current]::after { content: ""; position: absolute; inset: auto 0
 .tire-widget b { color: #e7e9ec; font: 700 .81rem/1.2 var(--display); }
 .tire-widget[data-worn="true"] b { color: #ff977f; }
 .tire-widget meter { grid-column: 1 / -1; width: 100%; height: 6px; accent-color: #d1dfe6; }
+.race-actions { justify-self: end; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 5px; }
+.race-actions .secondary { padding: 5px 8px; min-height: 32px; }
+.race-actions kbd { font-size: .66rem; margin-right: 1px; }
+.pit-menu, .pit-status { position: absolute; z-index: 2; pointer-events: auto; }
+.pit-menu { right: clamp(15px, 3vw, 38px); top: clamp(74px, 12vh, 102px); width: min(240px, calc(100% - 30px));
+  display: grid; gap: 10px; padding: 11px; background: #17242ff2; border: 1px solid #83b4c770; border-radius: 7px; }
+.pit-menu label { display: flex; justify-content: space-between; align-items: center; gap: 7px; font-size: .76rem; }
+.pit-menu select { font-size: .76rem; min-width: 0; padding: 4px; }
+.pit-menu small { color: #bac8d5; font-size: .68rem; }
+.pit-status { top: 18%; left: 50%; transform: translateX(-50%); white-space: nowrap; color: #9bf0ff; border: 1px solid #6ddde5;
+  border-radius: 5px; padding: 6px 12px; background: #12232cf5; font: 750 .9rem/1 var(--display); pointer-events: none; }
 .difficulty-config { margin-top: 11px; padding-top: 10px; border-top: 1px solid #dbeeff29; }
 .difficulty-heading, .result-heading { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .difficulty-heading > strong { font-size: .75rem; color: #e6e1dc; }
