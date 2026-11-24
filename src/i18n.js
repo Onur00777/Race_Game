@@ -184,6 +184,7 @@ const messages = {
   tc_high: ['Yüksek', 'High'],
   forecastDry: ['Kuru pist bekleniyor', 'Dry track expected'],
   forecastWet: ['Başlangıçta pist ıslak', 'Wet track at the start'],
+  forecastDryAt: ['Islak start · {0}. turda kuruma bekleniyor', 'Wet start · Drying expected near lap {0}'],
   forecastRainAt: ['{0}. tur civarında yağmur', 'Rain expected around lap {0}'],
   tireLife: ['Lastik ömrü', 'Tire life'],
   pitStrategy: ['Pit stratejisi', 'Pit strategy'],
@@ -195,6 +196,17 @@ const messages = {
   pitStopHint: ['Sarı servis alanında tamamen dur.', 'Stop inside the yellow pit box.'],
   pitServiceTimer: ['PİT SERVİSİ · {0} sn', 'PIT SERVICE · {0}s'],
   pitLimiter: ['PİT LİMİTİ · 80 km/sa', 'PIT LIMITER · 80 km/h'],
+  raceControl: ['YARIŞ KONTROL', 'RACE CONTROL'],
+  flagYellow: ['SARI BAYRAK', 'YELLOW FLAG'],
+  flagCaution: ['Olay bölgesinde 80 km/sa · Geçiş yasak', '80 km/h through the incident sector · No overtaking'],
+  flagRed: ['KIRMIZI BAYRAK', 'RED FLAG'],
+  flagSuspended: ['Yarış durduruldu', 'Race suspended'],
+  flagGreen: ['YEŞİL BAYRAK', 'GREEN FLAG'],
+  flagCleared: ['Pist açık. Yarış devam ediyor.', 'Track clear. Racing resumes.'],
+  flagMinorRepair: ['Küçük hasarı onar (en fazla %18)', 'Repair minor damage (up to 18%)'],
+  flagRestartHint: ['Yarış durduruldu. Lastik seçip kalan turlar için sıralı starta dönebilirsin.', 'The race is suspended. Choose tires and return to the ordered grid for the remaining laps.'],
+  flagRestart: ['Grid’den yeniden başlat', 'Restart from grid'],
+  timePenalty: ['Sarı bayrak ihlali · +{0} sn', 'Yellow flag violation · +{0}s'],
 };
 
 let language = 'tr';

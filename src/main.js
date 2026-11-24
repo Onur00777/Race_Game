@@ -13,7 +13,7 @@ import { legacyEvents } from './events.js';
 import { difficultyId, purseFor } from './difficulty.js';
 import { compoundBadge, compoundControls, compoundOptions, difficultyBadge, difficultyControls, payoutBreakdown } from './race-ui.js';
 import { integrity, vehicleCondition } from './vehicle-damage.js';
-import { tireHealth } from './tire-strategy.js';
+import { recommendedCompound, tireHealth } from './tire-strategy.js';
 import './style.css';
 
 const app = document.querySelector('#app');
@@ -75,6 +75,7 @@ app.innerHTML = `
         <label><span data-text="pitRepair"></span><input id="pit-repair" type="checkbox" data-pit-repair></label>
         <small data-text="pitStopHint"></small></div>
       <div id="pit-status" class="pit-status" hidden></div>
+      <div id="race-control-flag" class="race-control-flag" hidden role="status"><strong></strong><span></span></div>
       <div id="hit-vignette" class="hit-vignette" aria-hidden="true"></div>
       <div id="countdown" class="countdown" aria-live="polite"></div>
       <div class="race-bottom">
@@ -195,8 +196,8 @@ function updateSoundButton() {
 }
 
 function playAudio() {
-  const driving = sound && mode === 'race' && !paused;
-  updateAudio(audio, race, driving, driving || sound && mode === 'result');
+  const driving = sound && mode === 'race' && !paused && race.control.flag !== 'red';
+  updateAudio(audio, race, driving, sound && (mode === 'result' || mode === 'race' && !paused));
 }
 
 function enableAudio() {
@@ -407,6 +408,7 @@ function startRace(restart = false) {
   mapShape = circuitMap(track, map.width, map.height);
   updateHud();
   saveActiveRace();
+  syncRaceControl();
   enableAudio();
   circuit.focus({ preventScroll: true });
 }
@@ -431,6 +433,7 @@ function updateHud() {
   byId('tire-meter').value = tyreLife;
   byId('tire-life').textContent = tyreLife + '%';
   updatePitStatus(player);
+  updateFlagBanner();
   const rpm = race.launchHold || player.actuation?.rpm || 0;
   setEcuIndicator('tc', race.electronics.traction, player.actuation?.tc, t('tc_' + race.tcMode));
   setEcuIndicator('abs', race.electronics.abs, player.actuation?.abs);
@@ -494,6 +497,36 @@ function updatePitStatus(player) {
   if (message !== status.textContent) status.textContent = message;
 }
 
+function updateFlagBanner() {
+  const { flag, changed } = race.control;
+  const penalty = race.player.timePenalty ?? 0;
+  const banner = byId('race-control-flag');
+  banner.hidden = flag === 'green' && (!changed || race.elapsed - changed > 3.5);
+  banner.dataset.flag = flag;
+  const title = t(flag === 'red' ? 'flagRed' : flag === 'yellow' ? 'flagYellow' : 'flagGreen');
+  const rule = flag === 'yellow' ? t('flagCaution') : flag === 'red' ? t('flagSuspended') : t('flagCleared');
+  const body = flag === 'yellow' && penalty ? `${rule} · ${t('timePenalty', penalty)}` : rule;
+  if (banner.firstElementChild.textContent !== title) banner.firstElementChild.textContent = title;
+  if (banner.lastElementChild.textContent !== body) banner.lastElementChild.textContent = body;
+}
+
+function syncRaceControl() {
+  if (mode !== 'race' || race.control.flag !== 'red' || overlay.dataset.kind === 'red') return;
+  keys.clear();
+  setPitMenu(false);
+  race.redPlan ??= { compound: recommendedCompound(race.wetness, track.event.laps - race.player.lap), repair: false };
+  overlay.dataset.kind = 'red';
+  overlay.innerHTML = `<div class="control-eyebrow">${t('raceControl')}</div><h2>${t('flagRed')}</h2>
+    <p>${t('flagRestartHint')}</p>
+    <label class="pause-setting"><span>${t('nextCompound')}</span><select data-red-compound>${compoundOptions(race.redPlan.compound)}</select></label>
+    <label class="pause-setting"><span>${t('flagMinorRepair')}</span><input type="checkbox" data-red-repair ${race.redPlan.repair ? 'checked' : ''}></label>
+    <div class="dialog-actions"><button type="button" class="primary" data-action="red-restart">${t('flagRestart')}</button>
+      <button type="button" class="secondary" data-action="save-exit">${t('saveExit')}</button></div>`;
+  if (!overlay.open) overlay.showModal();
+  else overlay.querySelector('[data-action="red-restart"]').focus();
+  if (saveActiveRace(true)) saveSkids();
+}
+
 function saveActiveRace(quiet = false) {
   if (mode !== 'race' || race.order) return false;
   career = { ...career, screen: 'calendar', activeRace: raceCheckpoint(career, race, activeLoadout, alternateCamera) };
@@ -520,7 +553,7 @@ function clearSkidSave() {
 }
 
 function pauseRace() {
-  if (mode !== 'race' || paused) return;
+  if (mode !== 'race' || paused || race.control.flag === 'red') return;
   keys.clear();
   paused = true;
   setPitMenu(false);
@@ -533,6 +566,7 @@ function pauseRace() {
 }
 
 function renderPause(saved) {
+  delete overlay.dataset.kind;
   overlay.innerHTML = `<h2>${t('paused')}</h2><p>${t(saved ? 'pauseSaved' : 'pauseUnsaved')}</p>
     <label class="pause-setting"><span>${t('graphics')}</span><select data-graphics>${graphicsOptions()}</select></label>
     <label class="pause-setting"><span>${t('racingLine')} <kbd>L</kbd></span><input type="checkbox" data-racing-line ${career.racingLine !== false ? 'checked' : ''}></label>
@@ -569,8 +603,9 @@ function resumeRace() {
 }
 
 function finishRace() {
-  career = finishEvent(career, race.order, race.player.finishTime ?? race.elapsed, race.player.bestLap, activeLoadout, track.event, {
-    difficulty: race.difficulty, retired: race.retired, retiredDrivers: race.retiredDrivers, condition: race.player,
+  const penalty = race.retired ? 0 : race.player.timePenalty ?? 0;
+  career = finishEvent(career, race.order, (race.player.finishTime ?? race.elapsed) + penalty, race.player.bestLap, activeLoadout, track.event, {
+    difficulty: race.difficulty, retired: race.retired, retiredDrivers: race.retiredDrivers, condition: race.player, timePenalty: penalty,
   });
   mode = 'result';
   paused = false;
@@ -581,6 +616,7 @@ function finishRace() {
   const result = career.results.at(-1);
   const condition = integrity(result.condition);
   const unlocked = !result.retired && teams.find(team => team.unlock === career.completed);
+  delete overlay.dataset.kind;
   overlay.innerHTML = `
     <div class="result-heading"><div class="hero-meta"><span></span> ${translatedField(track.event)}</div>${difficultyBadge(result.difficulty)}</div>
     <h2>${result.retired ? 'DNF' : t('raceResult', result.place)}</h2>
@@ -592,6 +628,7 @@ function finishRace() {
       <div><small>${upper(t('bestLap'))}</small><b>${formatTime(result.bestLap)}</b></div>
     </div>
     ${result.retired ? '' : payoutBreakdown(result)}
+    ${result.timePenalty ? `<p class="retirement-reason">${t('timePenalty', result.timePenalty)}</p>` : ''}
     <p class="result-condition">${t('bodyCondition')} <b>${condition}%</b></p>
     ${unlocked ? `<p>${t('teamUnlocked', unlocked.name)}</p>` : ''}
     <div class="dialog-actions">
@@ -702,7 +739,18 @@ app.addEventListener('click', event => {
       break;
     case 'save-exit':
       if (saveActiveRace()) saveSkids();
+      delete overlay.dataset.kind;
       showMenu('calendar');
+      break;
+    case 'red-restart':
+      if (race.restartAfterRed(race.redPlan)) {
+        delete overlay.dataset.kind;
+        overlay.close();
+        accumulator = 0;
+        updateHud();
+        saveActiveRace();
+        circuit.focus({ preventScroll: true });
+      }
       break;
     case 'calendar': showMenu('calendar'); break;
     case 'garage': showMenu('garage'); break;
@@ -770,6 +818,10 @@ app.addEventListener('change', event => {
   const field = event.target;
   if (mode === 'race' && (field.hasAttribute('data-pit-compound') || field.hasAttribute('data-pit-repair'))) {
     race.pit.plan = { compound: byId('pit-compound').value, repair: byId('pit-repair').checked };
+    saveActiveRace(true);
+  }
+  if (mode === 'race' && race.control.flag === 'red' && (field.hasAttribute('data-red-compound') || field.hasAttribute('data-red-repair'))) {
+    race.redPlan = { compound: overlay.querySelector('[data-red-compound]').value, repair: overlay.querySelector('[data-red-repair]').checked };
     saveActiveRace(true);
   }
   if (field.hasAttribute('data-race-compound') && !hasSavedRace(career)) {
@@ -872,13 +924,14 @@ window.addEventListener('keydown', event => {
   }
   if (mode === 'race' && event.code === 'Escape') {
     event.preventDefault();
+    if (race.control.flag === 'red') return;
     if (!event.repeat) {
       if (paused) resumeRace();
       else pauseRace();
     }
     return;
   }
-  if (mode !== 'race' || paused) return;
+  if (mode !== 'race' || paused || race.control.flag === 'red' || race.player.finishTime != null) return;
   if (drivingKeys.has(event.code)) {
     event.preventDefault();
     keys.add(event.code);
@@ -925,11 +978,15 @@ function frame(now) {
       steering: Number(keys.has('KeyD') || keys.has('ArrowRight')) - Number(keys.has('KeyA') || keys.has('ArrowLeft')),
     };
     accumulator += dt;
-    while (accumulator >= raceStep && !race.order) {
+    while (accumulator >= raceStep && !race.order && race.control.flag !== 'red') {
       race.update(raceStep, input);
       accumulator -= raceStep;
     }
     if (race.order) finishRace();
+    else if (race.control.flag === 'red') {
+      accumulator = 0;
+      syncRaceControl();
+    }
     else if (now - lastCheckpoint >= 700) {
       saveActiveRace(true);
       lastCheckpoint = now;
@@ -941,7 +998,7 @@ function frame(now) {
     playAudio();
   }
   if (mode !== 'menu' || now - lastMenuDraw >= 100) {
-    const fraction = mode === 'race' && !paused ? accumulator / raceStep : 1;
+    const fraction = mode === 'race' && !paused && race.control.flag !== 'red' ? accumulator / raceStep : 1;
     view.draw(race, mode, dt, braking, alternateCamera, paused, fraction, career.racingLine !== false);
     if (mode === 'menu') lastMenuDraw = now;
     if (mode === 'race' && !paused && now - lastSkidSave > 10000) {

@@ -14,6 +14,7 @@ import { createSkidMarks } from './skid-marks.js';
 import { loadCarAsset } from './car-asset.js';
 import { addPitView } from './pit-view.js';
 import { t } from './i18n.js';
+import { addMarshalLights } from './track-marshal.js';
 
 const standard = (color, roughness = 0.78, metalness = 0) => new T.MeshStandardMaterial({ color, roughness, metalness });
 const boxGeometry = new T.BoxGeometry(1, 1, 1);
@@ -292,6 +293,8 @@ export async function createView(canvas, quality) {
   let studio;
   let setWetAsphalt;
   let setWetPitLane;
+  let setMarshalLights;
+  let marshalClock = 0;
   let racingLine;
   let skidMarks;
 
@@ -320,6 +323,7 @@ export async function createView(canvas, quality) {
     addTerrain(scene, track, assets);
     setWetAsphalt = addTrack(scene, track, assets, label);
     setWetPitLane = addPitView(scene, track, assets, t);
+    setMarshalLights = addMarshalLights(scene, track);
     addTrees(scene, track);
     effects = createRaceEffects(scene);
     racingLine = createRacingLineView();
@@ -388,7 +392,9 @@ export async function createView(canvas, quality) {
         shakePhase = 0;
       }
     }
-    const driving = mode === 'race' && !paused;
+    const driving = mode === 'race' && !paused && race.control.flag !== 'red';
+    marshalClock += dt;
+    setMarshalLights(race.control, race.elapsed, marshalClock, reduceMotion.matches);
     effects.update(dt, driving || mode === 'result' ? race : null, canvas.height, driving);
     skidMarks.update(race, mode === 'race' && !paused, mode === 'race' || mode === 'result');
     const cars = race.cars.map((car, index) => renderPose(car, race.previousPoses[index], fraction));

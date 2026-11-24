@@ -96,6 +96,21 @@ nav button[aria-current]::after { content: ""; position: absolute; inset: auto 0
 .pit-menu small { color: #bac8d5; font-size: .68rem; }
 .pit-status { top: 18%; left: 50%; transform: translateX(-50%); white-space: nowrap; color: #9bf0ff; border: 1px solid #6ddde5;
   border-radius: 5px; padding: 6px 12px; background: #12232cf5; font: 750 .9rem/1 var(--display); pointer-events: none; }
+.race-control-flag { --flag:#fbc459; position: absolute; inset: max(74px, 10vh) auto auto 50%; transform: translateX(-50%);
+  display: grid; gap: 2px; width: max-content; max-width: calc(100% - 28px); color: var(--flag); text-align: center;
+  border: 1px solid var(--flag); border-left-width: 4px; background: #171b20f6; padding: 6px 14px;
+  box-shadow: 0 10px 24px #060a0e50; pointer-events: none; }
+.race-control-flag strong { font: 800 1.2rem/1 var(--display); letter-spacing: .1em; }
+.race-control-flag span { color: #ecf0f3; font-size: .69rem; }
+.race-control-flag[data-flag="green"] { --flag: #6ce9a1; }
+.race-control-flag[data-flag="red"] { --flag: #ff806e; }
+.control-eyebrow { color: #ff9985; font: 750 .83rem/1 var(--display); letter-spacing: .13em; margin-bottom: 10px; }
+dialog[data-kind="red"] { border-top-color: #ff624c; }
+dialog[data-kind="red"] h2 { color: #ff806e; }
+@media (prefers-reduced-motion: no-preference) {
+  .race-control-flag[data-flag="yellow"] { animation: flag-pulse 1.5s ease-in-out infinite alternate; }
+  @keyframes flag-pulse { to { box-shadow: 0 0 19px #f8b95872; } }
+}
 .difficulty-config { margin-top: 11px; padding-top: 10px; border-top: 1px solid #dbeeff29; }
 .difficulty-heading, .result-heading { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .difficulty-heading > strong { font-size: .75rem; color: #e6e1dc; }
