@@ -37,7 +37,8 @@ export function compoundOptions(active) {
 
 export function compoundControls(active, saved, event) {
   const forecast = event.forecast?.find(change => change.wetness >= 0.37);
-  const weather = weatherTarget(event, 0) >= 0.37 ? t('forecastWet') : forecast ?
+  const dry = event.forecast?.find(change => change.wetness < 0.23);
+  const weather = weatherTarget(event, 0) >= 0.37 ? (dry ? t('forecastDryAt', dry.lap + 1) : t('forecastWet')) : forecast ?
     t('forecastRainAt', forecast.lap + 1) : t('forecastDry');
   return `<div class="compound-config"><div><strong>${t('tireCompound')}</strong><small>${weather}</small></div>
     ${saved ? compoundBadge(active) : `<select data-race-compound aria-label="${t('tireCompound')}">${compoundOptions(active)}</select>`}</div>`;
