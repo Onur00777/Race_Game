@@ -4,9 +4,14 @@ import { DecalGeometry } from 'three/addons/geometries/DecalGeometry.js';
 import { sponsors } from './setup.js';
 import { axles, wheelRadius, wheelTrack } from './tires.js';
 import { carSurfaceMaps } from './car-materials.js';
+import { compoundId, compounds } from './tire-strategy.js';
 
 const box = new T.BoxGeometry(1, 1, 1);
 const rubber = new T.MeshStandardMaterial({ color: '#141515', roughness: 0.86 });
+const wetRubber = rubber.clone();
+const stripe = new T.RingGeometry(0.321, 0.330, 72);
+const sidewallColors = Object.fromEntries(compounds.map(({ id, color }) =>
+  [id, new T.MeshStandardMaterial({ color, roughness: 0.77 })]));
 const carbon = new T.MeshStandardMaterial({ color: '#191d23', roughness: 0.62, metalness: 0.36 });
 const inset = new T.MeshStandardMaterial({ color: '#090c10', roughness: 0.88 });
 const aluminum = new T.MeshStandardMaterial({ color: '#9da7b1', roughness: 0.30, metalness: 0.84 });
@@ -230,7 +235,7 @@ export const sharedCarResources = new Set([box, rubber, carbon, inset, aluminum,
   glass, headlight, tailLight, brakeLight, lensHousing, tire, rimLip, brakeDisc, center, tailPipe, intake, shadowPlane, shadowMaterial,
   bodyShape, cabinShape, wingShape, diffuserPanel, grillPanel, tailHousing, tailStrip, headStrip, spokes,
   splitterShape, sidewall, rotorFace, exhaustTube, flameShape, flameMaterial, flameCore, brokenLamp, crackedLens, cracks,
-  fascia, seat, bucket, cage, rimBarrel, upholstery, harness]);
+  fascia, seat, bucket, cage, rimBarrel, upholstery, harness, wetRubber, stripe, ...Object.values(sidewallColors)]);
 
 const stockParts = { tires: 0, brakes: 0, aero: 0, engine: 0 };
 const defaultAppearance = { wing: 'touring', wingColor: '#21272d', wingAngle: 3, frontCamber: -1, rearCamber: -1, decals: [], parts: stockParts };
@@ -361,6 +366,7 @@ function finishMaterials() {
   const composite = new T.MeshPhysicalMaterial({ ...detail.carbon, color: '#333943', map: weave, roughness: 0.54, metalness: 0.47,
     clearcoat: 0.58, clearcoatRoughness: 0.15, side: T.DoubleSide });
   Object.assign(rubber, detail.rubber);
+  Object.assign(wetRubber, detail.rain);
   const lettering = new T.MeshStandardMaterial({ map: tirePrint, transparent: true, depthWrite: false, roughness: 0.88 });
   const steel = new T.MeshStandardMaterial({ map: drilling, metalness: 0.70, roughness: 0.37 });
   finish = { weave, detail, composite, lettering, steel };
@@ -451,6 +457,8 @@ function addWheels(root) {
       mount(wheel, center, aluminum, side * 0.141);
       const print = mount(wheel, sidewall, lettering);
       print.rotation.y = side * Math.PI / 2;
+      const compoundRing = mount(wheel, stripe, sidewallColors.medium);
+      compoundRing.rotation.y = side * Math.PI / 2;
       const disk = mount(wheel, brakeDisc, rotor.clone(), side * 0.089);
       const face = mount(wheel, rotorFace, steel.clone(), side * 0.103);
       disk.material.emissive.set('#fa4614');
@@ -459,7 +467,7 @@ function addWheels(root) {
       face.rotation.y = side * Math.PI / 2;
       const calliper = block(holder, performanceCaliper, 0.044, 0.113, 0.094, side * 0.108, 0.057, -0.16);
       calliper.rotation.x = 0.34;
-      wheels.push({ holder, wheel, side, steering: axle > 0, tyre, print, disk, face, calliper });
+      wheels.push({ holder, wheel, side, steering: axle > 0, tyre, print, compoundRing, disk, face, calliper });
     }
   }
   return wheels;
@@ -603,7 +611,7 @@ export function createCarModel(color, asset) {
   });
   enclosure.castShadow = false;
   for (const { mesh } of decals) mesh.castShadow = mesh.receiveShadow = false;
-  for (const { print, face } of wheels) print.castShadow = face.castShadow = false;
+  for (const { print, face, compoundRing } of wheels) print.castShadow = face.castShadow = compoundRing.castShadow = false;
   for (const flame of flames) flame.traverse(object => { object.castShadow = object.receiveShadow = false; });
   const scuffs = scuffMeshes(shell, projections.scuffs);
   return { root, shell, paint, body, rear, nose, wheels, lights, wing, decals, splitter, diffuser, fins, skirts, exhausts,
@@ -631,11 +639,12 @@ function applyAppearance(model, appearance) {
     mesh.visible = Boolean(logo && appearance.decals.includes(slot));
     if (logo) mesh.material = logo;
   }
-  for (const { holder, side, steering, tyre, print, disk, face, calliper } of model.wheels) {
+  for (const { holder, side, steering, tyre, print, compoundRing, disk, face, calliper } of model.wheels) {
     holder.rotation.z = -side * T.MathUtils.degToRad(steering ? appearance.frontCamber : appearance.rearCamber);
     tyre.scale.x = 1 + tires * 0.095;
     tyre.position.x = -side * tires * 0.007;
     print.position.x = side * (0.150 + tires * 0.007);
+    compoundRing.position.x = side * (0.1495 + tires * 0.007);
     print.visible = tires > 0;
     disk.scale.set(1, 0.87 + brakes * 0.076, 0.87 + brakes * 0.076);
     face.scale.setScalar(0.87 + brakes * 0.076);
@@ -686,6 +695,14 @@ function deformBody(model, car) {
 
 export function updateCarModel(model, car, dt, braking, fire = 0) {
   applyAppearance(model, car.appearance ?? defaultAppearance);
+  const compound = compoundId(car.compound ?? car.appearance?.compound);
+  if (compound !== model.compound) {
+    model.compound = compound;
+    for (const { compoundRing, tyre } of model.wheels) {
+      compoundRing.material = sidewallColors[compound];
+      tyre.material = compound === 'rain' ? wetRubber : rubber;
+    }
+  }
   model.root.position.set(car.x, 0, car.z);
   model.root.rotation.y = car.yaw;
   model.paint.color.set(car.color);

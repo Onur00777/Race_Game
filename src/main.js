@@ -11,8 +11,9 @@ import { graphicsModes, qualityMode } from './graphics-settings.js';
 import { circuitMap, drawBriefingMap } from './circuit-map.js';
 import { legacyEvents } from './events.js';
 import { difficultyId, purseFor } from './difficulty.js';
-import { difficultyBadge, difficultyControls, payoutBreakdown } from './race-ui.js';
+import { compoundBadge, compoundControls, difficultyBadge, difficultyControls, payoutBreakdown } from './race-ui.js';
 import { integrity, vehicleCondition } from './vehicle-damage.js';
+import { tireHealth } from './tire-strategy.js';
 import './style.css';
 
 const app = document.querySelector('#app');
@@ -79,6 +80,8 @@ app.innerHTML = `
             <span id="lc-indicator" hidden>LC <small></small></span>
           </div></div>
         <div class="speed">
+          <div class="tire-widget" id="tire-widget"><span id="race-compound"></span><b id="tire-life"></b>
+            <meter id="tire-meter" min="0" max="100" low="25" high="55" optimum="100" value="100" data-label="tireLife"></meter></div>
           <strong id="speed"></strong><small data-text="kmh"></small><span><i id="speed-bar"></i></span>
           <div class="condition"><small data-text="body"></small><meter id="body-condition" min="0" max="100" low="42" high="77" optimum="100" data-label="bodyCondition" value="100"></meter><b id="condition-percent">100%</b></div>
         </div>
@@ -308,7 +311,8 @@ function updateMenu() {
       <div class="briefing-conditions"><strong>${t(event.format)}</strong><span>${t('laps', event.laps)}</span><span>${t(event.weather)}</span><span>${event.time}</span></div></div>
       <div class="briefing-prizes"><div><small>${t('prizePool')}</small><b>${garageMoney(pool)}</b></div>
       <div><small>${t('winnerPayout')}</small><b>${garageMoney(purse[0])}</b></div></div>
-      ${difficultyControls(difficulty, saved)}`;
+      ${difficultyControls(difficulty, saved)}
+      ${compoundControls(saved ? career.activeRace.cars?.[0]?.compound ?? career.activeRace.loadout?.setup?.compound : career.setup.compound, saved, event)}`;
     drawBriefingMap(briefing.querySelector('canvas'), trackFor(event));
   }
   const entries = screen === 'teams' ? teams.map(candidate => {
@@ -409,6 +413,17 @@ function updateHud() {
   byId('position').textContent = race.position();
   byId('speed').textContent = speed;
   byId('speed-bar').style.width = Math.min(100, speed / 2.35) + '%';
+  const tyreLife = Math.round(tireHealth(player) * 100);
+  const compound = byId('race-compound');
+  const widget = byId('tire-widget');
+  if (compound.dataset.id !== player.compound || compound.lang !== getLanguage()) {
+    compound.dataset.id = player.compound;
+    compound.lang = getLanguage();
+    compound.innerHTML = compoundBadge(player.compound);
+  }
+  widget.dataset.worn = String(tyreLife < 23);
+  byId('tire-meter').value = tyreLife;
+  byId('tire-life').textContent = tyreLife + '%';
   const rpm = race.launchHold || player.actuation?.rpm || 0;
   setEcuIndicator('tc', race.electronics.traction, player.actuation?.tc, t('tc_' + race.tcMode));
   setEcuIndicator('abs', race.electronics.abs, player.actuation?.abs);
@@ -726,6 +741,10 @@ app.addEventListener('input', event => {
 
 app.addEventListener('change', event => {
   const field = event.target;
+  if (field.hasAttribute('data-race-compound') && !hasSavedRace(career)) {
+    career = { ...career, setup: normalizeSetup({ ...career.setup, compound: field.value }, career.upgrades.aero) };
+    persist();
+  }
   if (field.hasAttribute('data-difficulty') && !hasSavedRace(career)) {
     career = { ...career, difficulty: difficultyId(field.value) };
     persist();

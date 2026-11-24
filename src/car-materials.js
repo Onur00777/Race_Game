@@ -42,12 +42,15 @@ export function carSurfaceMaps() {
     return grain - Math.floor(grain);
   }, 9, 15, 0.12, 0.64, 1);
   const rubber = detailMap((u, v) => {
+    return 0.73 + 0.05 * Math.cos(v * Math.PI * 32) * Math.sin(u * Math.PI * 76);
+  }, 22, 1, 1.2, 0.77, 1);
+  const rain = detailMap((u, v) => {
     const rib = 0.5 + 0.5 * Math.cos(8 * Math.PI * u + 19 * Math.abs(v - 0.50));
     const tread = Math.exp(-((v - 0.50) ** 6) * 44000);
     const score = Math.max(0, rib - 0.72) * tread;
     return 0.76 - score * 1.5 + 0.07 * Math.cos(v * Math.PI * 32) * Math.sin(u * Math.PI * 76);
   }, 22, 1, 1.2, 0.77, 1);
-  return { carbon, paint, rubber };
+  return { carbon, paint, rubber, rain };
 }
 
 export function createStudioHDR() {

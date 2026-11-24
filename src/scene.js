@@ -252,6 +252,12 @@ function addTrack(scene, track, assets, label) {
 
   addGuardrails(scene, track, metal);
   addGrandstand(scene, track, metal);
+  return wetness => {
+    asphalt.color.setRGB(0.36 - wetness * 0.20, 0.37 - wetness * 0.197, 0.39 - wetness * 0.183);
+    asphalt.roughness = 0.94 - wetness * 0.70;
+    asphalt.normalScale.setScalar(0.56 - wetness * 0.36);
+    asphalt.envMapIntensity = 1 + wetness * 1.2;
+  };
 }
 
 export async function createView(canvas, quality) {
@@ -282,6 +288,7 @@ export async function createView(canvas, quality) {
   let width = 0;
   let height = 0;
   let studio;
+  let setWetAsphalt;
   let racingLine;
   let skidMarks;
 
@@ -308,7 +315,7 @@ export async function createView(canvas, quality) {
     updateLight = lightTrack(scene, track, assets);
     fitShadowResolution(scene, pipeline.shadowSize());
     addTerrain(scene, track, assets);
-    addTrack(scene, track, assets, label);
+    setWetAsphalt = addTrack(scene, track, assets, label);
     addTrees(scene, track);
     effects = createRaceEffects(scene);
     racingLine = createRacingLineView();
@@ -355,6 +362,7 @@ export async function createView(canvas, quality) {
 
   function draw(race, mode, dt, braking, alternateCamera, paused, fraction = 1, guide = false) {
     if (!resize()) return;
+    setWetAsphalt(race.wetness);
     if (drawnRace !== race) {
       drawnRace = race;
       lastImpact = null;

@@ -1,6 +1,7 @@
 import { difficulties } from './difficulty.js';
-import { getLanguage, t } from './i18n.js';
+import { getLanguage, local, t } from './i18n.js';
 import { garageMoney } from './garage.js';
+import { compoundSpec, compounds, weatherTarget } from './tire-strategy.js';
 
 const labels = { easy: 'difficultyEasy', medium: 'difficultyMedium', hard: 'difficultyHard', legend: 'difficultyLegend' };
 const hints = { easy: 'difficultyEasyHint', medium: 'difficultyMediumHint', hard: 'difficultyHardHint', legend: 'difficultyLegendHint' };
@@ -22,6 +23,24 @@ export function difficultyControls(active, saved) {
       ${Object.keys(difficulties).map(id => `<label><input type="radio" name="difficulty" value="${id}" data-difficulty ${id === active ? 'checked' : ''}><span>${t(labels[id])}</span></label>`).join('')}
     </fieldset><p>${t(hints[active])}</p>`}
   </div>`;
+}
+
+export function compoundBadge(id) {
+  const compound = compoundSpec(id);
+  return `<span class="compound-badge" style="--compound:${compound.color}"><i aria-hidden="true"></i>${local(compound.name)}</span>`;
+}
+
+export function compoundOptions(active) {
+  return compounds.map(compound =>
+    `<option value="${compound.id}" ${active === compound.id ? 'selected' : ''}>${local(compound.name)}</option>`).join('');
+}
+
+export function compoundControls(active, saved, event) {
+  const forecast = event.forecast?.find(change => change.wetness >= 0.37);
+  const weather = weatherTarget(event, 0) >= 0.37 ? t('forecastWet') : forecast ?
+    t('forecastRainAt', forecast.lap + 1) : t('forecastDry');
+  return `<div class="compound-config"><div><strong>${t('tireCompound')}</strong><small>${weather}</small></div>
+    ${saved ? compoundBadge(active) : `<select data-race-compound aria-label="${t('tireCompound')}">${compoundOptions(active)}</select>`}</div>`;
 }
 
 export function payoutBreakdown(result) {

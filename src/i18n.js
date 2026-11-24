@@ -182,6 +182,10 @@ const messages = {
   tc_low: ['Düşük', 'Low'],
   tc_medium: ['Orta', 'Medium'],
   tc_high: ['Yüksek', 'High'],
+  forecastDry: ['Kuru pist bekleniyor', 'Dry track expected'],
+  forecastWet: ['Başlangıçta pist ıslak', 'Wet track at the start'],
+  forecastRainAt: ['{0}. tur civarında yağmur', 'Rain expected around lap {0}'],
+  tireLife: ['Lastik ömrü', 'Tire life'],
 };
 
 let language = 'tr';

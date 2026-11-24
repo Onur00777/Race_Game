@@ -37,10 +37,10 @@ export function createRaceEffects(scene) {
       varying float vSeed;
       void main() {
         vec4 view = modelViewMatrix * vec4(position, 1.0);
-        opacity = sin(min(age * 5.0, 1.57)) * pow(1.0 - age, 1.7) * (kind > 1.5 ? .48 : .24);
+        opacity = sin(min(age * 7.0, 1.57)) * pow(1.0 - age, 1.7) * (kind > 2.5 ? .66 : kind > 1.5 ? .48 : .24);
         vKind = kind;
         vSeed = seed;
-        float spread = kind > 1.5 ? .26 + age * 1.5 : kind > .5 ? .31 + age * 2.5 : .23 + age * 1.9;
+        float spread = kind > 2.5 ? .18 + age * 1.7 : kind > 1.5 ? .26 + age * 1.5 : kind > .5 ? .31 + age * 2.5 : .23 + age * 1.9;
         gl_PointSize = clamp(resolution * spread / max(-view.z, 1.5), 1.0, 168.0);
         gl_Position = projectionMatrix * view;
       }
@@ -53,7 +53,7 @@ export function createRaceEffects(scene) {
         vec2 p = gl_PointCoord - 0.5;
         float noise = sin(p.x * 19.0 + p.y * 6.0 + vSeed) * sin(p.y * 15.0 - p.x * 4.0 + vSeed * 1.3) * 0.075;
         float cloud = (1.0 - smoothstep(0.05, 0.49, length(p) + noise)) * opacity;
-        vec3 color = vKind > 1.5 ? vec3(.095, .109, .119) : vKind > .5 ? vec3(.70, .74, .77) : vec3(.47, .39, .28);
+        vec3 color = vKind > 2.5 ? vec3(.55, .65, .72) : vKind > 1.5 ? vec3(.095, .109, .119) : vKind > .5 ? vec3(.70, .74, .77) : vec3(.47, .39, .28);
         gl_FragColor = vec4(color, cloud);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
@@ -112,25 +112,28 @@ export function createRaceEffects(scene) {
     dustTimer %= 1;
   }
 
-  function spawnTireSmoke(car, dt) {
+  function spawnTireSmoke(car, dt, wetness) {
     const timer = smokeTimers.get(car.id) ?? new Float32Array(4);
     smokeTimers.set(car.id, timer);
     for (const [i, wheel] of car.wheels.entries()) {
-      if (!wheel.onRoad || wheel.slip < 0.22 || wheel.speed < 6) {
+      const spray = wetness > 0.16 && wheel.speed > 8;
+      if (!wheel.onRoad || (!spray && (wheel.slip < 0.22 || wheel.speed < 6))) {
         timer[i] = 0;
         continue;
       }
-      timer[i] += dt * wheel.slip * (10 + Math.min(10, wheel.speed * 0.27));
+      const emission = spray ? wetness * wheel.speed * (car.compound === 'rain' ? 0.91 : 0.59) :
+        wheel.slip * (10 + Math.min(10, wheel.speed * 0.27));
+      timer[i] += dt * emission;
       for (let count = 0; timer[i] >= 1 && dust.length < maxDust && count < 3; count++) {
         timer[i]--;
         dust.push({
           x: wheel.x - wheel.vx * 0.018,
           z: wheel.z - wheel.vz * 0.018,
           y: 0.10 + Math.random() * 0.07,
-          vx: wheel.vx * 0.17 + (Math.random() - 0.5) * 1.2,
-          vz: wheel.vz * 0.17 + (Math.random() - 0.5) * 1.2,
-          lifetime: 0.73 + Math.random() * 0.57,
-          age: 0, kind: 1, seed: Math.random() * 14,
+          vx: wheel.vx * (spray ? 0.22 : 0.17) + (Math.random() - 0.5) * 1.2,
+          vz: wheel.vz * (spray ? 0.22 : 0.17) + (Math.random() - 0.5) * 1.2,
+          lifetime: spray ? 0.32 + Math.random() * 0.37 : 0.73 + Math.random() * 0.57,
+          age: 0, kind: spray ? 3 : 1, seed: Math.random() * 14,
         });
       }
       timer[i] %= 1;
@@ -160,7 +163,7 @@ export function createRaceEffects(scene) {
   function update(dt, race, height, driving) {
     if (race) {
       for (const car of race.cars) {
-        if (driving) spawnTireSmoke(car, dt);
+        if (driving) spawnTireSmoke(car, dt, race.wetness);
         spawnEngineSmoke(car, dt);
       }
       if (driving) spawnDust(race.player, dt);
@@ -191,7 +194,7 @@ export function createRaceEffects(scene) {
       cloud.x += cloud.vx * dt;
       cloud.vx *= Math.exp(-dt * 1.15);
       cloud.vz *= Math.exp(-dt * 1.15);
-      cloud.y += dt * (cloud.kind === 2 ? 1.16 : cloud.kind === 1 ? 0.60 : 0.39);
+      cloud.y += dt * (cloud.kind === 2 ? 1.16 : cloud.kind === 3 ? 1.34 * (1 - cloud.age / cloud.lifetime) : cloud.kind === 1 ? 0.60 : 0.39);
       cloud.z += cloud.vz * dt;
       dust[i] = cloud;
       dustPositions.set([cloud.x, cloud.y, cloud.z], i * 3);
