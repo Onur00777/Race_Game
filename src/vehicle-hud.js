@@ -1,4 +1,4 @@
-import { t } from './i18n.js';
+import { getLanguage, t } from './i18n.js';
 import { compoundBadge } from './race-ui.js';
 import { tireTemperatureWindow } from './tire-strategy.js';
 import { engineWarning } from './thermals.js';
@@ -93,9 +93,9 @@ export function createVehicleHud(root) {
         status: corner?.detached ? t('wheelDetached') : corner?.punctured ? t('wheelPunctured') :
           suspension >= 30 ? t('suspensionWear', suspension) : `${life}% · ${temp}°C` };
     }
-    if (compound.dataset.id !== car.compound || compound.dataset.label !== t('tireCompound')) {
+    if (compound.dataset.id !== car.compound || compound.lang !== getLanguage()) {
       compound.dataset.id = car.compound;
-      compound.dataset.label = t('tireCompound');
+      compound.lang = getLanguage();
       compound.innerHTML = compoundBadge(car.compound);
     }
     assign(engineReading, `${temperature}°C`);
