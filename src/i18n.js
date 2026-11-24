@@ -167,6 +167,21 @@ const messages = {
   financeRepairHint: ['Eksik {0} gelecek yarış ödüllerinden kesilir.', 'The remaining {0} comes out of future race payouts.'],
   repairDebt: ['Kalan servis borcu {0}', 'Outstanding repair balance {0}'],
   repairRepayment: ['Servis borcu ödemesi', 'Repair balance repayment'],
+  ecuTab: ['Elektronik', 'Electronics'],
+  launchControl: ['Kalkış kontrolü', 'Launch control'],
+  launchDetail: ['Kalkışta motor devrini tutar ve tahrik tekerlerinin patinajını yönetir.', 'Holds launch RPM and manages driven-wheel slip from the grid.'],
+  tractionControl: ['Çekiş kontrolü', 'Traction control'],
+  tractionDetail: ['Viraj çıkışında kaymayı algılar ve motor torkunu düzenler.', 'Detects wheelspin and manages torque on corner exits.'],
+  absControl: ['Kilitlenme önleyici fren', 'Anti-lock braking'],
+  absDetail: ['Sert frenajda basıncı teker teker düzenler.', 'Modulates each wheel’s brake pressure during hard stops.'],
+  diffControl: ['Aktif diferansiyel', 'Active differential'],
+  diffDetail: ['Virajda tork dağılımıyla dönüşe yardımcı olur.', 'Uses torque distribution to help rotation under corner load.'],
+  tcSetting: ['Çekiş kontrolü seviyesi', 'Traction control setting'],
+  tcTuningHint: ['Yarış sırasında T ile değiştir.', 'Press T during a race to cycle the setting.'],
+  tc_off: ['Kapalı', 'Off'],
+  tc_low: ['Düşük', 'Low'],
+  tc_medium: ['Orta', 'Medium'],
+  tc_high: ['Yüksek', 'High'],
 };
 
 let language = 'tr';

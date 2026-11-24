@@ -2,8 +2,10 @@ import { currentTeam, maxUpgrade, money, price, repairQuote, upgrades } from './
 import { escapeHtml, getLanguage, local, t, translatedField } from './i18n.js';
 import { compounds, decalSlots, sliders, sponsors, vehicleStats, wings } from './setup.js';
 import { damagePerformance, integrity, vehicleCondition } from './vehicle-damage.js';
+import { electronics, tractionModes } from './ecu.js';
+import { estimateStints } from './telemetry.js';
 
-export const garageTabs = { parts: 'parts', tuning: 'tuning', aero: 'aero', sponsors: 'livery', service: 'service' };
+export const garageTabs = { parts: 'parts', tuning: 'tuning', aero: 'aero', sponsors: 'livery', service: 'service', ecu: 'ecuTab' };
 export const defaultOrbit = { azimuth: 0.96, elevation: 0.36, zoom: 1 };
 export const garageAngles = { front: 0.80, side: 1.57, rear: 2.58 };
 export const garageMoney = amount => money(amount, getLanguage());
@@ -75,6 +77,10 @@ const panels = {
       <select data-tune="compound">${compounds.map(compound => `<option value="${compound.id}" ${selected(career.setup.compound === compound.id)}>${local(compound.name)}</option>`).join('')}</select>
       <small>${t('compoundHint')}</small>
     </label>
+    ${career.electronics.traction ? `<label class="tune-field"><strong>${t('tcSetting')}</strong>
+      <select data-tune="tcMode">${tractionModes.map(id => `<option value="${id}" ${selected(career.setup.tcMode === id)}>${t('tc_' + id)}</option>`).join('')}</select>
+      <small>${t('tcTuningHint')}</small>
+    </label>` : ''}
     ${sliders.filter(slider => slider.id !== 'downforce').map(spec => sliderMarkup(career, spec.id)).join('')}
   `,
   aero: career => {
@@ -107,6 +113,15 @@ const panels = {
       ${decalSlots.map(slot => `<label><input type="checkbox" data-decal="${slot.id}" ${checked(career.decals.includes(slot.id))}> ${local(slot.name)}</label>`).join('')}
     </fieldset>`,
   service: servicePanel,
+  ecu: career => electronics.map(spec => {
+    const level = career.electronics[spec.id];
+    const cost = spec.cost * (level + 1);
+    const max = level >= maxUpgrade;
+    return `<article class="work-row" data-ecu-part="${spec.id}">
+      <div><small>${t('upgradeLevel', level, maxUpgrade)}</small><h3>${t(spec.label)}</h3><p>${t(spec.detail)}</p></div>
+      <button type="button" class="secondary" data-buy-ecu="${spec.id}" aria-label="${max ? t('maxLevel') : t('partPrice', t(spec.label), garageMoney(cost))}" ${disabled(max || cost > career.cash)}>
+        ${max ? t('maxLevel') : garageMoney(cost)}</button></article>`;
+  }).join(''),
 };
 
 export function garagePanel(career, saved) {
@@ -118,14 +133,15 @@ function telemetry(career, condition) {
   const stats = vehicleStats(currentTeam(career), career.upgrades, career.setup);
   const performance = damagePerformance(condition);
   const topSpeed = stats.topSpeed * performance.speed;
-  const limit = topSpeed + 8;
-  const acceleration = stats.acceleration * performance.power;
+  const handling = { ...stats, surfaceGrip: 1, ecu: career.electronics, tcMode: career.setup.tcMode };
+  const stints = estimateStints(handling, condition);
+  const stockRotation = career.electronics.diff ? estimateStints({ ...handling, ecu: { ...handling.ecu, diff: 0 } }, condition).rotation : stints.rotation;
   return {
     topSpeed: topSpeed * 3.6,
-    acceleration: topSpeed > 100 / 3.6 ? -limit / acceleration * Math.log(1 - (100 / 3.6) / limit) : Infinity,
+    acceleration: stints.acceleration,
     downforce: stats.load * performance.aero,
-    stopping: (100 / 3.6) ** 2 / (2 * stats.braking),
-    grip: stats.grip * performance.grip,
+    stopping: stints.stopping,
+    grip: stats.grip * performance.grip * (stockRotation ? stints.rotation / stockRotation : 1),
   };
 }
 
@@ -134,10 +150,15 @@ export function previewPart(career, id) {
   return { ...career, upgrades: { ...career.upgrades, [id]: career.upgrades[id] + 1 } };
 }
 
+export function previewElectronics(career, id) {
+  if (career.electronics[id] >= maxUpgrade) return null;
+  return { ...career, electronics: { ...career.electronics, [id]: career.electronics[id] + 1 } };
+}
+
 export function garageStats(career, preview, applied = false, condition = vehicleCondition(career.condition)) {
-  const baseline = telemetry(career, condition);
-  const next = preview && telemetry(preview, condition);
   const unavailable = integrity(condition) === 0;
+  const baseline = unavailable ? {} : telemetry(career, condition);
+  const next = preview && !unavailable && telemetry(preview, condition);
   const metrics = [
     ['topSpeed', t('kmh'), 100, 260, false, 0],
     ['acceleration', 's', 1.8, 4.7, true, 2],

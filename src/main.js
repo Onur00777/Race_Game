@@ -1,9 +1,9 @@
-import { acceptSponsor, buyUpgrade, changeTeam, currentEvent, currentTeam, events, finishEvent, gameName,
+import { acceptSponsor, buyElectronics, buyUpgrade, changeTeam, currentEvent, currentTeam, events, finishEvent, gameName,
   loadCareer, normalizeLoadout, repairVehicle, saveCareer, saveProfile, standings, teamById, teams, toggleDecal } from './career.js';
 import { createRace, createTrack, raceStep } from './race.js';
 import { eventDifficulty, eventForResume, hasSavedRace, raceCheckpoint, restoreRace } from './progress.js';
 import { decalSlots, normalizeSetup, sliders } from './setup.js';
-import { defaultOrbit, driverForm, garageAngles, garageMoney, garagePanel, garageStats, garageTabs, previewPart, setupValue } from './garage.js';
+import { defaultOrbit, driverForm, garageAngles, garageMoney, garagePanel, garageStats, garageTabs, previewElectronics, previewPart, setupValue } from './garage.js';
 import { escapeHtml, getLanguage, setLanguage, t, translatedField, upper } from './i18n.js';
 import { createAudio, updateAudio } from './audio.js';
 import { animateAmount, createWallet } from './wallet.js';
@@ -73,7 +73,11 @@ app.innerHTML = `
       <div id="countdown" class="countdown" aria-live="polite"></div>
       <div class="race-bottom">
         <canvas id="map" width="180" height="156" data-label="minimap"></canvas>
-        <div class="drive-help"><span id="road-warning" role="status"></span><div id="drive-help"></div><div class="line-indicator" id="line-indicator"><kbd>L</kbd> <span id="line-state"></span></div></div>
+        <div class="drive-help"><span id="road-warning" role="status"></span><div id="drive-help"></div><div class="line-indicator" id="line-indicator"><kbd>L</kbd> <span id="line-state"></span></div>
+          <div class="ecu-indicators" id="ecu-indicators" data-label="ecuTab">
+            <span id="tc-indicator" hidden>TC <small></small></span><span id="abs-indicator" hidden>ABS</span>
+            <span id="lc-indicator" hidden>LC <small></small></span>
+          </div></div>
         <div class="speed">
           <strong id="speed"></strong><small data-text="kmh"></small><span><i id="speed-bar"></i></span>
           <div class="condition"><small data-text="body"></small><meter id="body-condition" min="0" max="100" low="42" high="77" optimum="100" data-label="bodyCondition" value="100"></meter><b id="condition-percent">100%</b></div>
@@ -372,7 +376,7 @@ function startRace(restart = false) {
   }
   const continued = !restart && restored?.race;
   useTrack(next, continued || createRace(next, teamById(activeLoadout.team), activeLoadout.upgrades, activeLoadout.setup,
-    activeLoadout.appearance, { difficulty: eventDifficulty(career), condition: career.condition }));
+    activeLoadout.appearance, { difficulty: eventDifficulty(career), condition: career.condition, electronics: activeLoadout.electronics }));
   if (continued) restoreSkids();
   else clearSkidSave();
   byId('circuit-home').append(circuit);
@@ -405,6 +409,10 @@ function updateHud() {
   byId('position').textContent = race.position();
   byId('speed').textContent = speed;
   byId('speed-bar').style.width = Math.min(100, speed / 2.35) + '%';
+  const rpm = race.launchHold || player.actuation?.rpm || 0;
+  setEcuIndicator('tc', race.electronics.traction, player.actuation?.tc, t('tc_' + race.tcMode));
+  setEcuIndicator('abs', race.electronics.abs, player.actuation?.abs);
+  setEcuIndicator('lc', race.electronics.launch, rpm, rpm ? `${rpm} RPM` : '');
   const condition = integrity(player);
   byId('body-condition').value = condition;
   byId('condition-percent').textContent = condition + '%';
@@ -438,6 +446,13 @@ function updateHud() {
     mapContext.arc(...mapShape.point(car), car === player ? 5 : 3.6, 0, Math.PI * 2);
     mapContext.fill();
   }
+}
+
+function setEcuIndicator(id, installed, active, detail) {
+  const badge = byId(id + '-indicator');
+  badge.hidden = !installed;
+  badge.dataset.active = String(Boolean(active));
+  if (detail !== undefined && badge.lastElementChild.textContent !== detail) badge.lastElementChild.textContent = detail;
 }
 
 function saveActiveRace(quiet = false) {
@@ -591,6 +606,17 @@ app.addEventListener('click', event => {
     (samePart ?? byId('garage').querySelector('nav [aria-current]'))?.focus();
     if (before !== career) showStats(before, career, true);
   }
+  if (dataset.buyEcu) {
+    const before = career;
+    career = buyElectronics(career, dataset.buyEcu);
+    if (before !== career) {
+      persist();
+      updateGarage();
+      const same = byId('garage-panel').querySelector(`[data-buy-ecu="${dataset.buyEcu}"]:not(:disabled)`);
+      (same ?? byId('garage').querySelector('nav [aria-current]'))?.focus();
+      showStats(before, career, true);
+    }
+  }
   if (dataset.team) {
     career = changeTeam(career, dataset.team);
     persist();
@@ -679,12 +705,12 @@ app.addEventListener('click', event => {
 
 const workbench = byId('garage-panel');
 function previewPartRow(event) {
-  const row = event.target.closest('[data-part]');
+  const row = event.target.closest('[data-part],[data-ecu-part]');
   if (!row || row.contains(event.relatedTarget)) return;
-  showStats(career, previewPart(career, row.dataset.part));
+  showStats(career, row.dataset.ecuPart ? previewElectronics(career, row.dataset.ecuPart) : previewPart(career, row.dataset.part));
 }
 function clearPartRow(event) {
-  const row = event.target.closest('[data-part]');
+  const row = event.target.closest('[data-part],[data-ecu-part]');
   if (row && !row.contains(event.relatedTarget)) showStats(career);
 }
 workbench.addEventListener('pointerover', previewPartRow);
@@ -775,6 +801,15 @@ garagePreview.addEventListener('wheel', event => {
 }, { passive: false });
 
 window.addEventListener('keydown', event => {
+  if (mode === 'race' && event.code === 'KeyT' && race.electronics.traction && !event.target.closest?.('select,input,textarea')) {
+    event.preventDefault();
+    if (!event.repeat) {
+      race.rotateTC();
+      updateHud();
+      saveActiveRace(true);
+    }
+    return;
+  }
   if (mode === 'race' && event.code === 'KeyL' && !event.target.closest?.('select,input,textarea')) {
     event.preventDefault();
     if (!event.repeat) setRacingLine(career.racingLine === false);

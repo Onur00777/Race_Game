@@ -91,15 +91,16 @@ export function updateAudio(audio, race, playing, allowImpact = playing) {
   if (!audio) return;
   const speed = Math.abs(race?.player.speed ?? 0);
   const audible = playing && race.countdown === 0;
+  const launchHold = playing ? race?.launchHold ?? 0 : 0;
   const level = race?.engineLevel ?? 0;
   const load = race?.throttle ? 1 : 0;
   const now = audio.context.currentTime;
   const previousShift = [48, 36, 25, 15, 7, 0].find(shift => speed >= shift);
-  const hz = 46 + (speed - previousShift) * (4.75 - level * 0.29) + speed * 0.83 + load * 12;
+  const hz = launchHold ? launchHold / 36 : 46 + (speed - previousShift) * (4.75 - level * 0.29) + speed * 0.83 + load * 12;
   audio.engine.frequency.setTargetAtTime(hz, now, 0.067);
   audio.sub.frequency.setTargetAtTime(hz * (level > 0 ? 0.5 : 0.75), now, 0.067);
   audio.filter.frequency.setTargetAtTime(179 + speed * 4.9 + level * 33 + load * 106, now, 0.083);
-  audio.gain.gain.setTargetAtTime(audible ? 0.015 + Math.min(speed / 4200, 0.012) + load * (0.007 + level * 0.002) : 0, now, 0.08);
+  audio.gain.gain.setTargetAtTime(audible || launchHold ? 0.015 + Math.min(speed / 4200, 0.012) + load * (0.007 + level * 0.002) : 0, now, 0.08);
   updateScreech(audio, race, audible, now);
   if (race?.impact && race.impact !== audio.lastImpact) {
     audio.lastImpact = race.impact;
