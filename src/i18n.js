@@ -194,6 +194,7 @@ const messages = {
   conditionFront: ['Kaput ve ön tampon', 'Hood and front bumper'],
   conditionRear: ['Kanat ve difüzör', 'Wing and diffuser'],
   wheelDetached: ['Teker koptu', 'Wheel detached'],
+  suspensionWear: ['Süspansiyon hasarı %{0}', 'Suspension damage {0}%'],
   wheelPunctured: ['Lastik patlak', 'Tire punctured'],
   wheelRetirement: ['{0} tekeri koptu · Mekanik arıza', '{0} wheel detached · Mechanical failure'],
   limpToPit: ['{0} patlak · Pit’e dön', '{0} punctured · Return to pit'],

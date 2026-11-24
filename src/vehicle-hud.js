@@ -87,9 +87,11 @@ export function createVehicleHud(root) {
       const life = Math.round((car.tireLife?.[index] ?? 1) * 100);
       const temp = Math.round(car.tireTemperatures?.[index] ?? 65);
       const corner = car.corners?.[index];
+      const suspension = Math.round((corner?.damage ?? 0) * 100);
       current[id] = { damage: corner?.detached || corner?.punctured ? 100 : Math.max(100 - life, Math.round((corner?.damage ?? 0) * 100)),
         life: `${life}%`, temp: `${temp}°C`, heat: thermal(temp, min, max),
-        status: corner?.detached ? t('wheelDetached') : corner?.punctured ? t('wheelPunctured') : `${life}% · ${temp}°C` };
+        status: corner?.detached ? t('wheelDetached') : corner?.punctured ? t('wheelPunctured') :
+          suspension >= 30 ? t('suspensionWear', suspension) : `${life}% · ${temp}°C` };
     }
     if (compound.dataset.id !== car.compound || compound.dataset.label !== t('tireCompound')) {
       compound.dataset.id = car.compound;

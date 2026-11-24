@@ -255,12 +255,27 @@ const scuffMounts = [
   ['rightDamage', [-0.89, 0.43, -0.21], [0, -Math.PI / 2, 0], [1.32, 0.44, 0.54]],
 ];
 
+function hoodFlexGeometry(geometry) {
+  const position = geometry.attributes.position;
+  const delta = new Float32Array(position.count * 3);
+  for (let i = 0; i < position.count; i++) {
+    const x = Math.abs(position.getX(i)), y = position.getY(i), z = position.getZ(i);
+    const patch = T.MathUtils.smoothstep(z, 0.72, 1.62) * (1 - T.MathUtils.smoothstep(z, 1.93, 2.12)) *
+      T.MathUtils.smoothstep(y, 0.46, 0.61) * (1 - T.MathUtils.smoothstep(x, 0.38, 0.86));
+    delta[i * 3 + 1] = patch * 0.031;
+  }
+  geometry.morphTargetsRelative = true;
+  geometry.morphAttributes.position = [new T.BufferAttribute(delta, 3)];
+  return geometry;
+}
+
 function bodyDecals(body) {
   if (!projectedDecals.has(body)) {
     const projector = new T.Mesh(body, carbon);
     const project = layouts => layouts.map(([slot, center, rotation, size]) =>
-      ({ slot, geometry: projectDecal(projector, center, rotation, size) }));
+      ({ slot, geometry: hoodFlexGeometry(projectDecal(projector, center, rotation, size)) }));
     projectedDecals.set(body, { sponsors: project(decalMounts), scuffs: project(scuffMounts) });
+    hoodFlexGeometry(body);
   }
   return projectedDecals.get(body);
 }
@@ -750,6 +765,13 @@ export function updateCarModel(model, car, dt, braking, fire = 0) {
   model.shell.position.y += (-drop - model.shell.position.y) * settle;
   for (const light of model.lights) light.material = braking ? brakeLight : tailLight;
   model.lightClock += dt;
+  const flutterStrength = Math.max(0, (car.hoodDamage ?? 0) - 0.45) * T.MathUtils.smoothstep(Math.abs(car.speed), 18, 44);
+  const flutterClock = model.lightClock * 26;
+  const flutter = model.reducedMotion.matches ? 0 : flutterStrength *
+    (0.74 + Math.sin(flutterClock) * 0.49 + Math.sin(flutterClock * 1.63) * 0.26);
+  model.body.morphTargetInfluences[0] = flutter;
+  for (const { mesh } of model.decals) mesh.morphTargetInfluences[0] = flutter;
+  for (const { mesh } of model.scuffs) mesh.morphTargetInfluences[0] = flutter;
   let litLamps = 0;
   for (const { side, lamps, crack } of model.headlights) {
     const strength = (car.frontDamage ?? 0) + (side > 0 ? (car.leftDamage ?? 0) : (car.rightDamage ?? 0)) * 0.24;

@@ -11,8 +11,8 @@ export const compounds = [
 ];
 export const compoundSpec = id => compounds.find(compound => compound.id === id) ?? compounds[1];
 export const compoundId = id => compoundSpec(id).id;
-export const tireTemperatureWindow = id => id === 'rain' ? [49, 76] :
-  id === 'soft' ? [72, 103] : id === 'hard' ? [79, 112] : [74, 107];
+const temperatureWindows = Object.freeze({ rain: [49, 76], soft: [72, 103], hard: [79, 112], medium: [74, 107] });
+export const tireTemperatureWindow = id => temperatureWindows[compoundId(id)];
 
 export function fitTires(car, id, life, temperature) {
   car.compound = compoundId(id);
