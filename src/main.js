@@ -731,7 +731,6 @@ app.addEventListener('click', event => {
       overlay.querySelector('[data-action="resume"]').focus();
       break;
     case 'confirm-restart':
-      career = { ...career, condition: vehicleCondition(race.player) };
       overlay.close();
       mode = 'menu';
       startRace(true);

@@ -86,7 +86,7 @@ const messages = {
   pauseUnsaved: ['Kayıt yapılamadı. Yarış bu sekmede duraklatıldı.', 'Saving failed. The race is paused in this tab.'],
   saveExit: ['Kaydet ve takvime dön', 'Save and exit to calendar'],
   restartRace: ['Yarışı yeniden başlat', 'Restart race'],
-  restartHint: ['Tur süresi ve konum sıfırlanacak. Aracın mevcut hasarı korunacak.', 'Lap time and position will reset. Current vehicle damage carries over.'],
+  restartHint: ['Tur süresi ve konum sıfırlanacak. Araç yarışa başladığı duruma dönecek.', 'Lap time and position will reset. The car will return to its pre-race condition.'],
   retireRace: ['Yarıştan çekil', 'Retire from race'],
   retireHint: ['Bu tur DNF olarak kaydedilecek. Ödül ve puan alamazsın. Aracın hasarı garaja taşınır.', 'This round will count as a DNF. You forfeit prize money and points. The car returns to the garage with its current damage.'],
   mechanicalFailure: ['Kritik mekanik arıza', 'Critical mechanical failure'],

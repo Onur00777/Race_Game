@@ -32,7 +32,7 @@ Duraklat menüsünden ideal çizgiyi açıp kapatabilir ve görüntü kalitesini
 
 İlk girişte sürücünün adını, başlangıç takımını ve oyun dilini seç. Türkçe ve İngilizce arasında Profil ekranından geçebilirsin.
 
-Kariyer ve açık yarış aynı tarayıcıda, aynı site adresinde otomatik kaydedilir. Kayıt turu, konumu, rakipleri, zorluğu, gövde durumunu, lastik izlerini, hava ve lastik durumunu, aktif pit servisini ve yarış kontrolü kararlarını içerir. Sekmeyi kapatıp ya da sayfayı yenileyip takvimden **Yarışa devam et** ile kaldığın yerden dönebilirsin. Duraklat menüsünden takvime dönebilir, hasarı koruyarak yarışı yeniden başlatabilir veya yarıştan çekilebilirsin.
+Kariyer ve açık yarış aynı tarayıcıda, aynı site adresinde otomatik kaydedilir. Kayıt turu, konumu, rakipleri, zorluğu, gövde durumunu, lastik izlerini, hava ve lastik durumunu, aktif pit servisini ve yarış kontrolü kararlarını içerir. Sekmeyi kapatıp ya da sayfayı yenileyip takvimden **Yarışa devam et** ile kaldığın yerden dönebilirsin. Duraklat menüsünden takvime dönebilir, aracı yarışa başladığı duruma döndürerek yarışı yeniden başlatabilir veya yarıştan çekilebilirsin.
 
 Yeni sezonda takvim ve puanlar sıfırlanır. Kazanç, takım erişimi ve yükseltmeler korunur.
 
