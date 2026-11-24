@@ -80,11 +80,6 @@ nav button[aria-current]::after { content: ""; position: absolute; inset: auto 0
 .compound-config select { font-size: .72rem; min-width: 0; padding: 5px 7px; }
 .compound-badge { display: inline-flex; align-items: center; gap: 5px; color: var(--compound); font: 700 .78rem/1.2 var(--display); }
 .compound-badge i { width: 8px; height: 8px; flex: 0 0 8px; border: 2px solid var(--compound); border-radius: 50%; }
-.tire-widget { width: max-content; margin: 0 0 6px auto; display: grid; grid-template-columns: auto auto; align-items: center;
-  gap: 1px 8px; border: 1px solid #adc4da42; border-radius: 4px; background: #111921e8; padding: 4px 6px; }
-.tire-widget b { color: #e7e9ec; font: 700 .81rem/1.2 var(--display); }
-.tire-widget[data-worn="true"] b { color: #ff977f; }
-.tire-widget meter { grid-column: 1 / -1; width: 100%; height: 6px; accent-color: #d1dfe6; }
 .race-actions { justify-self: end; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 5px; }
 .race-actions .secondary { padding: 5px 8px; min-height: 32px; }
 .race-actions kbd { font-size: .66rem; margin-right: 1px; }
@@ -193,15 +188,56 @@ kbd { padding: 2px 4px; border: 1px solid #fff4; border-radius: 3px; font: 630 .
 .speed strong { display: inline-block; font: italic 850 clamp(38px, 6.7vw, 82px)/.89 var(--display); letter-spacing: -.09em; margin-right: .1em; }
 .speed > span { display: block; margin: 8px 0 0 auto; width: min(164px, 24vw); height: 4px; transform: skewX(-28deg); background: #ffede757; }
 .speed > span i { display: block; height: 100%; background: var(--orange); }
-.condition { display: flex; justify-content: flex-end; align-items: center; gap: 6px; margin-top: 7px; font-size: .72rem; }
-.condition small { font-size: .62rem; }
-.condition meter { width: clamp(21px, 4vw, 45px); height: 8px; }
-.condition meter::-webkit-meter-optimum-value { background: #a9cf9b; }
-.condition meter::-webkit-meter-suboptimum-value { background: #f8b56a; }
-.condition meter::-webkit-meter-even-less-good-value { background: #ff7953; }
-.condition b { min-width: 29px; font-variant-numeric: tabular-nums; }
-.condition[data-level="damaged"] b { color: #ffc481; }
-.condition[data-level="critical"] b { color: #ff846e; }
+.race-instruments { display: flex; align-items: end; justify-self: end; gap: 13px; }
+.vehicle-console { width: clamp(190px, 20vw, 252px); display: grid; gap: 6px; padding: 8px 10px; pointer-events: auto;
+  border: 1px solid #93b2c451; border-radius: 6px; background: linear-gradient(135deg, #16212ae8, #0b1017e0);
+  box-shadow: 0 6px 25px #05060877; font: 650 .78rem/1.15 var(--display); color: #e2eef2; }
+.vehicle-console > header, .vehicle-console-foot { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.vehicle-console h2 { margin: 0; font: 740 .83rem/1 var(--display); letter-spacing: .045em; text-transform: uppercase; }
+.vehicle-console-main { display: grid; grid-template-columns: 61px 1fr; align-items: stretch; gap: 8px; }
+.car-schematic { width: 100%; height: 83px; }
+.car-schematic-frame { fill: #12191d; stroke: #b0d3e66b; stroke-width: 1; }
+.car-schematic-mark { fill: none; stroke: #c5e9f0ad; stroke-width: 1.4; pointer-events: none; }
+.vehicle-console [data-health="healthy"] { --state: #87d6ac; }
+.vehicle-console [data-health="warn"] { --state: #eed262; }
+.vehicle-console [data-health="damaged"] { --state: #ff9b58; }
+.vehicle-console [data-health="critical"] { --state: #ff5d58; }
+.vehicle-console [data-heat="cold"] { --temp: #7ebeff; }
+.vehicle-console [data-heat="optimal"] { --temp: #a4e9ad; }
+.vehicle-console [data-heat="warm"] { --temp: #ffc078; }
+.vehicle-console [data-heat="critical"] { --temp: #ff6960; }
+.car-schematic g { cursor: pointer; outline: 0; }
+.car-schematic g :is(rect, path) { fill: var(--state, #98b7ae); fill-opacity: .38; stroke: var(--state, #98b7ae); stroke-width: 1; }
+.car-schematic g:is(:hover, :focus-visible, [aria-pressed="true"]) :is(rect, path) { fill-opacity: .8; stroke: #edf9ff; stroke-width: 1.65; }
+.vehicle-readings { display: grid; gap: 4px; min-width: 0; }
+.engine-reading { display: grid; grid-template-columns: auto 1fr; align-items: center; column-gap: 5px; padding: 0 0 3px; border-bottom: 1px solid #9cb9c748; }
+.engine-reading b { justify-self: end; color: var(--temp, #e4edf3); }
+.engine-reading meter { grid-column: 1/-1; width: 100%; height: 4px; accent-color: var(--temp); }
+.wheel-readings { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 3px; }
+.wheel-reading { display: grid; grid-template-columns: auto 1fr; gap: 0 5px; align-content: center;
+  text-align: left; color: #ecf4f6; background: #ffffff06; border: 1px solid #abc9db35;
+  border-left-color: var(--state); border-radius: 3px; font: inherit; padding: 2px 4px; }
+.wheel-reading b { color: var(--state); }
+.wheel-reading [data-life] { text-align: right; }
+.wheel-reading [data-temp] { grid-column: 1/-1; color: var(--temp, #e4edf3); }
+.wheel-reading[aria-pressed="true"] { border-color: #d2eaf2; background: #b2d1e51c; }
+.vehicle-console-foot { min-height: 13px; border-top: 1px solid #97b8c744; padding-top: 4px; color: #c7d8df; }
+.vehicle-console-foot [data-detail] { text-align: right; }
+@media (prefers-reduced-motion: no-preference) {
+  .car-schematic [data-health="critical"], .engine-reading[data-heat="critical"] b { animation: telemetry-alert 1.05s ease-in-out infinite alternate; }
+  @keyframes telemetry-alert { to { opacity: .60; } }
+}
+@media (max-width: 1000px) {
+  .race-instruments { flex-direction: column; gap: 7px; }
+}
+@media (max-width: 560px) {
+  .vehicle-console { width: 170px; padding: 5px 6px; font-size: .69rem; }
+  .vehicle-console-main { grid-template-columns: 44px 1fr; gap: 5px; }
+  .car-schematic { height: 68px; }
+  .vehicle-console h2 { font-size: .73rem; }
+  .race-bottom { grid-template-columns: auto minmax(0, 1fr) auto; gap: 5px; }
+  .drive-help #drive-help { display: none; }
+}
 .hit-vignette { position: absolute; inset: 0; opacity: 0; pointer-events: none; box-shadow: inset 0 0 105px 12px #f34b25; }
 
 dialog { width: min(92vw, 460px); max-height: 89svh; color: var(--ink); background: #1a1c1b; border: 1px solid #e2c49b47; border-top: 3px solid var(--orange); border-radius: 8px; padding: clamp(20px, 4vw, 34px); }
@@ -420,7 +456,6 @@ button, input, output, select, meter { font-variant-numeric: tabular-nums; }
   .mark { width: 18px; height: 15px; }
   .entry { gap: 6px; grid-template-columns: 43px minmax(0, 1fr) auto; }
   .speed { min-width: 75px; }
-  .condition { gap: 3px; }
   .profile-top { gap: 7px; }
   .profile-top h1 { font-size: 28px; }
   .team-choices { grid-template-columns: 1fr; }

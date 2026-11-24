@@ -11,9 +11,10 @@ import { graphicsModes, qualityMode } from './graphics-settings.js';
 import { circuitMap, drawBriefingMap } from './circuit-map.js';
 import { legacyEvents } from './events.js';
 import { difficultyId, purseFor } from './difficulty.js';
-import { compoundBadge, compoundControls, compoundOptions, difficultyBadge, difficultyControls, payoutBreakdown } from './race-ui.js';
+import { compoundControls, compoundOptions, difficultyBadge, difficultyControls, payoutBreakdown } from './race-ui.js';
 import { integrity, vehicleCondition } from './vehicle-damage.js';
-import { recommendedCompound, tireHealth } from './tire-strategy.js';
+import { recommendedCompound } from './tire-strategy.js';
+import { createVehicleHud, vehicleHudMarkup } from './vehicle-hud.js';
 import './style.css';
 
 const app = document.querySelector('#app');
@@ -86,11 +87,9 @@ app.innerHTML = `
             <span id="tc-indicator" hidden>TC <small></small></span><span id="abs-indicator" hidden>ABS</span>
             <span id="lc-indicator" hidden>LC <small></small></span>
           </div></div>
-        <div class="speed">
-          <div class="tire-widget" id="tire-widget"><span id="race-compound"></span><b id="tire-life"></b>
-            <meter id="tire-meter" min="0" max="100" low="25" high="55" optimum="100" value="100" data-label="tireLife"></meter></div>
-          <strong id="speed"></strong><small data-text="kmh"></small><span><i id="speed-bar"></i></span>
-          <div class="condition"><small data-text="body"></small><meter id="body-condition" min="0" max="100" low="42" high="77" optimum="100" data-label="bodyCondition" value="100"></meter><b id="condition-percent">100%</b></div>
+        <div class="race-instruments">
+          ${vehicleHudMarkup()}
+          <div class="speed"><strong id="speed"></strong><small data-text="kmh"></small><span><i id="speed-bar"></i></span></div>
         </div>
       </div>
     </section>
@@ -103,6 +102,7 @@ const byId = id => document.getElementById(id);
 const circuit = byId('circuit');
 const overlay = byId('overlay');
 const map = byId('map');
+const updateVehicleStatus = createVehicleHud(app.querySelector('.vehicle-console'));
 const mapContext = map.getContext('2d');
 const garagePreview = byId('garage-preview');
 const updateWallet = createWallet(byId('wallet'), garageMoney);
@@ -423,27 +423,13 @@ function updateHud() {
   byId('position').textContent = race.position();
   byId('speed').textContent = speed;
   byId('speed-bar').style.width = Math.min(100, speed / 2.35) + '%';
-  const tyreLife = Math.round(tireHealth(player) * 100);
-  const compound = byId('race-compound');
-  const widget = byId('tire-widget');
-  if (compound.dataset.id !== player.compound || compound.lang !== getLanguage()) {
-    compound.dataset.id = player.compound;
-    compound.lang = getLanguage();
-    compound.innerHTML = compoundBadge(player.compound);
-  }
-  widget.dataset.worn = String(tyreLife < 23);
-  byId('tire-meter').value = tyreLife;
-  byId('tire-life').textContent = tyreLife + '%';
+  updateVehicleStatus(player);
   updatePitStatus(player);
   updateFlagBanner();
   const rpm = race.launchHold || player.actuation?.rpm || 0;
   setEcuIndicator('tc', race.electronics.traction, player.actuation?.tc, t('tc_' + race.tcMode));
   setEcuIndicator('abs', race.electronics.abs, player.actuation?.abs);
   setEcuIndicator('lc', race.electronics.launch, rpm, rpm ? `${rpm} RPM` : '');
-  const condition = integrity(player);
-  byId('body-condition').value = condition;
-  byId('condition-percent').textContent = condition + '%';
-  byId('body-condition').parentElement.dataset.level = condition < 40 ? 'critical' : condition < 70 ? 'damaged' : 'healthy';
   const impact = race.impact;
   const recent = impact && impact.impulse > 2.6 && race.elapsed - impact.time < 1.45;
   if (recent && lastHudHit !== impact) {
