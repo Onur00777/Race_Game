@@ -1,6 +1,7 @@
 import { velocity } from './contact.js';
 import { damagePerformance } from './vehicle-damage.js';
 import { regulateVehicle } from './ecu.js';
+import { enginePowerFactor } from './thermals.js';
 
 export const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 export const approach = (value, target, amount) => value + clamp(target - value, -amount, amount);
@@ -24,7 +25,7 @@ export function advanceVehicle(car, controls, handling, dt, canReverse = false) 
   const roadGrip = surfaceGrip * (car.tireGrip ?? 1);
   const effectiveBrake = braking * roadGrip * (1 - (car.tireSlip ?? 0) * 0.11);
   if (gas) {
-    const force = car.speed < 0 ? effectiveBrake : acceleration * condition.power * (1.0 + draft * 0.097) *
+    const force = car.speed < 0 ? effectiveBrake : acceleration * condition.power * enginePowerFactor(car) * (1.0 + draft * 0.097) *
       Math.max(0, 1 - Math.max(0, car.speed) / (maximum + 8));
     car.speed += gas * force * driveGrip * dt;
   } else if (brake) {

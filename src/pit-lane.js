@@ -72,7 +72,7 @@ export function createPitControl(race, plan) {
     const wetChange = race.wetness > 0.40 && car.compound !== 'rain';
     const drying = race.wetness < 0.20 && car.compound === 'rain';
     if (state.routeLap === null && lap > 0 && lapsLeft > 0 && lap - state.servicedLap >= 1 &&
-        local > lane.entry - 105 && local < lane.entry - 79 && (wetChange || drying || tireHealth(car) < 0.23)) {
+        local > lane.entry - 146 && local < lane.entry - 120 && (wetChange || drying || tireHealth(car) < 0.23)) {
       state.routeLap = lap;
       state.plan = { compound: recommendedCompound(race.wetness, lapsLeft), repair: car.damage > 39 };
     }
@@ -90,7 +90,7 @@ export function createPitControl(race, plan) {
     const target = track.at(car.station + look, targetOffset);
     const yaw = Math.atan2(target.x - car.x, target.z - car.z);
     const heading = angleBetween(car.yaw, yaw);
-    const deceleration = 1.7 + Math.min(1.3, (car.tireGrip ?? 1) * track.event.surfaceGrip);
+    const deceleration = 1.12 + Math.min(1.35, (car.tireGrip ?? 1) * track.event.surfaceGrip);
     const stop = stillNeedsBox ? Math.sqrt(Math.max(0, distance - 0.58) * 2 * deceleration) : pitSpeed;
     let pace = Math.min(pitSpeed, stop);
     for (const other of cars) {
@@ -121,7 +121,7 @@ export function createPitControl(race, plan) {
       if (!state.remaining) {
         const service = state.service;
         race.fitTires(car, service.compound);
-        if (service.repair) Object.assign(car, vehicleCondition());
+        if (service.repair) Object.assign(car, vehicleCondition(), { engineTemperature: Math.min(91, car.engineTemperature) });
         state.stops++;
         state.servicedLap = lapAt(car);
         state.service = null;

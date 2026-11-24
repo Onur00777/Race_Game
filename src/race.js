@@ -11,6 +11,7 @@ import { launchRPM, normalizeElectronics, tractionMode, tractionModes } from './
 import { applyTireGrip, fitTires, recommendedCompound, wearTires, weatherTarget } from './tire-strategy.js';
 import { buildPitLane, createPitControl } from './pit-lane.js';
 import { createRaceControl } from './race-control.js';
+import { restoreEngineTemperature, updateEngineTemperature } from './thermals.js';
 
 const wrap = (value, period) => ((value % period) + period) % period;
 export const raceStep = 1 / 120;
@@ -118,7 +119,10 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
   fitTires(player, setup?.compound);
   opponents.forEach((car, index) => fitTires(car, race.wetness >= 0.37 ? 'rain' :
     index === 0 ? recommendedCompound(race.wetness, track.event.laps) : index === 3 && track.event.laps > 3 ? 'hard' : 'medium'));
-  cars.forEach(car => applyTireGrip(car, race.wetness));
+  cars.forEach(car => {
+    applyTireGrip(car, race.wetness);
+    restoreEngineTemperature(car);
+  });
   const surfaceGrip = track.event.surfaceGrip;
   const electronics = normalizeElectronics(options.electronics);
   const playerHandling = { ...vehicleStats(team, upgrades, { ...setup, compound: 'medium' }),
@@ -195,6 +199,7 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
     updateTires(car, controls, handling, projection, track.event.width / 2, dt,
       (station, offset) => track.pit.contains(station, offset));
     wearTires(car, race.wetness, dt);
+    updateEngineTemperature(car, controls.draft ?? 0, race.wetness, dt);
     const delta = relativeStation(projection.station, car.station);
     const previous = car.station;
     // Reject projection jumps between different sections of a hairpin.

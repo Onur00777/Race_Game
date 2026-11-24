@@ -5,6 +5,7 @@ import { difficultyId } from './difficulty.js';
 import { vehicleCondition } from './vehicle-damage.js';
 import { applyTireGrip, fitTires } from './tire-strategy.js';
 import { normalizePitPlan, restorePitCar } from './pit-lane.js';
+import { restoreEngineTemperature } from './thermals.js';
 
 const carFields = ['x', 'z', 'yaw', 'speed', 'lateral', 'spin', 'steer', 'station',
   'damage', 'frontDamage', 'rearDamage'];
@@ -31,7 +32,7 @@ export function raceCheckpoint(career, race, loadout, alternateCamera) {
     cars: race.cars.map((car, index) => ({
       ...Object.fromEntries(carFields.map(key => [key, car[key]])),
       leftDamage: car.leftDamage, rightDamage: car.rightDamage,
-      compound: car.compound, tireLife: car.tireLife, tireTemperature: car.tireTemperature,
+      compound: car.compound, tireLife: car.tireLife, tireTemperatures: car.tireTemperatures, engineTemperature: car.engineTemperature,
       pit: car.pit,
       timePenalty: car.timePenalty,
       recovered: car.recovered,
@@ -80,7 +81,8 @@ export function restoreRace(career, track) {
     if (!state || car.id !== state.id || !carFields.every(key => Number.isFinite(state[key]))) return null;
     for (const key of carFields) car[key] = state[key];
     Object.assign(car, vehicleCondition(state));
-    fitTires(car, state.compound ?? car.compound, state.tireLife, state.tireTemperature);
+    fitTires(car, state.compound ?? car.compound, state.tireLife, state.tireTemperatures ?? state.tireTemperature);
+    restoreEngineTemperature(car, state.engineTemperature);
     restorePitCar(car, state.pit);
     car.timePenalty = Number.isFinite(state.timePenalty) ? Math.max(0, Math.min(240, state.timePenalty)) : 0;
     car.recovered = state.recovered === true && car.damage >= 100;
