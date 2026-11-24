@@ -1,4 +1,5 @@
 import { wheelMounts } from './tires.js';
+import { wheelGripFactor } from './wheel-damage.js';
 
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 
@@ -41,7 +42,8 @@ export function applyTireGrip(car, wetness) {
     const thermalGrip = 1 - Math.min(0.049, Math.max(0, cold - temp) * 0.0015) -
       Math.min(0.12, Math.max(0, temp - hot) * 0.0031);
     const heat = clamp((temp - 55) / 92, 0, 1);
-    wheel.grip = (1 + spec.grip / 11) * tireGripFactor(spec, car.tireLife[index], wetness, heat) * thermalGrip;
+    wheel.grip = (1 + spec.grip / 11) * tireGripFactor(spec, car.tireLife[index], wetness, heat) *
+      thermalGrip * wheelGripFactor(car.corners?.[index]);
     grip += wheel.grip;
   }
   car.tireGrip = grip / 4;

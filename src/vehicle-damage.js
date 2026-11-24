@@ -1,4 +1,5 @@
 import { carLength, carWidth } from './contact.js';
+import { normalizeCorners } from './wheel-damage.js';
 
 const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
 const portion = (value, maximum) => Number.isFinite(value) ? clamp(value, 0, maximum) : 0;
@@ -12,6 +13,7 @@ export function vehicleCondition(value) {
     hoodDamage: portion(value?.hoodDamage ?? (value?.frontDamage ?? 0) * 0.53, 1),
     splitterDamage: portion(value?.splitterDamage, 1),
     wingDamage: portion(value?.wingDamage, 1),
+    corners: normalizeCorners(value?.corners),
   };
 }
 

@@ -99,8 +99,9 @@ export function createPitControl(race, plan) {
     const lapsLeft = track.event.laps - lap;
     const wetChange = race.wetness > 0.40 && car.compound !== 'rain';
     const drying = race.wetness < 0.20 && car.compound === 'rain';
+    const flat = car.corners.some(corner => corner.punctured);
     if (state.routeLap === null && lap > 0 && lapsLeft > 0 && lap - state.servicedLap >= 1 &&
-        local > lane.entry - 107 && local < lane.entry - 79 && (wetChange || drying || tireHealth(car) < 0.23)) {
+        local > lane.entry - 107 && local < lane.entry - 79 && (wetChange || drying || flat || tireHealth(car) < 0.23)) {
       state.routeLap = lap;
       state.plan = { compound: recommendedCompound(race.wetness, lapsLeft), repair: car.damage > 39 };
     }

@@ -1,6 +1,6 @@
 import { CatmullRomCurve3, Vector3 } from 'three';
 import { rivals } from './career.js';
-import { railRunoff, resolveBarrierContact, resolvePitWallContact, resolveVehicleContact } from './contact.js';
+import { railRunoff, resolveBarrierContact, resolvePitWallContact, resolveVehicleContact, velocity } from './contact.js';
 import { vehicleStats } from './setup.js';
 import { difficultyId } from './difficulty.js';
 import { advanceVehicle, angleBetween, clamp } from './vehicle-physics.js';
@@ -12,6 +12,7 @@ import { applyTireGrip, fitTires, recommendedCompound, wearTires, weatherTarget 
 import { buildPitLane, createPitControl } from './pit-lane.js';
 import { createRaceControl } from './race-control.js';
 import { restoreEngineTemperature, updateEngineTemperature } from './thermals.js';
+import { cornerContact, inspectWheelImpact, puncture, suspensionEffects } from './wheel-damage.js';
 
 const wrap = (value, period) => ((value % period) + period) % period;
 export const raceStep = 1 / 120;
@@ -118,6 +119,7 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
   race.dynamicWeather = options.dynamicWeather !== false;
   race.wetness = Number.isFinite(options.wetness) ? clamp(options.wetness, 0, 1) : weatherTarget(track.event, 0);
   fitTires(player, setup?.compound);
+  for (const corner of player.corners) if (!corner.detached) corner.punctured = false;
   opponents.forEach((car, index) => fitTires(car, race.wetness >= 0.37 ? 'rain' :
     index === 0 ? recommendedCompound(race.wetness, track.event.laps) : index === 3 && track.event.laps > 3 ? 'hard' : 'medium'));
   cars.forEach(car => {
@@ -136,12 +138,14 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
   };
   const { topSpeed, braking, grip, load } = playerHandling;
   let impactSerial = 0;
+  let wheelSerial = 0;
+  race.wheelEvents = [];
   let handlingUpdated = 0;
 
   function refreshHandling() {
     const performance = damagePerformance(player);
     const tyre = (player.tireGrip ?? 1) * surfaceGrip;
-    const next = { topSpeed: (topSpeed + (player.tireSpeedDelta ?? 0)) * performance.speed,
+    const next = { topSpeed: Math.min((topSpeed + (player.tireSpeedDelta ?? 0)) * performance.speed, suspensionEffects(player.corners).speedLimit),
       braking: braking * tyre, grip: (grip * performance.grip + load * 0.018 * performance.aero) * tyre };
     if (!race.handling || Object.keys(next).some(stat => Math.abs(next[stat] - race.handling[stat]) > 0.04)) race.handling = next;
     handlingUpdated = race.elapsed;
@@ -166,10 +170,26 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
     race.previousPoses[cars.indexOf(car)] = visualPose(car);
   }
 
+  function newPuncture(car, index, impact) {
+    const contact = cornerContact(car, index);
+    const motion = velocity(car);
+    race.wheelEvents.push({ ...contact, index, carId: car.id, type: 'puncture', serial: ++wheelSerial, color: car.color,
+      time: race.elapsed, vx: motion.x, vz: motion.z, normalSpeed: impact?.normalSpeed ?? Math.abs(car.speed) * 0.35 });
+    if (race.wheelEvents.length > 28) race.wheelEvents.shift();
+    if (car === player) {
+      applyTireGrip(player, race.wetness);
+      refreshHandling();
+    }
+  }
+
   function reportImpact(impact, first, second) {
     if (!impact) return;
     const primary = applyImpact(first, impact, false, Boolean(second));
     const secondary = second && applyImpact(second, impact, true, true);
+    const firstWheel = inspectWheelImpact(first, impact, Boolean(second));
+    const secondWheel = second && inspectWheelImpact(second, impact, true);
+    if (firstWheel?.flat) newPuncture(first, firstWheel.index, impact);
+    if (secondWheel?.flat) newPuncture(second, secondWheel.index, impact);
     const own = first === player ? primary : second === player ? secondary : null;
     if (own) refreshHandling();
     if (impact.impulse < 1.15) return;
@@ -205,6 +225,9 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
     updateTires(car, controls, handling, projection, track.event.width / 2, dt,
       (station, offset) => track.pit.contains(station, offset));
     wearTires(car, race.wetness, dt);
+    for (let index = 0; index < car.tireLife.length; index++) {
+      if (car.tireLife[index] === 0 && puncture(car, index)) newPuncture(car, index);
+    }
     updateEngineTemperature(car, controls.draft ?? 0, race.wetness, dt);
     const delta = relativeStation(projection.station, car.station);
     const previous = car.station;
@@ -308,6 +331,7 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
   race.refreshHandling = refreshHandling;
   race.fitTires = (car, compound) => {
     fitTires(car, compound);
+    for (const corner of car.corners) if (!corner.detached) corner.punctured = false;
     applyTireGrip(car, race.wetness);
     if (car === player) refreshHandling();
   };

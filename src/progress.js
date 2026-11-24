@@ -34,6 +34,7 @@ export function raceCheckpoint(career, race, loadout, alternateCamera) {
       ...Object.fromEntries(carFields.map(key => [key, car[key]])),
       leftDamage: car.leftDamage, rightDamage: car.rightDamage,
       hoodDamage: car.hoodDamage, splitterDamage: car.splitterDamage, wingDamage: car.wingDamage,
+      corners: car.corners,
       compound: car.compound, tireLife: car.tireLife, tireTemperatures: car.tireTemperatures, engineTemperature: car.engineTemperature,
       pit: car.pit,
       timePenalty: car.timePenalty,

@@ -2,6 +2,7 @@ import { velocity } from './contact.js';
 import { damagePerformance } from './vehicle-damage.js';
 import { regulateVehicle } from './ecu.js';
 import { enginePowerFactor } from './thermals.js';
+import { suspensionEffects } from './wheel-damage.js';
 
 export const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 export const approach = (value, target, amount) => value + clamp(target - value, -amount, amount);
@@ -20,8 +21,10 @@ export function advanceVehicle(car, controls, handling, dt, canReverse = false) 
   const draft = controls.draft ?? 0;
   const { topSpeed, acceleration, braking, surfaceGrip, grip, turn, brakeStability, load } = handling;
   const condition = damagePerformance(car);
+  const suspension = suspensionEffects(car.corners);
   const capped = Number.isFinite(controls.speedLimit);
-  const maximum = Math.min((topSpeed + (car.tireSpeedDelta ?? 0)) * condition.speed + draft * 2.4, controls.speedLimit ?? Infinity);
+  const maximum = Math.min((topSpeed + (car.tireSpeedDelta ?? 0)) * condition.speed + draft * 2.4,
+    suspension.speedLimit, controls.speedLimit ?? Infinity);
   const roadGrip = surfaceGrip * (car.tireGrip ?? 1);
   const effectiveBrake = braking * roadGrip * (1 - (car.tireSlip ?? 0) * 0.11);
   if (gas) {
@@ -42,7 +45,8 @@ export function advanceVehicle(car, controls, handling, dt, canReverse = false) 
   const frontLock = (actuation.locks[1] + actuation.locks[3]) * 0.5;
   const steerRate = car.steer * turn * Math.min(speed / 5, 1) * (2.15 / (1 + speed * 0.027)) * (1 - frontLock * 0.41);
   const rotation = -steerRate * Math.sign(car.speed) * dt;
-  car.yawRate = rotation * (handbrake ? 1.25 : 1) / dt + car.spin + vector - condition.pull * clamp(speed / 27, 0, 1);
+  car.yawRate = rotation * (handbrake ? 1.25 : 1) / dt + car.spin + vector -
+    condition.pull * clamp(speed / 27, 0, 1) + suspension.pull * clamp(speed / 16, 0, 1);
   car.yaw += car.yawRate * dt;
   car.spin *= Math.exp(-(car.onRoad ? 4.3 : 2.65) * dt);
   car.lateral -= car.speed * Math.sin(rotation) * (handbrake ? 1.08 : 0.52);
