@@ -4,7 +4,7 @@ import { legacyEvents } from './events.js';
 import { difficultyId } from './difficulty.js';
 import { vehicleCondition } from './vehicle-damage.js';
 import { applyTireGrip, fitTires } from './tire-strategy.js';
-import { restorePitCar } from './pit-lane.js';
+import { normalizePitPlan, restorePitCar } from './pit-lane.js';
 
 const carFields = ['x', 'z', 'yaw', 'speed', 'lateral', 'spin', 'steer', 'station',
   'damage', 'frontDamage', 'rearDamage'];
@@ -21,6 +21,9 @@ export function raceCheckpoint(career, race, loadout, alternateCamera) {
     tcMode: race.tcMode,
     weather: { wetness: race.wetness, dynamic: race.dynamicWeather },
     pitPlan: race.pit.plan,
+    raceControl: race.control,
+    redPlan: race.redPlan,
+    restartLaunchUntil: race.restartLaunchUntil,
     loadout,
     alternateCamera,
     elapsed: race.elapsed,
@@ -30,9 +33,11 @@ export function raceCheckpoint(career, race, loadout, alternateCamera) {
       leftDamage: car.leftDamage, rightDamage: car.rightDamage,
       compound: car.compound, tireLife: car.tireLife, tireTemperature: car.tireTemperature,
       pit: car.pit,
+      timePenalty: car.timePenalty,
+      recovered: car.recovered,
       id: car.id, offset: car.offset, onRoad: car.onRoad,
       ...(index === 0
-        ? { lap: car.lap, lapStarted: car.lapStarted, bestLap: car.bestLap }
+        ? { lap: car.lap, lapStarted: car.lapStarted, bestLap: car.bestLap, invalidatedLap: car.invalidatedLap, finishTime: car.finishTime }
         : { aiOffset: car.aiOffset, stuck: car.stuck, finishTime: car.finishTime }),
     })),
   };
@@ -64,7 +69,8 @@ export function restoreRace(career, track) {
   const race = createRace(track, teamById(loadout.team), loadout.upgrades, loadout.setup, loadout.appearance,
     { difficulty: eventDifficulty(career), runId: typeof save.runId === 'string' ? save.runId : undefined,
       electronics: loadout.electronics, tcMode: save.tcMode,
-      wetness: save.weather?.wetness, dynamicWeather: save.weather ? save.weather.dynamic !== false : false, pitPlan: save.pitPlan });
+      wetness: save.weather?.wetness, dynamicWeather: save.weather ? save.weather.dynamic !== false : false,
+      pitPlan: save.pitPlan, raceControl: save.raceControl });
   if (!Number.isFinite(save.elapsed) || save.elapsed < 0 ||
       !Number.isFinite(save.countdown) || save.countdown < 0 || save.countdown > 3 ||
       !Array.isArray(save.cars) || save.cars.length !== race.cars.length) return null;
@@ -76,14 +82,19 @@ export function restoreRace(career, track) {
     Object.assign(car, vehicleCondition(state));
     fitTires(car, state.compound ?? car.compound, state.tireLife, state.tireTemperature);
     restorePitCar(car, state.pit);
+    car.timePenalty = Number.isFinite(state.timePenalty) ? Math.max(0, Math.min(240, state.timePenalty)) : 0;
+    car.recovered = state.recovered === true && car.damage >= 100;
     applyTireGrip(car, race.wetness);
     const projection = track.project(car.x, car.z);
     car.offset = Number.isFinite(state.offset) ? state.offset : projection.offset;
     car.onRoad = typeof state.onRoad === 'boolean' ? state.onRoad : projection.distance <= event.width / 2 + 0.6;
     if (i === 0) {
-      if (!Number.isInteger(state.lap) || state.lap < 0 || state.lap >= track.event.laps ||
+      const finished = Number.isFinite(state.finishTime) && state.finishTime <= save.elapsed;
+      if (!Number.isInteger(state.lap) || state.lap < 0 || state.lap > track.event.laps || (state.lap === track.event.laps && !finished) ||
           !Number.isFinite(state.lapStarted) || !(state.bestLap === null || Number.isFinite(state.bestLap))) return null;
-      Object.assign(car, { lap: state.lap, lapStarted: state.lapStarted, bestLap: state.bestLap });
+      Object.assign(car, { lap: state.lap, lapStarted: state.lapStarted, bestLap: state.bestLap,
+        invalidatedLap: Number.isInteger(state.invalidatedLap) ? state.invalidatedLap : undefined });
+      if (finished) car.finishTime = state.finishTime;
     } else {
       if (!Number.isFinite(state.offset) || !(state.finishTime === null || Number.isFinite(state.finishTime))) return null;
       Object.assign(car, { aiOffset: Number.isFinite(state.aiOffset) ? state.aiOffset : car.offset,
@@ -93,6 +104,8 @@ export function restoreRace(career, track) {
   }
   race.elapsed = save.elapsed;
   race.countdown = save.countdown;
+  if (save.redPlan) race.redPlan = normalizePitPlan(save.redPlan, race.player.compound);
+  if (Number.isFinite(save.restartLaunchUntil)) race.restartLaunchUntil = Math.max(0, Math.min(race.elapsed + 3.6, save.restartLaunchUntil));
   race.refreshHandling();
   return { race, loadout, alternateCamera: save.alternateCamera === true };
 }

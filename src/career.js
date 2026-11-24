@@ -161,7 +161,8 @@ export function finishEvent(career, order, time, bestLap, loadout = normalizeLoa
   const repayment = Math.min(positiveMoney(career.repairDebt), racePrize + bonus);
   const prize = racePrize + bonus - repayment;
   const result = { place, points, prize, bonus, basePrize, teamPrize, racePrize, difficulty, multiplier,
-    time, bestLap, order, classificationPoints, laps: event?.laps, retired, retiredDrivers, repayment, condition };
+    time, bestLap, order, classificationPoints, laps: event?.laps, retired, retiredDrivers, repayment, condition,
+    timePenalty: Math.max(0, options.timePenalty ?? 0) };
   return {
     ...career,
     cash: career.cash + prize,

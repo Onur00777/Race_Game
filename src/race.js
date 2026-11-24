@@ -10,6 +10,7 @@ import { applyImpact, damagePerformance, vehicleCondition } from './vehicle-dama
 import { launchRPM, normalizeElectronics, tractionMode, tractionModes } from './ecu.js';
 import { applyTireGrip, fitTires, recommendedCompound, wearTires, weatherTarget } from './tire-strategy.js';
 import { buildPitLane, createPitControl } from './pit-lane.js';
+import { createRaceControl } from './race-control.js';
 
 const wrap = (value, period) => ((value % period) + period) % period;
 export const raceStep = 1 / 120;
@@ -149,6 +150,8 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
   const raceIntel = createRaceIntel(track, race.difficulty, opponents, relativeStation);
   const pitControl = createPitControl(race, options.pitPlan);
   race.pit = pitControl.pit;
+  const raceControl = createRaceControl(race, options.raceControl);
+  race.control = raceControl.state;
 
   function rejoin(car) {
     const nearby = cars.filter(other => other !== car && Math.abs(relativeStation(other.station, car.station)) < 5.5);
@@ -166,6 +169,7 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
     if (own) refreshHandling();
     if (impact.impulse < 1.15) return;
     const event = { ...impact, kind: second ? 'vehicle' : 'rail', time: race.elapsed, serial: ++impactSerial };
+    raceControl.report(event, first, second);
     if (impact.normalSpeed > 5.4 && impact.impulse > 2.7) {
       race.impacts.push(event);
       if (race.impacts.length > 32) race.impacts.shift();
@@ -210,7 +214,7 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
   function updateLap(previous) {
     const lap = Math.floor(player.station / track.length);
     if (lap < player.lap || player.station < 0 || (previous >= 0 && lap <= player.lap)) return;
-    if (lap > player.lap) {
+    if (lap > player.lap && player.invalidatedLap !== player.lap) {
       const lapTime = (player.finishTime ?? race.elapsed) - player.lapStarted;
       player.bestLap = Math.min(player.bestLap ?? Infinity, lapTime);
     }
@@ -223,13 +227,14 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
     race.retiredDrivers = cars.filter(car => car.damage >= 100 && car.finishTime == null).map(car => car.id);
     if (retired && !race.retiredDrivers.includes(player.id)) race.retiredDrivers.push(player.id);
     const stopped = new Set(race.retiredDrivers);
+    const resultTime = car => (car.finishTime ?? Infinity) + (car.timePenalty ?? 0);
     race.order = [...cars].sort((a, b) => Number(stopped.has(a.id)) - Number(stopped.has(b.id)) ||
-      (a.finishTime ?? Infinity) - (b.finishTime ?? Infinity) || b.station - a.station).map(car => car.id);
+      resultTime(a) - resultTime(b) || b.station - a.station).map(car => car.id);
   }
 
   function update(dt, input) {
-    if (race.order) return;
-    if (player.damage >= 100) {
+    if (race.order || race.control.flag === 'red') return;
+    if (player.damage >= 100 && player.finishTime == null) {
       classify(true);
       return;
     }
@@ -252,15 +257,15 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
       race.backfire = { time: race.elapsed, intensity: 0.58 + upgrades.engine * 0.18 };
     }
     race.throttle = throttle;
-    const active = cars.filter(car => car.finishTime == null || car.speed > 1);
+    const active = cars.filter(car => car.finishTime == null || (car !== player && car.speed > 1));
     active.forEach(car => applyTireGrip(car, race.wetness));
     if (race.elapsed - handlingUpdated > 0.9) refreshHandling();
     race.launchHold = 0;
-    const controls = active.map(car => car === player ? { ...input, launch: race.elapsed < 3.6, tcMode: race.tcMode,
+    const controls = active.map(car => car === player ? { ...input, launch: race.elapsed < (race.restartLaunchUntil ?? 3.6), tcMode: race.tcMode,
       draft: wakeFactor(track, player, cars, relativeStation) } :
       car.damage >= 100 ? { gas: 0, brake: 0.34, steering: 0 } : raceIntel.controls(car, cars, race.elapsed, dt));
     active.forEach((car, index) => {
-      controls[index] = pitControl.controlsFor(car, controls[index]);
+      controls[index] = raceControl.limit(car, pitControl.controlsFor(car, controls[index]));
       advanceVehicle(car, controls[index], car === player ? playerHandling : raceIntel.handling, dt, car === player);
     });
     for (let i = 0; i < active.length; i++) {
@@ -271,15 +276,23 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
       }
     }
     active.forEach((car, index) => trackProgress(car, controls[index], car === player ? playerHandling : raceIntel.handling, dt));
-    if (player.damage >= 100) {
+    if (player.damage >= 100 && player.finishTime == null) {
       classify(true);
     } else if (player.finishTime != null) {
-      race.elapsed = player.finishTime;
-      classify();
-    }
+      const corrected = player.finishTime + (player.timePenalty ?? 0);
+      if (race.elapsed >= corrected || opponents.every(car => car.finishTime != null || car.damage >= 100)) {
+        race.elapsed = corrected;
+        classify();
+      }
+    } else raceControl.update(dt);
   }
 
   race.reset = () => rejoin(player);
+  race.restartAfterRed = plan => {
+    if (!raceControl.restart(plan)) return false;
+    race.previousPoses = cars.map(visualPose);
+    return true;
+  };
   race.retire = () => { if (!race.order) classify(true); };
   race.refreshHandling = refreshHandling;
   race.fitTires = (car, compound) => {
