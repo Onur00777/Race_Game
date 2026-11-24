@@ -263,6 +263,12 @@ dialog p { margin: 12px 0; color: #d7c9bb; }
 .studio-controls button { border: 1px solid #ffffff26; background: #ffffff08; border-radius: 4px; padding: 5px 9px; font-size: .75rem; font-weight: 650; }
 .studio-controls button:hover { border-color: var(--orange); }
 .studio-controls p { margin: 0; font-size: .72rem; color: #c3b8ac; text-align: center; }
+.showroom-expanded { overflow: hidden; }
+.showroom-expanded .garage-stage { position: fixed; inset: 0; z-index: 12; border: 0; border-radius: 0; }
+.showroom-expanded .garage-preview { height: 100%; }
+.showroom-expanded .studio-controls { position: absolute; right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); left: 12px;
+  border: 1px solid #b8c5d65c; border-radius: 6px; background: #111921e8; }
+.showroom-expanded :is(#topbar, .garage-heading, .workbench, .garage-stats) { visibility: hidden; }
 .garage-stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .garage-stats > div { display: grid; gap: 3px; padding: 12px 14px; min-width: 0; }
 .garage-stats > div + div { border-left: 1px solid var(--line); }

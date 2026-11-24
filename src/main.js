@@ -53,7 +53,8 @@ app.innerHTML = `
           <div class="studio-controls">
             <div><button type="button" data-view="front" data-text="front"></button><button type="button" data-view="side" data-text="side"></button><button type="button" data-view="rear" data-text="rear"></button></div>
             <p data-text="orbitHelp"></p>
-            <div><button type="button" data-zoom="-1" data-label="zoomOut">−</button><button type="button" data-zoom="1" data-label="zoomIn">+</button></div>
+            <div><button type="button" data-zoom="-1" data-label="zoomOut">−</button><button type="button" data-zoom="1" data-label="zoomIn">+</button>
+              <button type="button" id="showroom-toggle" data-action="showroom" data-text="showroomExpand" aria-pressed="false"></button></div>
           </div>
           <div id="garage-stats" class="garage-stats"></div>
         </section>
@@ -256,6 +257,7 @@ function showMenu(next = career.screen) {
     persist();
   }
   document.body.classList.remove('driving');
+  setShowroom(false);
   document.body.classList.toggle('in-garage', screen === 'garage');
   document.body.classList.toggle('onboarding', screen === 'profile' && !career.profile);
   byId('menu').hidden = screen !== 'calendar' && screen !== 'teams';
@@ -654,6 +656,13 @@ function aimGarage(location) {
   orbit.elevation = location === 'front' ? 0.43 : location === 'side' || location === 'right' ? 0.23 : 0.32;
 }
 
+function setShowroom(open) {
+  document.body.classList.toggle('showroom-expanded', open);
+  const button = byId('showroom-toggle');
+  button.setAttribute('aria-pressed', String(open));
+  button.textContent = t(open ? 'showroomClose' : 'showroomExpand');
+}
+
 function tune(key, value) {
   career = { ...career, setup: normalizeSetup({ ...career.setup, [key]: value }, career.upgrades.aero) };
   pendingTuning = true;
@@ -715,6 +724,7 @@ app.addEventListener('click', event => {
   if (dataset.view) aimGarage(dataset.view);
   if (dataset.zoom) orbit.zoom = Math.max(0.72, Math.min(1.42, orbit.zoom + Number(dataset.zoom) * 0.12));
   switch (dataset.action) {
+    case 'showroom': setShowroom(!document.body.classList.contains('showroom-expanded')); break;
     case 'race': startRace(); break;
     case 'pause': pauseRace(); break;
     case 'pit-menu': if (mode === 'race' && !paused) setPitMenu(byId('pit-menu').hidden); break;
@@ -903,6 +913,12 @@ garagePreview.addEventListener('wheel', event => {
 }, { passive: false });
 
 window.addEventListener('keydown', event => {
+  if (event.code === 'Escape' && document.body.classList.contains('showroom-expanded')) {
+    event.preventDefault();
+    setShowroom(false);
+    byId('showroom-toggle').focus({ preventScroll: true });
+    return;
+  }
   if (mode === 'race' && !paused && event.code === 'KeyP' && !event.target.closest?.('select,input,textarea')) {
     event.preventDefault();
     if (!event.repeat) setPitMenu(byId('pit-menu').hidden);

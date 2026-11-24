@@ -168,6 +168,8 @@ const messages = {
   repairDebt: ['Kalan servis borcu {0}', 'Outstanding repair balance {0}'],
   repairRepayment: ['Servis borcu ödemesi', 'Repair balance repayment'],
   ecuTab: ['Elektronik', 'Electronics'],
+  showroomExpand: ['Geniş görünüm', 'Expand showroom'],
+  showroomClose: ['Görünümü kapat', 'Exit showroom'],
   launchControl: ['Kalkış kontrolü', 'Launch control'],
   launchDetail: ['Kalkışta motor devrini tutar ve tahrik tekerlerinin patinajını yönetir.', 'Holds launch RPM and manages driven-wheel slip from the grid.'],
   tractionControl: ['Çekiş kontrolü', 'Traction control'],
