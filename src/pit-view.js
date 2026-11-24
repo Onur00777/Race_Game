@@ -59,8 +59,8 @@ export function addPitView(scene, track, assets, label) {
   for (let s = lane.entry; s < lane.exit - 2.1; s += 4.9) scene.add(ribbon(track, s, s + 2.10, inside, 0.10, 0.021, white));
   for (const stall of [lane.box - 12, lane.box - 6, lane.box, lane.box + 6, lane.box + 12]) {
     const material = stall === lane.box ? boxColor : white;
-    for (const shift of [-1.08, 1.08]) scene.add(ribbon(track, stall - 2.6, stall + 2.6, () => lane.center + shift, 0.082, 0.024, material));
-    for (const tip of [-2.6, 2.6]) scene.add(ribbon(track, stall + tip, stall + tip + 0.09, () => lane.center, 2.22, 0.024, material));
+    for (const shift of [-1.08, 1.08]) scene.add(ribbon(track, stall - 2.6, stall + 2.6, () => lane.stallCenter + shift, 0.082, 0.024, material));
+    for (const tip of [-2.6, 2.6]) scene.add(ribbon(track, stall + tip, stall + tip + 0.09, () => lane.stallCenter, 2.22, 0.024, material));
   }
   const rail = lane.side * (track.railOffset - 0.25);
   pitSign(scene, track, lane.laneStart - 2, rail, label('pitEntry') + ' · 80', '#66e0ee');

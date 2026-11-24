@@ -48,3 +48,19 @@ test('the Summit pack calls at least one pit stop per car when rain arrives', ()
     assert.ok(Number.isFinite(car.finishTime), car.id);
   }
 });
+
+test('Legend rivals complete the long wet-to-dry stint without getting stuck in the pit lane', () => {
+  const track = createTrack(events.find(event => event.id === 'strait'));
+  assert.equal(track.event.laps, 15);
+  const race = createRace(track, currentTeam(career), career.upgrades, career.setup, undefined, { difficulty: 'legend' });
+  const outside = track.pit.side * (track.railOffset - 1.34);
+  Object.assign(race.player, track.at(125, outside), { station: 125, offset: outside, onRoad: false });
+  for (let step = 0; step < 560 / raceStep && race.opponents.some(car => car.finishTime == null); step++) {
+    race.update(raceStep, { gas: 0, brake: 0, steering: 0 });
+  }
+  assert.equal(race.control.flag, 'green');
+  for (const car of race.opponents) {
+    assert.ok(car.pit.stops >= 2, car.id);
+    assert.ok(Number.isFinite(car.finishTime) && !car.rejoins, car.id);
+  }
+});

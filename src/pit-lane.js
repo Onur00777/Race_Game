@@ -10,6 +10,8 @@ export function buildPitLane(track) {
   const side = track.event.pitSide ?? -1;
   const edge = track.event.width / 2;
   const center = side * (edge + 2.38);
+  const stallCenter = side * (edge + 3.38);
+  const fastCenter = side * (edge + 1.12);
   const halfWidth = 1.94;
   const wrap = station => ((station - entry + track.length * 0.5) % track.length + track.length) % track.length -
     track.length * 0.5 + entry;
@@ -21,7 +23,7 @@ export function buildPitLane(track) {
     const local = wrap(station);
     return local > entry && local < exit && side * offset > edge + 0.12 && Math.abs(offset - offsetAt(local)) < halfWidth + 0.18;
   };
-  return { entry, laneStart, box, laneEnd, exit, side, center, halfWidth, edge, wrap, offsetAt, contains };
+  return { entry, laneStart, box, laneEnd, exit, side, center, stallCenter, fastCenter, halfWidth, edge, wrap, offsetAt, contains };
 }
 
 const stateFor = car => ({
@@ -70,21 +72,36 @@ export function createPitControl(race, plan) {
     const wetChange = race.wetness > 0.40 && car.compound !== 'rain';
     const drying = race.wetness < 0.20 && car.compound === 'rain';
     if (state.routeLap === null && lap > 0 && lapsLeft > 0 && lap - state.servicedLap >= 1 &&
-        local > lane.entry - 26 && local < lane.entry - 10 && (wetChange || drying || tireHealth(car) < 0.23)) {
+        local > lane.entry - 105 && local < lane.entry - 79 && (wetChange || drying || tireHealth(car) < 0.23)) {
       state.routeLap = lap;
       state.plan = { compound: recommendedCompound(race.wetness, lapsLeft), repair: car.damage > 39 };
     }
     if (state.routeLap !== lap) return controls;
     const distance = boxFor(car) - local;
-    const stillNeedsBox = state.servicedLap !== lap && distance > -2.7;
+    const outsideStall = Math.abs(car.offset - lane.stallCenter) > 1.2;
+    if (distance < -2.7 || (distance < 0.73 && outsideStall)) state.plan = null;
+    const stillNeedsBox = Boolean(state.plan) && state.servicedLap !== lap;
     const look = Math.min(stillNeedsBox ? Math.max(2, distance + 1) : 13, 4 + Math.max(0, car.speed) * 0.40);
-    const target = track.at(car.station + look, lane.offsetAt(local + look));
+    const ahead = local + look;
+    const baseOffset = lane.offsetAt(ahead);
+    const laneBlend = smooth((ahead - lane.entry) / 21) * smooth((lane.exit - ahead) / 23);
+    const moveToStall = stillNeedsBox ? smooth((19 - distance + look) / 15) : 0;
+    const targetOffset = baseOffset + (lane.fastCenter - lane.center + (lane.stallCenter - lane.fastCenter) * moveToStall) * laneBlend;
+    const target = track.at(car.station + look, targetOffset);
     const yaw = Math.atan2(target.x - car.x, target.z - car.z);
     const heading = angleBetween(car.yaw, yaw);
-    const stop = stillNeedsBox ? Math.sqrt(Math.max(0, distance - 0.62) * 2 * 5.7) : pitSpeed;
-    const pace = Math.min(pitSpeed, stop);
-    return { ...controls, steering: -clamp(heading * 4.25, -1, 1),
-      gas: clamp((pace - car.speed) * 0.37, 0, 1), brake: clamp((car.speed - pace + 0.02) * 0.40, 0, 1), draft: 0 };
+    const deceleration = 1.7 + Math.min(1.3, (car.tireGrip ?? 1) * track.event.surfaceGrip);
+    const stop = stillNeedsBox ? Math.sqrt(Math.max(0, distance - 0.58) * 2 * deceleration) : pitSpeed;
+    let pace = Math.min(pitSpeed, stop);
+    for (const other of cars) {
+      if (other === car || (!other.pit.lane && other.pit.routeLap !== lap)) continue;
+      const gap = other.station - car.station;
+      if (gap <= 0 || gap > 28 || Math.abs(other.offset - car.offset) > 2.04) continue;
+      pace = Math.min(pace, Math.sqrt(Math.max(0, other.speed) ** 2 + 2 * deceleration * Math.max(0, gap - 5.1)));
+    }
+    const thresholdBrake = clamp((car.tireGrip ?? 1) * track.event.surfaceGrip * 0.80, 0.26, 0.81);
+    return { ...controls, steering: local < lane.entry - 30 ? controls.steering : -clamp(heading * 4.25, -1, 1),
+      gas: clamp((pace - car.speed) * 0.37, 0, 1), brake: clamp((car.speed - pace) * 0.78, 0, thresholdBrake), draft: 0 };
   }
 
   function controlsFor(car, controls) {
@@ -114,7 +131,7 @@ export function createPitControl(race, plan) {
     }
     if (car.damage >= 100 || car.finishTime != null || !state.lane ||
         state.servicedLap === lapAt(car) || Math.hypot(car.speed, car.lateral) > 0.82 ||
-        Math.abs(local - boxFor(car)) > 2.9 || Math.abs(projection.offset - lane.center) > 1.19) return;
+        Math.abs(local - boxFor(car)) > 2.9 || Math.abs(projection.offset - lane.stallCenter) > 1.20) return;
     if (car !== player && !state.plan) return;
     state.service = { ...(car === player ? pit.plan : state.plan) };
     state.duration = 2.25 + (state.service.repair ? car.damage * 0.046 : 0);
