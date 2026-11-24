@@ -44,6 +44,10 @@ Yeni sezonda takvim ve puanlar sıfırlanır. Kazanç, takım erişimi ve yükse
 
 Aracı sürükleyerek çevir, kaydırarak yakınlaştır veya ön, yan ve arka görünüm düğmelerini kullan. Yarıda kaydedilmiş bir yarış, başladığı takım ve araç ayarlarıyla devam eder. Garaj değişiklikleri sonraki yarışta uygulanır.
 
+Garajın görüntü kalitesi menüsünde Ultra, donanım ve ekran oranı elverdiğinde 4K’ya kadar çıkar. Stüdyo, otomobil boyasında yumuşak kutu ışıklarının HDR yansımalarını kullanır.
+
+Özel gövde için self-contained bir `.glb` dosyasını `public/models/` dizinine koy ve aynı dizindeki `car.json` dosyasının `model` alanına dosya adını yaz. Gövdeyi `Body` düğümünde grupla. Model metre cinsinden, araç önü +Z, yukarısı +Y ve zemin Y=0 olacak şekilde ortalanmalı. Referans genişlik 1,98 m, uzunluk 4,28 m. Teker merkezleri X=±0,828 m, Y=0,365 m ve Z=−1,29/+1,34 m. İsteğe bağlı `Cabin` kendi malzemeleriyle gelir. `WingMount`, `FrontMount` ve `RearMount` düğümleri uç konumları hizalar. Teker, fren, kanat, hasar ve çıkartmalar oyun tarafından uygulanır. Geçersiz modelde yerleşik gövde yüklenir.
+
 Parça kartının üzerine gelerek veya klavyeyle odaklanarak sonraki seviyeyi önizle. Yeşil çubuk iyileşmeyi, turuncu çubuk kaybı gösterir. Yükseltmeler kanat ve difüzör, lastik ve diskler veya egzoz üzerinde görünür. Ses açıkken yükseltilmiş motorun tonu değişir. Yeterli hızda gazı bırakmak egzoz patlamasını tetikler.
 
 ## Yarış takvimi
