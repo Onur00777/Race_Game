@@ -62,7 +62,7 @@ Yarışa başlamadan önce **Kolay (1,00×)**, **Orta (1,25×)**, **Zor (1,60×)
 ## Lastik stratejisi ve yarış kontrolü
 
 - Takvimde kırmızı **Yumuşak**, sarı **Orta**, beyaz **Sert** ve mavi **Yağmur** lastikleri arasından seç. Yumuşak lastik yüksek tutuş karşılığında hızlı aşınır. Yağmur lastiği ıslakta avantajlıdır, kuruda ısınıp hızla aşınır. Her tekerin ömrü mesafe, viraj yükü, fren ve patinajla değişir.
-- **P** ile pit planını seç, mavi çizgiyi takip et ve sarı servis alanında tamamen dur. Pit yolunda 80 km/sa sınırı otomatik devreye girer. Servis lastik ömrünü %100’e çıkarır. Gövde onarımı, hasara göre duruşu uzatır.
+- **P** ile pit planını seç. Ayrılan girişte mavi çizgiyi takip et ve garajların önündeki sarı servis alanında tamamen dur. 80 km/sa sınırı giriş çizgisinde otomatik devreye girer. Beyaz çizgiyi izleyerek pit çıkışından piste birleş. Lastik değişimi patlağı onarır. Gövde onarımını da seçersen süspansiyon ve aerodinamik parçalar onarılır, servis daha uzun sürer.
 - **Sarı bayrakta** olay bölgesinde 80 km/sa sınırı ve geçiş yasağı var. İhlal 3 sn ceza getirir. **Kırmızı bayrakta** süre durur. Lastik değiştirebilir, en fazla 18 puan gövde hasarını onarabilir ve kalan turlar için durarak yeniden başlayabilirsin.
 
 ## Çarpışma ve hasar
@@ -70,6 +70,10 @@ Yarışa başlamadan önce **Kolay (1,00×)**, **Orta (1,25×)**, **Zor (1,60×)
 Sert fren, el freni ve yüksek yanal kayma her teker için ayrı lastik izi, duman ve lastik sesi üretebilir. Rakipler de aynı kayma ve temas modelini kullanır.
 
 Çarpışma hasarı darbenin hızına, açısına ve gövde bölgesine göre değişir. Gövde %70’e kadar tam performans sağlar. %69–40 aralığında son hız, tutuş ve yere basma kuvveti düşer. %39 ve altında motor gücü azalır, asimetrik hasar aracı yana çekebilir. %35’in altında kaput duman çıkarır. %0, ödülsüz ve puansız mekanik arızadır (DNF). Hasar onarılana kadar sonraki yarışa taşınır.
+
+Hız göstergesinin yanındaki araç şemasından gövde bölgelerini, dört tekerin durumunu ve motor sıcaklığını inceleyebilirsin. Teker kartları ayrı ayrı ömür ve sıcaklık gösterir. Islak yüzey lastikleri soğutur, yüksek yük ve patinaj ısıtır. Motor 110°C’yi aştığında kaputtan buhar çıkar ve güç kademeli düşer.
+
+Sert bir köşe darbesi süspansiyonu bozabilir, lastiği patlatabilir veya tekeri koparabilir. Patlakla düşük hızda pite dönebilirsin. Tekerin kopması mekanik DNF’dir. Arka kanat koptuğunda kanadın yere basma kuvveti kaybolur.
 
 Fizik, kariyer ve kayıt testleri için `npm test` çalıştır.
 
