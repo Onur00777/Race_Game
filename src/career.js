@@ -2,6 +2,7 @@ import { carAppearance, decalSlots, defaultSetup, normalizeSetup, sponsors } fro
 import { defaultPoints, defaultPrizes, events } from './events.js';
 import { difficulties, difficultyId } from './difficulty.js';
 import { integrity, vehicleCondition } from './vehicle-damage.js';
+import { electronics, normalizeElectronics } from './ecu.js';
 
 export const gameName = 'Kırmızı Çizgi';
 
@@ -43,7 +44,7 @@ export function newCareer() {
     cash: 400, team: teams[0].id, upgrades: { engine: 0, tires: 0, brakes: 0, aero: 0 },
     setup: { ...defaultSetup }, sponsor: null, decals: [], completed: 0, season: 1, results: [],
     profile: null, activeRace: null, difficulty: 'medium', screen: 'calendar', garageTab: 'parts',
-    condition: vehicleCondition(), repairDebt: 0,
+    condition: vehicleCondition(), repairDebt: 0, electronics: normalizeElectronics(),
   };
 }
 
@@ -55,7 +56,8 @@ export function normalizeLoadout(data) {
   }));
   const sponsor = sponsors.find(offer => offer.id === data?.sponsor);
   const decals = decalSlots.filter(slot => sponsor && Array.isArray(data?.decals) && data.decals.includes(slot.id)).map(slot => slot.id);
-  const loadout = { team: team.id, upgrades: parts, setup: normalizeSetup(data?.setup, parts.aero), sponsor: sponsor?.id ?? null, decals };
+  const loadout = { team: team.id, upgrades: parts, setup: normalizeSetup(data?.setup, parts.aero),
+    electronics: normalizeElectronics(data?.electronics), sponsor: sponsor?.id ?? null, decals };
   return { ...loadout, appearance: carAppearance(loadout) };
 }
 
@@ -63,8 +65,8 @@ export function loadCareer(storage) {
   try {
     const career = JSON.parse(storage.getItem(storageKey));
     if (career && currentTeam(career) && Array.isArray(career.results) && career.upgrades) {
-      const { team, upgrades: parts, setup, sponsor, decals } = normalizeLoadout(career);
-      return { ...newCareer(), ...career, team, upgrades: parts, setup, sponsor, decals, difficulty: difficultyId(career.difficulty),
+      const { team, upgrades: parts, setup, sponsor, decals, electronics: ecu } = normalizeLoadout(career);
+      return { ...newCareer(), ...career, team, upgrades: parts, setup, sponsor, decals, electronics: ecu, difficulty: difficultyId(career.difficulty),
         condition: vehicleCondition(career.condition), repairDebt: positiveMoney(career.repairDebt) };
     }
   } catch {
@@ -89,6 +91,15 @@ export function buyUpgrade(career, id) {
   const cost = price(upgrade, level);
   if (level >= maxUpgrade || cost > career.cash) return career;
   return { ...career, cash: career.cash - cost, upgrades: { ...career.upgrades, [id]: level + 1 } };
+}
+
+export function buyElectronics(career, id) {
+  const spec = electronics.find(item => item.id === id);
+  if (!spec) return career;
+  const level = career.electronics[id];
+  const cost = spec.cost * (level + 1);
+  if (level >= maxUpgrade || cost > career.cash) return career;
+  return { ...career, cash: career.cash - cost, electronics: { ...career.electronics, [id]: level + 1 } };
 }
 
 export function changeTeam(career, id) {

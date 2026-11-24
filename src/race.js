@@ -7,6 +7,7 @@ import { advanceVehicle, angleBetween, clamp } from './vehicle-physics.js';
 import { createRaceIntel, wakeFactor } from './race-ai.js';
 import { createTires, updateTires } from './tires.js';
 import { applyImpact, damagePerformance, vehicleCondition } from './vehicle-damage.js';
+import { launchRPM, normalizeElectronics, tractionMode, tractionModes } from './ecu.js';
 
 const wrap = (value, period) => ((value % period) + period) % period;
 export const raceStep = 1 / 120;
@@ -108,7 +109,14 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
     runId: options.runId ?? (globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)), previousPoses: cars.map(visualPose),
     elapsed: 0, countdown: 3, order: null, impact: null, impacts: [], retired: false, throttle: false, backfire: null, engineLevel: upgrades.engine };
   const surfaceGrip = track.event.surfaceGrip;
-  const playerHandling = { ...vehicleStats(team, upgrades, setup), surfaceGrip };
+  const electronics = normalizeElectronics(options.electronics);
+  const playerHandling = { ...vehicleStats(team, upgrades, setup), surfaceGrip, ecu: electronics, tcMode: tractionMode(setup?.tcMode) };
+  race.electronics = electronics;
+  race.tcMode = tractionMode(options.tcMode ?? setup?.tcMode);
+  race.launchHold = 0;
+  race.rotateTC = () => {
+    if (electronics.traction) race.tcMode = tractionModes[(tractionModes.indexOf(race.tcMode) + 1) % tractionModes.length];
+  };
   const { topSpeed, braking, grip, load } = playerHandling;
   let impactSerial = 0;
 
@@ -206,6 +214,7 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
       return;
     }
     if (race.countdown > 0) {
+      race.launchHold = launchRPM(electronics.launch, input.gas, input.brake);
       race.countdown = Math.max(0, race.countdown - dt);
       return;
     }
@@ -219,7 +228,9 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
     }
     race.throttle = throttle;
     const active = cars.filter(car => car.finishTime == null || car.speed > 1);
-    const controls = active.map(car => car === player ? { ...input, draft: wakeFactor(track, player, cars, relativeStation) } :
+    race.launchHold = 0;
+    const controls = active.map(car => car === player ? { ...input, launch: race.elapsed < 3.6, tcMode: race.tcMode,
+      draft: wakeFactor(track, player, cars, relativeStation) } :
       car.damage >= 100 ? { gas: 0, brake: 0.34, steering: 0 } : raceIntel.controls(car, cars, race.elapsed, dt));
     active.forEach((car, index) => {
       advanceVehicle(car, controls[index], car === player ? playerHandling : raceIntel.handling, dt, car === player);

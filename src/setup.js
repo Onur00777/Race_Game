@@ -1,3 +1,5 @@
+import { tractionMode } from './ecu.js';
+
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 const number = (value, fallback, low, high) => Number.isFinite(value) ? clamp(value, low, high) : fallback;
 
@@ -35,7 +37,7 @@ export const sliders = [
 
 export const defaultSetup = {
   gearing: 0, frontCamber: -1.5, rearCamber: -1, brakeBias: 60,
-  downforce: 4, compound: 'medium', wing: 'touring', wingColor: '#263039',
+  downforce: 4, compound: 'medium', wing: 'touring', wingColor: '#263039', tcMode: 'medium',
 };
 
 export function normalizeSetup(input, aeroLevel) {
@@ -47,6 +49,7 @@ export function normalizeSetup(input, aeroLevel) {
   if (compounds.some(compound => compound.id === input?.compound)) setup.compound = input.compound;
   if (wings.some(wing => wing.id === input?.wing && wing.level <= aeroLevel)) setup.wing = input.wing;
   if (/^#[\da-f]{6}$/i.test(input?.wingColor ?? '')) setup.wingColor = input.wingColor;
+  setup.tcMode = tractionMode(input?.tcMode);
   return setup;
 }
 

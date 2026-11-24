@@ -20,7 +20,7 @@ export function updateTires(car, controls, handling, road, halfWidth, dt) {
   const fz = Math.cos(car.yaw);
   const brake = clamp(Number(controls.brake) || 0, 0, 1);
   const frontBias = 0.60 + handling.brakeStability / 9;
-  const treadGrip = Math.max(0.5, handling.surfaceGrip * (0.92 + (handling.grip - 8.8) * 0.026));
+  const treadGrip = Math.max(0.28, (car.tireGrip ?? 1) * handling.surfaceGrip * (0.92 + (handling.grip - 8.8) * 0.026));
   const yawRate = car.yawRate ?? 0;
 
   for (const [index, mount] of wheelMounts.entries()) {
@@ -42,9 +42,10 @@ export function updateTires(car, controls, handling, road, halfWidth, dt) {
     const transfer = mount.front ? frontBias * 1.55 : (1 - frontBias) * 2.18;
     const localGrip = treadGrip * (wheel.onRoad ? 1 : 0.57);
     const capacity = Math.max(0.40, 0.79 * localGrip - Math.abs(slipAngle) * 0.48);
-    const brakeLock = clamp((brake * transfer - capacity) * 2.17, 0, 0.89);
+    const brakeLock = car.actuation?.locks[index] ?? clamp((brake * transfer - capacity) * 2.17, 0, 0.89);
     const lock = controls.handbrake && !mount.front ? 0.98 : brakeLock;
-    const target = along * (1 - lock);
+    const wheelspin = !mount.front && !controls.handbrake ? car.actuation?.spin ?? 0 : 0;
+    const target = along * (1 - lock) + Math.max(5, along) * wheelspin;
     wheel.rolling = (wheel.rolling ?? along) + (target - (wheel.rolling ?? along)) *
       (1 - Math.exp(-dt * (lock > 0.1 ? 31 : 42)));
     wheel.ratio = (along - wheel.rolling) / Math.max(5, Math.abs(along));
