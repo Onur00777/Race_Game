@@ -333,7 +333,7 @@ export async function createView(canvas, quality) {
     fitShadowResolution(scene, pipeline.shadowSize());
     addTerrain(scene, track, assets);
     setWetAsphalt = addTrack(scene, track, assets, label);
-    setWetPitLane = addPitView(scene, track, assets, t);
+    setWetPitLane = addPitView(scene, track, assets, t, cars);
     setMarshalLights = addMarshalLights(scene, track);
     addTrees(scene, track);
     effects = createRaceEffects(scene);
