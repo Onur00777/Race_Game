@@ -1,6 +1,7 @@
 import * as T from 'three';
 import { pitStall } from './pit-lane.js';
 import { addPitGarages } from './pit-garage.js';
+import { addPitCrew } from './pit-crew.js';
 
 function ribbon(track, start, end, offset, width, height, material) {
   const count = Math.max(1, Math.ceil((end - start) / 1.25));
@@ -116,7 +117,7 @@ export function addPitView(scene, track, assets, label, cars) {
   const outside = station => lane.offsetAt(station) + lane.side * (lane.widthAt(station) - 0.04);
   const inside = station => lane.offsetAt(station) - lane.side * (lane.widthAt(station) - 0.04);
   scene.add(ribbon(track, lane.entry, lane.exit, lane.offsetAt, station => lane.widthAt(station) * 2, 0.010, pavement));
-  scene.add(ribbon(track, lane.box - 15.1, lane.box + 15.1, () => lane.side * (lane.edge + 12.51), 5.02, 0.013, concrete));
+  scene.add(ribbon(track, lane.box - 15.1, lane.box + 15.1, () => lane.side * (lane.edge + 13.0), 6.0, 0.013, concrete));
   scene.add(ribbon(track, lane.entry, lane.exit, outside, 0.115, 0.021, blue));
   scene.add(ribbon(track, lane.laneEnd, lane.exit + 9, inside, 0.13, 0.023, white));
   for (let s = lane.entry + 4; s < lane.wallStart - 4; s += 4.9) {
@@ -128,7 +129,9 @@ export function addPitView(scene, track, assets, label, cars) {
   const divider = () => (lane.fastCenter + lane.stallCenter) / 2;
   for (let s = lane.laneStart; s < lane.laneEnd - 1; s += 5) scene.add(ribbon(track, s, s + 2.1, divider, 0.12, 0.022, white));
   scene.add(ribbon(track, lane.speedLine, lane.speedLine + 0.26, lane.offsetAt, s => lane.widthAt(s) * 2, 0.023, white));
-  const bays = cars.map((car, index) => ({ car, station: pitStall(lane, index - 1), player: index === 0 }))
+  const bays = cars.map(({ name, color }, index) => ({
+    name, index, station: pitStall(lane, index - 1), player: index === 0, color: index === 0 ? '#f27855' : color,
+  }))
     .sort((a, b) => a.station - b.station);
   for (const { station: stall, player } of bays) {
     const material = player ? boxColor : white;
@@ -138,9 +141,13 @@ export function addPitView(scene, track, assets, label, cars) {
   }
   wallAndFence(scene, track, block, steel);
   addPitGarages(scene, track, bays, { block, part, label });
+  const updateCrew = addPitCrew(scene, track, bays);
   pitSign(scene, track, lane.entry + 3, outside(lane.entry + 3) + lane.side * 0.25, label('pitEntry'), '#66e0ee');
   pitSign(scene, track, lane.speedLine, outside(lane.speedLine) + lane.side * 0.38, '80 km/h', '#66e0ee');
-  pitSign(scene, track, lane.box + 2, lane.stallCenter + lane.side * 2.03, label('pitBox'), '#ffcb74');
+  const serviceSign = lane.box + 2.65;
+  const signOffset = outside(serviceSign) + lane.side * 0.41;
+  block(steel, serviceSign + 0.075, signOffset, 1.13, 0.08, 2.26, 0.095);
+  pitSign(scene, track, serviceSign, signOffset, label('pitBox'), '#ffcb74', 2.18);
   pitSign(scene, track, lane.exit - 9, outside(lane.exit - 9) + lane.side * 0.38, label('pitExit'), '#66e0ee');
   for (const [geometry, materials] of batches) {
     for (const [material, groups] of materials) for (const [shadow, matrices] of groups.entries()) {
@@ -152,9 +159,11 @@ export function addPitView(scene, track, assets, label, cars) {
       scene.add(mesh);
     }
   }
-  return wetness => {
+  return (race, reducedMotion) => {
+    const { wetness } = race;
     pavement.roughness = 0.88 - wetness * 0.64;
     pavement.envMapIntensity = 1 + wetness;
     concrete.roughness = 0.87 - wetness * 0.25;
+    updateCrew(race, reducedMotion);
   };
 }

@@ -9,20 +9,19 @@ function baySigns(scene, track, bays, face, label) {
   canvas.height = bays.length * 96;
   const ctx = canvas.getContext('2d');
   const { side } = track.pit;
-  bays.forEach(({ car, station, player }, index) => {
+  bays.forEach(({ name, color, player }, index) => {
     const y = index * 96;
-    const accent = player ? '#ffc157' : car.color;
     ctx.fillStyle = '#121b26';
     ctx.fillRect(0, y, 768, 96);
-    ctx.fillStyle = accent;
+    ctx.fillStyle = color;
     ctx.fillRect(0, y + 86, 768, 10);
     ctx.font = 'bold 66px Rajdhani, sans-serif';
     ctx.textBaseline = 'middle';
     ctx.fillText(String(index + 1).padStart(2, '0'), 27, y + 46);
     ctx.fillStyle = '#f4f6f6';
     ctx.font = 'bold 49px Rajdhani, sans-serif';
-    ctx.fillText(player ? label('pitYourBay') : car.name.toLocaleUpperCase('tr'), 151, y + 48, 540);
-    ctx.fillStyle = accent;
+    ctx.fillText(player ? label('pitYourBay') : name.toLocaleUpperCase('tr'), 151, y + 48, 540);
+    ctx.fillStyle = color;
     for (let stripe = 0; stripe < 3; stripe++) {
       const x = 704 + stripe * 17;
       ctx.beginPath();
@@ -45,7 +44,7 @@ function baySigns(scene, track, bays, face, label) {
     for (let i = 0; i < uv.count; i++) uv.setY(i, uv.getY(i) ? top : bottom);
     const board = new T.Mesh(geometry, material);
     const point = track.at(station, face - side * 0.16);
-    board.position.set(point.x, 3.17, point.z);
+    board.position.set(point.x, 3.52, point.z);
     board.rotation.y = point.yaw + side * Math.PI / 2;
     scene.add(board);
   });
@@ -99,10 +98,10 @@ export function addPitGarages(scene, track, bays, { block, part, label }) {
   const hazard = surface('#d4a04e', 0.73);
   const led = new T.MeshBasicMaterial({ color: new T.Color(1.44, 1.74, 1.92) });
   const equipment = addPitEquipment({ block, part, side });
-  bays.forEach(({ car, station, player }, index) => {
-    const accent = surface(player ? '#c78b36' : car.color, 0.51, 0.23);
+  bays.forEach(({ color, station }, index) => {
+    const accent = surface(color, 0.51, 0.23);
     const build = (material, z, x, ...dimensions) => block(material, station + z, face + side * x, ...dimensions);
-    build(back, 0, 3.55, 1.62, 0.18, 3.24, 6.0);
+    build(back, 0, 3.55, 1.62, 0.18, 3.24, 6.8);
     for (const edgeZ of [-2.96, 2.96]) {
       build(joint, edgeZ, 1.84, 1.59, 3.71, 3.20, 0.15);
       build(frame, edgeZ, 0.04, 1.66, 0.44, 3.32, 0.28);
@@ -111,8 +110,8 @@ export function addPitGarages(scene, track, bays, { block, part, label }) {
       build(frame, edgeZ, -0.55, 3.04, 1.5, 0.14, 0.17);
     }
     build(roof, 0, 0.91, 3.51, 5.43, 0.20, 6.08);
-    build(frame, 0, -1.80, 3.49, 0.18, 0.24, 6.07);
-    build(trim, 0, -1.92, 3.56, 0.065, 0.064, 6.06);
+    build(frame, 0, -1.89, 3.53, 0.18, 0.68, 6.07);
+    build(trim, 0, -2.00, 3.87, 0.065, 0.064, 6.06);
     build(panel, 0, 0, 3.19, 0.27, 0.67, 5.96);
     build(accent, 0, -0.14, 2.87, 0.08, 0.075, 5.73);
     build(joint, 0, 0.26, 2.79, 0.16, 0.10, 5.20);
@@ -133,6 +132,6 @@ export function addPitGarages(scene, track, bays, { block, part, label }) {
     equipment.garage(station, face, accent, index % 2 ? 1 : -1);
     equipment.timingStand(station + 0.12, track.pit.wallOffset + side * 0.39);
   });
-  baySigns(scene, track, bays, face, label);
+  baySigns(scene, track, bays, face - side * 1.89, label);
   addGarageLighting(scene, track, bays);
 }

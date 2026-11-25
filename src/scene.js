@@ -302,7 +302,7 @@ export async function createView(canvas, quality) {
   let height = 0;
   let studio;
   let setWetAsphalt;
-  let setWetPitLane;
+  let updatePitView;
   let setMarshalLights;
   let marshalClock = 0;
   let racingLine;
@@ -333,7 +333,7 @@ export async function createView(canvas, quality) {
     fitShadowResolution(scene, pipeline.shadowSize());
     addTerrain(scene, track, assets);
     setWetAsphalt = addTrack(scene, track, assets, label);
-    setWetPitLane = addPitView(scene, track, assets, t, cars);
+    updatePitView = addPitView(scene, track, assets, t, cars);
     setMarshalLights = addMarshalLights(scene, track);
     addTrees(scene, track);
     effects = createRaceEffects(scene);
@@ -382,7 +382,7 @@ export async function createView(canvas, quality) {
   function draw(race, mode, dt, braking, alternateCamera, paused, fraction = 1, guide = false) {
     if (!resize()) return;
     setWetAsphalt(race.wetness);
-    setWetPitLane(race.wetness);
+    updatePitView(race, reduceMotion.matches);
     if (drawnRace !== race) {
       drawnRace = race;
       lastImpact = null;
