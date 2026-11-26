@@ -19,12 +19,13 @@ import { wheelLabel } from './wheel-damage.js';
 import './style.css';
 
 const app = document.querySelector('#app');
+const [brandWord, brandAccent] = gameName.split(' ');
 app.innerHTML = `
   <div id="circuit-home"><canvas id="circuit" data-label="track"></canvas></div>
   <div class="shade"></div>
   <div class="game-shell">
     <header class="topbar" id="topbar">
-      <div class="brand" aria-label="${gameName}"><span class="mark" aria-hidden="true"></span><div>KIRMIZI <span>ÇİZGİ</span></div></div>
+      <div class="brand" aria-label="${gameName}"><span class="mark" aria-hidden="true"></span><div>${brandWord} <span>${brandAccent}</span></div></div>
       <nav id="career-nav" data-label="careerNav">
         <button type="button" data-tab="calendar" data-text="calendar"></button>
         <button type="button" data-tab="garage" data-text="garage"></button>

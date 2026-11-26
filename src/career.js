@@ -4,7 +4,7 @@ import { difficulties, difficultyId } from './difficulty.js';
 import { integrity, vehicleCondition } from './vehicle-damage.js';
 import { electronics, normalizeElectronics } from './ecu.js';
 
-export const gameName = 'Kırmızı Çizgi';
+export const gameName = 'VIN VIN';
 
 export { events };
 

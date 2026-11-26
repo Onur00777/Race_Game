@@ -1,4 +1,4 @@
-# Kırmızı Çizgi
+# VIN VIN
 
 WASD ile sürülen, tek oyunculu bir 3D yarış kariyeri. Beş sürücü, sprintlerden 15 turluk dayanıklılık yarışına uzanan altı pistte yarışır. Her etap şampiyona puanı ve para kazandırır. İlk iki yarışı bitirmek yeni takım transferlerinin kilidini açar.
 
