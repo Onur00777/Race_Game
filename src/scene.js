@@ -209,7 +209,7 @@ function addTrack(scene, track, assets, label) {
     const edge = (half - 0.32) * sign;
     addSurface(strip(track, edge - 0.065, edge + 0.065, 0.006, paint));
   }
-  addTrackDetails(scene, track);
+  addTrackDetails(scene, track, assets);
 
   const gantry = new T.Group();
   const gate = track.at(0);

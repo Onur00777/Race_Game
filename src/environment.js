@@ -1,5 +1,6 @@
 import * as T from 'three';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 export function seeded(seed) {
   return () => {
@@ -130,13 +131,15 @@ export function lightTrack(scene, track, assets) {
   };
 }
 
-function terrainHeight(track, x, z) {
+export function terrainHeight(track, x, z) {
   const { distance, station, offset } = track.project(x, z);
   const rail = track.railAt(station, Math.sign(offset));
   const rise = T.MathUtils.smoothstep(distance, rail + 1, rail + 32);
   const wave = Math.sin(x * 0.029 + z * 0.016) * Math.cos(z * 0.039) * 2.8
     + Math.sin(x * 0.088 - z * 0.063) * 0.7;
-  return -0.045 + rise * wave;
+  const hills = T.MathUtils.smoothstep(distance, rail + 30, rail + 155) *
+    (3 + 3 * Math.sin(x * 0.016 + 0.85) * Math.cos(z * 0.013));
+  return -0.045 + rise * wave + hills;
 }
 
 export function addTerrain(scene, track, assets) {
@@ -173,9 +176,9 @@ function pineCrown(seed) {
       colors.push(color.r, color.g, color.b);
     }
   }
-  for (let level = 0; level < 9; level++) {
-    const y = 1.45 + level * 0.55;
-    const radius = (1 - level / 10) ** 0.78 * (1.52 + random() * 0.27);
+  for (let level = 0; level < 7; level++) {
+    const y = 1.32 + level * 0.67;
+    const radius = (1 - level / 8) ** 0.72 * (1.58 + random() * 0.32);
     const branches = 7 - Math.floor(level / 3);
     const phase = random() * Math.PI * 2;
     for (let b = 0; b < branches; b++) {
@@ -187,15 +190,13 @@ function pineCrown(seed) {
       const root = point(0.02, 0, 0.39);
       const spine = point(0.48, 0, 0.13);
       const tip = point(1, (random() - 0.5) * 0.22, -0.19 + random() * 0.23);
-      const left = point(0.53, 0.28, -0.24);
-      const right = point(0.43, -0.24, -0.21);
+      const left = point(0.53, 0.36, -0.26);
+      const right = point(0.43, -0.31, -0.24);
       triangle(root, left, spine, 0.21);
       triangle(root, spine, right, 0.23);
       triangle(spine, left, tip, 0.21);
       triangle(spine, tip, right, 0.24);
       triangle(left, right, tip, 0.13);
-      triangle(left, point(0.8, 0.31, -0.32), spine, 0.22);
-      triangle(right, spine, point(0.73, -0.29, -0.26), 0.22);
     }
   }
   const geometry = new T.BufferGeometry();
@@ -203,6 +204,25 @@ function pineCrown(seed) {
   geometry.setAttribute('color', new T.Float32BufferAttribute(colors, 3));
   geometry.computeVertexNormals();
   return geometry;
+}
+
+function roundCrown() {
+  const lobes = [[0, 3.77, 0, 1.51], [-0.97, 3.42, 0.18, 1.18], [0.86, 3.60, 0.52, 1.17],
+    [0.47, 3.42, -0.99, 1.14], [-0.61, 3.70, -0.67, 1.08], [0.09, 4.72, -0.1, 1.02]];
+  const tint = new T.Color();
+  const geometries = lobes.map(([x, y, z, radius], i) => {
+    const geometry = new T.IcosahedronGeometry(radius, 1).scale(1, 0.86, 1).rotateY(i * 1.18).translate(x, y, z);
+    const colors = [];
+    for (let k = 0; k < geometry.attributes.position.count; k++) {
+      tint.setHSL(0.18 + i * 0.012, 0.32, 0.15 + (geometry.attributes.position.getY(k) - 2) * 0.036);
+      colors.push(tint.r, tint.g, tint.b);
+    }
+    geometry.setAttribute('color', new T.Float32BufferAttribute(colors, 3));
+    return geometry;
+  });
+  const crown = mergeGeometries(geometries);
+  geometries.forEach(geometry => geometry.dispose());
+  return crown;
 }
 
 export function addTrees(scene, track) {
@@ -215,7 +235,7 @@ export function addTrees(scene, track) {
     const minimum = track.railAt(station, Math.sign(offset)) + 5;
     const cluster = Math.sin(x * 0.041 - z * 0.016) * Math.sin(z * 0.035);
     if (distance < minimum || (cluster < 0.04 && random() > 0.20)) continue;
-    const stand = stands[i % stands.length];
+    const stand = stands[i % 5 === 0 ? 2 : i % 2];
     if (stand.length >= 100) continue;
     stand.push({ x, z, size: 0.67 + random() * 1.80, spin: random() * Math.PI * 2 });
   }
@@ -226,7 +246,7 @@ export function addTrees(scene, track) {
   const needles = new T.MeshStandardMaterial({ roughness: 0.98, side: T.DoubleSide, vertexColors: true });
   stands.forEach((trees, variant) => {
     const trunk = new T.InstancedMesh(trunkGeometry, bark, trees.length);
-    const foliage = new T.InstancedMesh(pineCrown(173 + 107 * variant), needles, trees.length);
+    const foliage = new T.InstancedMesh(variant === 2 ? roundCrown() : pineCrown(173 + 107 * variant), needles, trees.length);
     trees.forEach(({ x, z, size, spin }, i) => {
       dummy.position.set(x, terrainHeight(track, x, z) - 0.07, z);
       dummy.rotation.set((random() - 0.5) * 0.12, spin, (random() - 0.5) * 0.1);
@@ -237,7 +257,6 @@ export function addTrees(scene, track) {
       const brightness = 0.64 + random() * 0.28;
       foliage.setColorAt(i, tint.setRGB(brightness, brightness, brightness * 0.94));
     });
-    trunk.castShadow = foliage.castShadow = true;
     foliage.receiveShadow = true;
     scene.add(trunk, foliage);
   });
