@@ -92,6 +92,7 @@ export function addPitView(scene, track, assets, label, cars) {
   const lane = track.pit;
   const pavement = new T.MeshStandardMaterial({ color: '#62666c', map: assets.asphalt, roughness: 0.90, side: T.DoubleSide });
   const blue = new T.MeshStandardMaterial({ color: '#46dff1', roughness: 0.72, side: T.DoubleSide });
+  const green = new T.MeshStandardMaterial({ color: '#76dfa4', roughness: 0.76, side: T.DoubleSide });
   const white = new T.MeshStandardMaterial({ color: '#f0e1bf', roughness: 0.82, side: T.DoubleSide });
   const boxColor = new T.MeshStandardMaterial({ color: '#ffc157', emissive: '#ffae46', emissiveIntensity: 0.37, roughness: 0.72, side: T.DoubleSide });
   const steel = new T.MeshStandardMaterial({ color: '#66747c', roughness: 0.68, metalness: 0.48 });
@@ -129,6 +130,10 @@ export function addPitView(scene, track, assets, label, cars) {
   const divider = () => (lane.fastCenter + lane.stallCenter) / 2;
   for (let s = lane.laneStart; s < lane.laneEnd - 1; s += 5) scene.add(ribbon(track, s, s + 2.1, divider, 0.12, 0.022, white));
   scene.add(ribbon(track, lane.speedLine, lane.speedLine + 0.26, lane.offsetAt, s => lane.widthAt(s) * 2, 0.023, white));
+  if (lane.speedEnd < lane.exit) {
+    scene.add(ribbon(track, lane.speedEnd - 0.2, lane.speedEnd, lane.offsetAt, lane.halfWidth * 2, 0.024, green));
+    pitSign(scene, track, lane.speedEnd, outside(lane.speedEnd) + lane.side * 0.32, label('pitLimiterEnd'), '#91e8ae');
+  }
   const bays = cars.map(({ name, color }, index) => ({
     name, index, station: pitStall(lane, index - 1), player: index === 0, color: index === 0 ? '#f27855' : color,
   }))

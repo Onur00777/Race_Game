@@ -40,6 +40,28 @@ test('the continuous pit wall keeps a car on its original side and produces a co
   assert.equal(race.player.pit.lane, false);
 });
 
+test('the extended exit cannot skip the limiter through the wall, apron or track reset', () => {
+  for (const event of [events[0], events.at(-1)]) {
+    const track = createTrack(event);
+    const race = createRace(track, currentTeam(career), career.upgrades, career.setup);
+    race.countdown = 0;
+    const { pit } = track;
+    const station = 95;
+    const offset = pit.wallOffset + pit.side * 2.5;
+    const pose = track.at(station, offset);
+    Object.assign(race.player, pose, { station, offset, speed: pitSpeed, yaw: pose.yaw + pit.side * Math.PI / 2 });
+    tick(race, 0.17);
+    assert.equal(race.impact?.surface, 'concrete');
+    assert.ok(pit.speedLimited(race.player.station, race.player.offset));
+    assert.ok(pit.speedLimited(station, pit.garageFace));
+    assert.ok(!pit.speedLimited(station, 0));
+    race.reset();
+    assert.ok(pit.speedLimited(race.player.station, race.player.offset));
+    assert.ok(pit.exit - pit.speedEnd >= 55);
+    assert.ok(!pit.speedLimited(pit.speedEnd + 0.2, pit.fastCenter));
+  }
+});
+
 test('legacy pit checkpoints migrate the serviced car to its new garage bay', () => {
   const track = createTrack(events[0]);
   const race = createRace(track, currentTeam(career), career.upgrades, career.setup);

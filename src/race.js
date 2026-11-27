@@ -171,7 +171,12 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
 
   function rejoin(car) {
     const nearby = cars.filter(other => other !== car && Math.abs(relativeStation(other.station, car.station)) < 5.5);
-    const offset = [0, -4.2, 4.2].find(lane => nearby.every(other => Math.abs(other.offset - lane) > 2.5)) ?? 0;
+    const { pit } = track;
+    const station = pit.wrap(car.station);
+    const pitCenter = pit.offsetAt(station);
+    const pitRecovery = pit.speedLimited(car.station, car.offset);
+    const lanes = pitRecovery ? [pitCenter, pitCenter + pit.side * 1.85] : [0, -4.2, 4.2];
+    const offset = lanes.find(lane => nearby.every(other => Math.abs(other.offset - lane) > 2.5)) ?? lanes[0];
     Object.assign(car, track.at(car.station, offset), { speed: 0, lateral: 0, spin: 0, steer: 0, yawRate: 0,
       offset, onRoad: true, stuck: 0, aiOffset: offset, wheels: createTires(), tireSlip: 0 });
     race.previousPoses[cars.indexOf(car)] = visualPose(car);
@@ -341,7 +346,7 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
     } else raceControl.update(dt);
   }
 
-  race.reset = () => rejoin(player);
+  race.reset = () => { if (!player.pit.remaining) rejoin(player); };
   race.restartAfterRed = plan => {
     if (!raceControl.restart(plan)) return false;
     race.looseWheels.length = 0;

@@ -488,9 +488,10 @@ function setPitMenu(open) {
 
 function updatePitStatus(player) {
   const status = byId('pit-status');
-  const { lane, remaining } = player.pit;
-  status.hidden = !lane && !remaining;
-  const message = remaining ? t('pitServiceTimer', remaining.toFixed(1)) : lane ? t('pitLimiter') : '';
+  const { remaining } = player.pit;
+  const limited = track.pit.speedLimited(player.station, player.offset);
+  status.hidden = !limited && !remaining;
+  const message = remaining ? t('pitServiceTimer', remaining.toFixed(1)) : limited ? t('pitLimiter') : '';
   if (message !== status.textContent) status.textContent = message;
 }
 

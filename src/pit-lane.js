@@ -7,11 +7,13 @@ export const pitLayoutVersion = 2;
 const smooth = value => { const x = clamp(value, 0, 1); return x * x * (3 - 2 * x); };
 
 export function buildPitLane(track) {
-  const entry = -88, laneStart = -33, box = 19, laneEnd = 68, exit = 113;
-  const wallStart = -24, wallEnd = 59, speedLine = -50;
+  const wide = Boolean(track.event.trackLayout);
+  const entry = -88, laneStart = -33, box = 19;
+  const laneEnd = wide ? 114 : 68, exit = wide ? 174 : 113;
+  const wallStart = -24, wallEnd = wide ? laneEnd : 59, speedLine = -50;
+  const speedEnd = wide ? wallEnd : exit;
   const side = track.event.pitSide ?? -1;
   const edge = track.event.width / 2;
-  const wide = Boolean(track.event.trackLayout);
   const center = side * (edge + (wide ? 8.15 : 6.15));
   const stallCenter = side * (edge + (wide ? 10.40 : 7.23));
   const fastCenter = side * (edge + (wide ? 5.30 : 3.55));
@@ -22,7 +24,8 @@ export function buildPitLane(track) {
   const wrap = station => ((station + track.length * 0.5) % track.length + track.length) % track.length - track.length * 0.5;
   const taper = station => smooth((station - entry) / (laneStart - entry)) * smooth((exit - station) / (exit - laneEnd));
   const offsetAt = station => {
-    return side * (edge - 1.85) + (center - side * (edge - 1.85)) * taper(station);
+    const endpoint = side * (edge + (wide && station > laneEnd ? 0.15 : -1.85));
+    return endpoint + (center - endpoint) * taper(station);
   };
   const widthAt = station => 1.68 + (halfWidth - 1.68) * taper(station);
   const railAt = station => {
@@ -40,8 +43,14 @@ export function buildPitLane(track) {
     return local > speedLine && local < exit && side * offset > (wallAt(station) ? Math.abs(wallOffset) : edge + 0.10) &&
       Math.abs(offset - offsetAt(local)) < widthAt(local) + 0.18;
   };
-  return { entry, laneStart, box, laneEnd, exit, wallStart, wallEnd, wallOffset, wallWidth, speedLine,
-    side, center, stallCenter, fastCenter, halfWidth, garageFace, edge, wrap, offsetAt, widthAt, taper, railAt, wallAt, garageAt, contains };
+  const speedLimited = (station, offset) => {
+    const local = wrap(station);
+    if (local <= speedLine || local >= speedEnd) return false;
+    return wide && wallAt(station) ? side * (offset - wallOffset) > 0 : contains(station, offset);
+  };
+  return { entry, laneStart, box, laneEnd, exit, wallStart, wallEnd, wallOffset, wallWidth, speedLine, speedEnd,
+    side, center, stallCenter, fastCenter, halfWidth, garageFace, edge, wrap, offsetAt, widthAt,
+    taper, railAt, wallAt, garageAt, contains, speedLimited };
 }
 
 export const pitStall = (lane, index) => lane.box + (index < 0 ? 0 : [-12, -6, 6, 12][index]);
@@ -140,7 +149,7 @@ export function createPitControl(race, plan) {
     const state = car.pit;
     const selected = aiRoute(car, controls);
     if (state.remaining > 0) return { ...selected, gas: 0, brake: 1, steering: 0, holdPosition: true, speedLimit: 0, draft: 0 };
-    if (!state.lane) return selected;
+    if (!lane.speedLimited(car.station, car.offset)) return selected;
     return { ...selected, speedLimit: pitSpeed, draft: 0 };
   }
 
