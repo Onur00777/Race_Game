@@ -29,8 +29,8 @@ export const rivals = [
   { id: 'mert', name: 'Mert Aydın', color: '#f2e8de', pace: 0.86 },
 ];
 
-// Keep the original key and team ID so that existing careers load after the rename.
-const storageKey = 'apex-circuit-career-v1';
+const legacyStorageKey = 'apex-circuit-career-v1';
+export const careerSaveKey = 'vin-vin-career-v2';
 const positiveMoney = value => Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
 export const maxUpgrade = stages;
 const currencyFormats = { en: new Intl.NumberFormat('en-US'), tr: new Intl.NumberFormat('tr-TR') };
@@ -43,11 +43,23 @@ export const currentEvent = career => events[career.results.length];
 
 export function newCareer() {
   return {
-    cash: 1200, team: teams[0].id, upgrades: { engine: 0, tires: 0, brakes: 0, aero: 0 }, hardware: normalizeHardware(),
+    saveVersion: 2, cash: 1200, team: teams[0].id, upgrades: { engine: 0, tires: 0, brakes: 0, aero: 0 }, hardware: normalizeHardware(),
     setup: { ...defaultSetup }, sponsor: null, decals: [], completed: 0, season: 1, results: [],
     profile: null, activeRace: null, difficulty: 'medium', screen: 'calendar', garageTab: 'parts',
     condition: vehicleCondition(), repairDebt: 0, electronics: normalizeElectronics(),
   };
+}
+
+export function resetCareer(previous) {
+  const fresh = newCareer();
+  const profile = previous?.profile;
+  if (profile && typeof profile.name === 'string') {
+    Object.assign(fresh, saveProfile(fresh, profile.name, profile.language, fresh.team));
+  }
+  for (const key of ['graphics', 'sound', 'racingLine', 'showFps']) {
+    if (previous?.[key] !== undefined) fresh[key] = previous[key];
+  }
+  return fresh;
 }
 
 export function normalizeLoadout(data) {
@@ -67,7 +79,16 @@ export function normalizeLoadout(data) {
 
 export function loadCareer(storage) {
   try {
-    const career = JSON.parse(storage.getItem(storageKey));
+    const current = storage.getItem(careerSaveKey);
+    if (current === null) {
+      const previous = JSON.parse(storage.getItem(legacyStorageKey));
+      if (previous && Array.isArray(previous.results)) {
+        const fresh = resetCareer(previous);
+        saveCareer(storage, fresh);
+        return fresh;
+      }
+    }
+    const career = JSON.parse(current);
     if (career && currentTeam(career) && Array.isArray(career.results) && career.upgrades) {
       const { team, upgrades: parts, hardware, setup, sponsor, decals, electronics: ecu } = normalizeLoadout(career);
       return { ...newCareer(), ...career, team, upgrades: parts, hardware, setup, sponsor, decals, electronics: ecu, difficulty: difficultyId(career.difficulty),
@@ -81,7 +102,7 @@ export function loadCareer(storage) {
 
 export function saveCareer(storage, career) {
   try {
-    storage.setItem(storageKey, JSON.stringify(career));
+    storage.setItem(careerSaveKey, JSON.stringify({ ...career, saveVersion: 2 }));
     return true;
   } catch {
     return false;

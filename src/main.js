@@ -1,5 +1,5 @@
 import { acceptSponsor, buyElectronics, buyUpgrade, changeTeam, currentEvent, currentTeam, events, finishEvent, gameName, newHardware,
-  loadCareer, normalizeLoadout, repairVehicle, saveCareer, saveProfile, standings, teamById, teams, toggleDecal } from './career.js';
+  loadCareer, normalizeLoadout, repairVehicle, resetCareer, saveCareer, saveProfile, standings, teamById, teams, toggleDecal } from './career.js';
 import { createRace, createTrack, raceStep } from './race.js';
 import { eventDifficulty, eventForResume, hasSavedRace, raceCheckpoint, restoreRace } from './progress.js';
 import { decalSlots, normalizeSetup, sliders } from './setup.js';
@@ -820,6 +820,28 @@ app.addEventListener('click', event => {
       break;
     }
     case 'profile': draft = undefined; showMenu('profile'); break;
+    case 'reset-career':
+      overlay.innerHTML = `<h2>${t('resetCareer')}</h2><p>${t('resetCareerConfirm')}</p>
+        <div class="dialog-actions">
+          <button type="button" class="secondary" data-action="cancel-reset-career" autofocus>${t('cancel')}</button>
+          <button type="button" class="primary" data-action="confirm-reset-career">${t('resetCareer')}</button>
+        </div>`;
+      overlay.showModal();
+      break;
+    case 'cancel-reset-career':
+      overlay.close();
+      byId('profile-screen').querySelector('[data-action="reset-career"]')?.focus();
+      break;
+    case 'confirm-reset-career': {
+      const fresh = resetCareer(career);
+      if (!saveCareer(storage, fresh)) { notify(t('storageError')); break; }
+      career = fresh;
+      draft = undefined;
+      clearSkidSave();
+      showMenu('calendar');
+      notify(t('careerResetDone'));
+      break;
+    }
     case 'cancel-profile':
       draft = undefined;
       setLanguage(career.profile.language);
@@ -1033,6 +1055,7 @@ window.addEventListener('pagehide', () => {
 overlay.addEventListener('cancel', event => {
   event.preventDefault();
   if (paused) resumeRace();
+  else if (mode === 'menu') overlay.close();
 });
 
 function frame(now) {

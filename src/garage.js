@@ -221,7 +221,8 @@ export function driverForm(career, draft) {
     ${isNew ? `<div id="team-choices"></div>` : ''}
     <div class="profile-actions">
       <button type="submit" class="primary">${t(isNew ? 'enterCareer' : 'saveProfile')} <span aria-hidden="true">↗</span></button>
-      ${isNew ? '' : `<button type="button" class="secondary" data-action="cancel-profile">${t('cancel')}</button>`}
+      ${isNew ? '' : `<button type="button" class="secondary" data-action="cancel-profile">${t('cancel')}</button>
+        <button type="button" class="secondary reset-career" data-action="reset-career">${t('resetCareer')}</button>`}
     </div>
   </form>`;
 }

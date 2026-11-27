@@ -26,7 +26,7 @@ Terminalde görünen yerel adresi aç. Dağıtıma hazır dosyaları oluşturmak
 - **P** — Sonraki pit stop için lastik ve onarım seç
 - **Esc** — Duraklat / devam et
 
-Duraklat menüsünden ideal çizgiyi açıp kapatabilir ve görüntü kalitesini değiştirebilirsin. Ultra, ekran oranına ve donanıma bağlı olarak 3840×2160 piksele kadar görüntü üretir. Yüksek ve Ultra, WebGL desteğine göre MSAA veya SMAA ile kenar yumuşatma ve HDR bloom kullanır.
+Duraklat menüsünden ideal çizgiyi açıp kapatabilir, FPS sayacını açabilir ve Düşük, Orta, Yüksek ya da Ultra görüntü kalitesini seçebilirsin. Ultra, ekran oranına ve donanıma bağlı olarak 3840×2160 piksele kadar görüntü üretir. Yüksek ve Ultra, WebGL desteğine göre MSAA veya SMAA ile kenar yumuşatma ve HDR bloom kullanır.
 
 ## Profil ve kayıt
 
@@ -36,14 +36,16 @@ Kariyer ve açık yarış aynı tarayıcıda, aynı site adresinde otomatik kayd
 
 Yeni sezonda takvim ve puanlar sıfırlanır. Kazanç, takım erişimi ve yükseltmeler korunur.
 
+Yeni kayıt şeması önceki sürümden ilk geçişte Sezon 1, Etap 1’de ₺1.200 ile başlar. Sürücü adı, dil ve görüntü ayarları yeni kariyere taşınır. Profil ekranındaki **Yeni kariyer başlat** düğmesi, onay verirsen aynı şekilde yeni bir kariyer açar.
+
 ## 3D garaj
 
-- **Parçalar** bölümünden motor, lastik, fren ve aerodinamik yükseltmelerini al.
+- **Parçalar** bölümünde motor, şasi ve lastik, fren ve aerodinamik modellerini satın alıp tak. Her modelin beş tuning aşaması vardır. Satın aldığın aşamalar, farklı bir modeli takıp geri döndüğünde de durur. Model listesi sonraki etap ve sezon kilitlerini gösterir.
 - **Ayarlar** bölümünden dişli oranını, lastik hamurunu, ön ve arka kamberi ve fren dengesini değiştir.
 - **Aerodinamik** bölümünde satın aldığın seviyeye göre arka kanat şeklini, açısını ve rengini seç. Kanat açısı arttıkça yere basma kuvveti artar, son hız biraz düşer.
 - **Sponsor ve çıkartmalar** bölümünde sözleşme yapıp çıkartmayı kaputa, kapılara veya arka tampona yerleştir. En az bir çıkartma takılıyken yarış bitirirsen sponsor bonusu alırsın.
 - **Servis** bölümünde gövde durumunu, dört bölgenin hasarını ve onarım bedelini gör. Hasarlı bölgeyi seçerek kamerayı o tarafa çevirebilirsin. Araç %0 durumdaysa ve kasadaki para onarıma yetmiyorsa, kalan tutarı gelecek yarış ödüllerinden ödeyebilirsin.
-- **Elektronik** bölümünde kalkış kontrolü, çekiş kontrolü, ABS ve aktif diferansiyel için üçer seviye var. Kalkışta gazı tutarak LC devrini sabitle. TC patinajda torku, ABS kilitlenmede her tekerin basıncını ayarlar. HUD, müdahaleleri gösterir.
+- **Elektronik** bölümünde kalkış kontrolü, çekiş kontrolü, ABS ve aktif diferansiyel için beşer seviye var. İleri seviyeler etap ve sezon ilerlemesiyle açılır. Kalkışta gazı tutarak LC devrini sabitle. TC patinajda torku, ABS kilitlenmede her tekerin basıncını ayarlar. HUD, müdahaleleri gösterir.
 
 Aracı sürükleyerek çevir, kaydırarak yakınlaştır veya ön, yan ve arka görünüm düğmelerini kullan. Yarıda kaydedilmiş bir yarış, başladığı takım ve araç ayarlarıyla devam eder. Garaj değişiklikleri sonraki yarışta uygulanır.
 

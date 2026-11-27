@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { acceptSponsor, buyUpgrade, currentEvent, currentTeam, events, finishEvent, loadCareer, newCareer, normalizeLoadout, saveCareer, saveProfile, toggleDecal } from '../src/career.js';
+import { acceptSponsor, buyUpgrade, careerSaveKey, currentEvent, currentTeam, events, finishEvent, loadCareer, newCareer, normalizeLoadout, resetCareer, saveCareer, saveProfile, toggleDecal } from '../src/career.js';
 import { eventForResume, raceCheckpoint, restoreRace } from '../src/progress.js';
 import { legacyEvents, originalEvents } from '../src/events.js';
 import { createRace, createTrack, raceStep, renderPose } from '../src/race.js';
@@ -8,8 +8,32 @@ import { vehicleStats } from '../src/setup.js';
 
 function memoryStorage() {
   const data = new Map();
-  return { getItem: id => data.get(id), setItem: (id, value) => data.set(id, value) };
+  return { getItem: id => data.get(id) ?? null, setItem: (id, value) => data.set(id, value) };
 }
+
+test('the career schema starts fresh once, preserving profile and leaving the old slot available', () => {
+  const storage = memoryStorage();
+  const legacyKey = 'apex-circuit-career-v1';
+  const previous = { ...saveProfile(newCareer(), 'Aylin', 'en', 'volt'), graphics: 'ultra', cash: 9000, season: 3,
+    completed: 12, sponsor: 'nova', results: [{}], activeRace: { elapsed: 47 }, upgrades: { engine: 2 } };
+  storage.setItem(legacyKey, JSON.stringify(previous));
+  const fresh = loadCareer(storage);
+  assert.equal(fresh.saveVersion, 2);
+  assert.equal(fresh.cash, 1200);
+  assert.equal(fresh.season, 1);
+  assert.deepEqual(fresh.results, []);
+  assert.equal(fresh.activeRace, null);
+  assert.equal(fresh.sponsor, null);
+  assert.equal(fresh.team, 'apex');
+  assert.equal(fresh.upgrades.engine, 0);
+  assert.deepEqual(fresh.profile, previous.profile);
+  assert.equal(fresh.graphics, 'ultra');
+  assert.equal(JSON.parse(storage.getItem(legacyKey)).cash, 9000);
+  assert.ok(storage.getItem(careerSaveKey));
+  saveCareer(storage, { ...fresh, cash: 2000 });
+  assert.equal(loadCareer(storage).cash, 2000);
+  assert.deepEqual(resetCareer({ ...fresh, cash: 2000 }), fresh);
+});
 
 test('previous career saves retain rewards and make new garage fields available', () => {
   const storage = memoryStorage();
