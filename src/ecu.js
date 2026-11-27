@@ -64,6 +64,6 @@ export function regulateVehicle(car, controls, handling) {
   const alignmentError = requestedYaw - (car.yawRate ?? requestedYaw);
   const vector = diff * Math.min(1, speed / 18) * (0.15 * gas + 0.07 * brake) *
     bound(alignmentError * 0.9 + requestedYaw * 0.36 - car.lateral * 0.04, -1, 1);
-  return { gas: gas * (1 - driveCut), brake, brakeForce, driveGrip, spin: gas ? spin : 0, locks,
+  return { gas: gas * (1 - driveCut), brake, brakeForce, brakePressure: pressure, driveGrip, spin: gas ? spin : 0, locks,
     vector: controls.handbrake ? 0 : vector, abs, tc: !rpm && driveCut > 0.018, rpm };
 }

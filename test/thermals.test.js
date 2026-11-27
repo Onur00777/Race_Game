@@ -40,3 +40,12 @@ test('old normalized tire heat and new per-wheel degrees both restore', () => {
   assert.deepEqual(newCar.tireTemperatures, [79, 81, 86, 91]);
   assert.deepEqual(fitTires({}, 'medium', null, 0.5).tireTemperatures, [96, 96, 96, 96]);
 });
+
+test('individual brake pressure heats its own tire without heating a detached corner', () => {
+  const car = fitTires({ speed: 30, actuation: { brakePressure: [0, 0.95, 0, 0.95] }, wheels: createTires(),
+    corners: [{}, {}, {}, { detached: true }] }, 'medium');
+  for (const wheel of car.wheels) Object.assign(wheel, { speed: 30, onRoad: true });
+  for (let i = 0; i < 100; i++) wearTires(car, 0, 0.05);
+  assert.ok(car.tireTemperatures[1] > car.tireTemperatures[0] + 9);
+  assert.equal(car.tireTemperatures[3], 65);
+});

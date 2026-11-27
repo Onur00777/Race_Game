@@ -58,6 +58,7 @@ export function wearTires(car, wetness, dt) {
   const [, hot] = tireTemperatureWindow(spec.id);
   const braking = car.actuation?.brakeForce ?? 0;
   for (const [index, wheel] of car.wheels.entries()) {
+    if (car.corners?.[index]?.detached) continue;
     const mount = wheelMounts[index];
     const distance = wheel.speed * dt;
     const contact = wheel.onRoad ? 1 : 0.43;
@@ -65,7 +66,8 @@ export function wearTires(car, wetness, dt) {
     const outside = clamp(-(car.yawRate ?? 0) * Math.sign(mount.x) * speed / 18, -0.36, 0.46);
     const rolling = clamp(wheel.speed / 29, 0, 1.22);
     const load = 43 * rolling + cornerLoad * 12 * (1 + outside);
-    const brakeHeat = 25 * braking * rolling * (mount.front ? 1.25 : 0.74);
+    const pressure = car.actuation?.brakePressure?.[index] ?? braking * (mount.front ? 1.25 : 0.74);
+    const brakeHeat = 25 * pressure * rolling;
     const slipHeat = (wheel.slip ?? Math.abs(wheel.ratio)) * 37 + Math.max(0, -wheel.ratio) * 11;
     const target = ambient + (load + brakeHeat + slipHeat) * (spec.id === 'rain' ? 1.12 : 0.95 + spec.heat * 0.13) *
       contact * (1 - wetness * 0.23);
