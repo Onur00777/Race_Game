@@ -34,7 +34,7 @@ export function restoreLooseWheels(value, carIds) {
         wheel.age < 0 || wheel.age >= life) continue;
     const entry = Object.fromEntries(dimensions.map(name => [name, clamp(wheel[name], -1400, 1400)]));
     result.set(wheel.id, { ...entry, id: wheel.id, compound: compoundId(wheel.compound),
-      bounces: Math.max(0, Math.min(200, Math.floor(wheel.bounces ?? 0))) });
+      bounces: Number.isFinite(wheel.bounces) ? Math.max(0, Math.min(200, Math.floor(wheel.bounces))) : 0 });
   }
   return [...result.values()];
 }
@@ -45,7 +45,8 @@ function barrier(wheel, track, road, radius, previousX, previousZ) {
   const wall = pit.wallAt(road.station) && wheel.y - radius < 0.99;
   const prior = road.offset - ((wheel.x - previousX) * lateralX + (wheel.z - previousZ) * lateralZ);
   const side = prior < pit.wallOffset ? 1 : -1;
-  const reach = radius * 0.78;
+  const axisAcrossRail = Math.abs(Math.cos(wheel.yaw) * lateralX - Math.sin(wheel.yaw) * lateralZ);
+  const reach = 0.16 * axisAcrossRail + radius * Math.sqrt(Math.max(0, 1 - axisAcrossRail ** 2));
   const wallDepth = (road.offset - pit.wallOffset) * side + reach + pit.wallWidth * 0.5;
   const railSide = Math.sign(road.offset);
   const railDepth = Math.abs(road.offset) + reach - track.railAt(road.station, railSide);
@@ -75,7 +76,7 @@ export function advanceLooseWheels(wheels, track, dt) {
     wheel.y += wheel.vy * dt;
     const radius = 0.19 + 0.175 * Math.abs(Math.cos(wheel.lean));
     const road = track.project(wheel.x, wheel.z);
-    const asphalt = road.distance <= track.event.width / 2 || track.pit.contains(road.station, road.offset);
+    const asphalt = road.distance <= track.event.width / 2 || track.pit.pavedAt(road.station, road.offset);
     const speed = Math.hypot(wheel.vx, wheel.vz);
     if (wheel.y <= radius) {
       wheel.y = radius;

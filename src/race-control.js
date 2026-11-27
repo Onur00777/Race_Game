@@ -85,6 +85,8 @@ export function createRaceControl(race, saved) {
       return;
     }
     for (const [id, expiry] of disabledByWheel) if (expiry < race.elapsed) disabledByWheel.delete(id);
+    const looseWheelSectors = race.looseWheels.map(wheel => track.project(wheel.x, wheel.z))
+      .filter(point => point.distance < track.event.width / 2).map(point => point.station);
     let hazards = cars.filter(car => disabledByWheel.has(car.id) || danger(car, dt));
     if (state.flag === 'yellow' && race.elapsed - state.changed >= 18) {
       for (const car of hazards) {
@@ -104,15 +106,16 @@ export function createRaceControl(race, saved) {
       announce('red', crowded?.station ?? hotspot, hazards);
       return;
     }
-    if (state.flag !== 'yellow' && (hazards.length || Number.isFinite(focus) || Number.isFinite(debrisFocus))) {
-      const center = debrisFocus ?? hazards[0]?.station ?? focus;
+    if (state.flag !== 'yellow' && (hazards.length || Number.isFinite(focus) || Number.isFinite(debrisFocus) || looseWheelSectors.length)) {
+      const center = debrisFocus ?? hazards[0]?.station ?? focus ?? looseWheelSectors[0];
       announce('yellow', center, hazards.filter(car => Math.abs(car.station - center) <= halfSector));
     }
     focus = undefined;
     debrisFocus = undefined;
     if (state.flag !== 'yellow') return;
     const live = hazards.filter(car => inSector(car.station));
-    if (live.length) {
+    const obstruction = looseWheelSectors.some(inSector);
+    if (live.length || obstruction) {
       state.hazards = [...new Set([...state.hazards, ...live.map(car => car.id)])];
       state.clearAt = 0;
     } else if (!state.clearAt) {

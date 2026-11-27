@@ -101,3 +101,23 @@ test('an AI wheel detachment opens a yellow sector and restores the obstacle fro
   assert.equal(restored.looseWheels[0].id, race.looseWheels[0].id);
   assert.ok(restored.opponents[0].corners.some(wheel => wheel.detached));
 });
+
+test('a loose wheel still on the racing surface holds a yellow flag after the car is removed', () => {
+  const track = createTrack(events[0]);
+  const race = createRace(track, currentTeam(career), career.upgrades, career.setup);
+  pitWallCrash(race, race.opponents[0], 55);
+  const wheel = race.looseWheels[0];
+  const obstruction = track.at(145);
+  Object.assign(wheel, { x: obstruction.x, z: obstruction.z, y: 0.365, vx: 0, vy: 0, vz: 0 });
+  const disabled = race.opponents[0];
+  const runoff = -track.pit.side * (track.railOffset - 1.34);
+  Object.assign(disabled, track.at(150, runoff), { station: 150, offset: runoff, recovered: true, onRoad: false, speed: 0 });
+  Object.assign(race.player, track.at(220, runoff), { station: 220, offset: runoff, onRoad: false });
+  Object.assign(race.control, { flag: 'yellow', sector: 145, changed: race.elapsed, clearAt: 0 });
+  for (const rival of race.opponents.slice(1)) Object.assign(rival, { finishTime: 10, speed: 0 });
+  for (let i = 0; i < 12 / raceStep; i++) race.update(raceStep, { gas: 0, brake: 0, steering: 0 });
+  assert.equal(race.control.flag, 'yellow');
+  wheel.age = 19;
+  for (let i = 0; i < 3 / raceStep; i++) race.update(raceStep, { gas: 0, brake: 0, steering: 0 });
+  assert.equal(race.control.flag, 'green');
+});
