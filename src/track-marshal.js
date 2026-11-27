@@ -5,36 +5,52 @@ export function addMarshalLights(scene, track) {
   const lamp = new T.BoxGeometry(0.54, 0.19, 0.19);
   const post = new T.CylinderGeometry(0.035, 0.052, 1.55, 10);
   const pole = new T.MeshStandardMaterial({ color: '#37414c', metalness: 0.44, roughness: 0.64 });
-  const dim = new T.MeshStandardMaterial({ color: '#15202a', emissive: '#182329', emissiveIntensity: 0.1 });
-  const yellow = new T.MeshStandardMaterial({ color: '#ffb816', emissive: '#ffc11c', emissiveIntensity: 2.1 });
-  const red = new T.MeshStandardMaterial({ color: '#fb3e35', emissive: '#ff2815', emissiveIntensity: 2.0 });
-  const green = new T.MeshStandardMaterial({ color: '#37e486', emissive: '#34ed8c', emissiveIntensity: 1.7 });
+  const glow = new T.MeshBasicMaterial();
+  const dim = new T.Color('#18232a');
+  const yellow = new T.Color('#ffc11c');
+  const red = new T.Color('#ff412d').multiplyScalar(2);
+  const green = new T.Color('#34ed8c').multiplyScalar(1.7);
   const lights = [];
   for (let station = 10; station < track.length; station += 38) {
     const side = lights.length % 2 ? 1 : -1;
     const offset = side === track.pit.side && track.pit.wallAt(station) ?
       track.pit.wallOffset : side * (track.railAt(station, side) - 0.16);
     const point = track.at(station, offset);
-    const group = new T.Group();
-    group.position.set(point.x, 0, point.z);
-    group.rotation.y = point.yaw;
-    const stand = new T.Mesh(post, pole);
-    stand.position.y = 0.775;
-    const body = new T.Mesh(fixture, pole);
-    body.position.y = 1.55;
-    const glow = new T.Mesh(lamp, dim);
-    glow.position.y = 1.55;
-    group.add(stand, body, glow);
-    scene.add(group);
-    lights.push({ station, glow });
+    lights.push({ station, point });
   }
+  const stands = new T.InstancedMesh(post, pole, lights.length);
+  const cases = new T.InstancedMesh(fixture, pole, lights.length);
+  const signals = new T.InstancedMesh(lamp, glow, lights.length);
+  signals.instanceMatrix.setUsage(T.StaticDrawUsage);
+  const pose = new T.Object3D();
+  lights.forEach(({ point }, index) => {
+    pose.rotation.y = point.yaw;
+    pose.position.set(point.x, 0.775, point.z);
+    pose.updateMatrix();
+    stands.setMatrixAt(index, pose.matrix);
+    pose.position.y = 1.55;
+    pose.updateMatrix();
+    cases.setMatrixAt(index, pose.matrix);
+    signals.setMatrixAt(index, pose.matrix);
+    signals.setColorAt(index, dim);
+  });
+  signals.instanceColor.setUsage(T.DynamicDrawUsage);
+  scene.add(stands, cases, signals);
+  const pulse = new T.Color();
+  let lastFlag, lastSector, lastPulse;
   return (control, elapsed, dt, reducedMotion) => {
-    yellow.emissiveIntensity = reducedMotion ? 2.1 : 1.5 + 0.7 * (1 + Math.sin(dt * 5.6));
-    for (const { glow, station } of lights) {
+    const flag = control.flag === 'green' && (!control.changed || elapsed - control.changed >= 3.5) ? 'dim' : control.flag;
+    const strength = flag !== 'yellow' ? 0 : reducedMotion ? 2.1 : 1.5 + 0.7 * (1 + Math.sin(dt * 5.6));
+    if (flag === lastFlag && control.sector === lastSector && Math.abs(strength - lastPulse) < 0.04) return;
+    lastFlag = flag;
+    lastSector = control.sector;
+    lastPulse = strength;
+    pulse.copy(yellow).multiplyScalar(strength);
+    for (const [index, { station }] of lights.entries()) {
       const difference = Math.abs(station - control.sector) % track.length;
       const sector = Math.min(difference, track.length - difference) < 52;
-      glow.material = control.flag === 'red' ? red : control.flag === 'yellow' && sector ? yellow :
-        control.flag === 'green' && control.changed > 0 && elapsed - control.changed < 3.5 ? green : dim;
+      signals.setColorAt(index, flag === 'red' ? red : flag === 'yellow' && sector ? pulse : flag === 'green' ? green : dim);
     }
+    signals.instanceColor.needsUpdate = true;
   };
 }

@@ -15,6 +15,7 @@ import { loadCarAsset } from './car-asset.js';
 import { addPitView } from './pit-view.js';
 import { t } from './i18n.js';
 import { addMarshalLights } from './track-marshal.js';
+import { addStaticBoxes } from './static-boxes.js';
 
 const standard = (color, roughness = 0.78, metalness = 0) => new T.MeshStandardMaterial({ color, roughness, metalness });
 const boxGeometry = new T.BoxGeometry(1, 1, 1);
@@ -254,7 +255,7 @@ function addTrack(scene, track, assets, label) {
     const post = new T.Group();
     post.rotation.y = point.yaw;
     post.position.set(point.x, 0, point.z);
-    box(post, metal, 0.13, height, 0.13, 0, height / 2, 0).castShadow = true;
+    box(post, metal, 0.13, height, 0.13, 0, height / 2, 0);
     box(post, dark, night ? 2.16 : 1.7, 0.20, night ? 0.48 : 0.23, -side * 0.78, height - 0.06, 0);
     const lamp = box(post, bulb, night ? 1.35 : 0.66, 0.070, night ? 0.46 : 0.26, -side * 1.34, height - 0.16, 0);
     lamp.rotation.z = side * 0.13;
@@ -263,6 +264,7 @@ function addTrack(scene, track, assets, label) {
 
   addGuardrails(scene, track, metal);
   addGrandstand(scene, track, metal);
+  addStaticBoxes(scene, boxGeometry);
   return wetness => {
     asphalt.color.setRGB(0.36 - wetness * 0.20, 0.37 - wetness * 0.197, 0.39 - wetness * 0.183);
     asphalt.roughness = 0.94 - wetness * 0.70;
