@@ -96,8 +96,9 @@ export function addPitGarages(scene, track, bays, { block, part, label }) {
   const paint = surface('#d8cdb0', 0.77);
   const hazard = surface('#d4a04e', 0.73);
   const led = new T.MeshBasicMaterial({ color: new T.Color(1.44, 1.74, 1.92) });
+  const bayLamp = new T.MeshBasicMaterial({ color: new T.Color(2.0, 1.40, 0.52) });
   const equipment = addPitEquipment({ block, part, side });
-  bays.forEach(({ color, station }, index) => {
+  bays.forEach(({ color, station, player }, index) => {
     const accent = surface(color, 0.51, 0.23);
     const build = (material, z, x, ...dimensions) => block(material, station + z, face + side * x, ...dimensions);
     build(back, 0, 3.55, 1.62, 0.18, 3.24, 6.8);
@@ -125,6 +126,15 @@ export function addPitGarages(scene, track, bays, { block, part, label }) {
     for (const z of [-2.87, -1.46, 0, 1.46, 2.87]) build(trim, z, 0.26, 4.47, 0.075, 0.99, 0.065);
     build(trim, 0, 0.26, 4.10, 0.079, 0.068, 5.76);
     build(led, 0, 0.41, 4.81, 0.035, 0.040, 5.46);
+    if (player) {
+      const arm = Math.abs(face - track.pit.stallCenter);
+      build(frame, 0.52, -0.24, 1.54, 0.15, 3.07, 0.17);
+      build(frame, 0.52, -arm / 2, 2.91, arm + 0.29, 0.12, 0.18);
+      build(frame, 0.52, -arm, 2.79, 0.72, 0.21, 0.27);
+      for (const shift of [-0.21, 0, 0.21]) {
+        build(bayLamp, 0.37, -arm + shift, 2.79, 0.12, 0.087, 0.037);
+      }
+    }
     build(drains, 0, -0.58, 0.022, 0.17, 0.013, 5.75);
     for (let z = -2.70; z <= 2.71; z += 0.18) build(trim, z, -0.58, 0.032, 0.126, 0.008, 0.026);
     for (const z of [-2.48, 2.48]) build(paint, z, -0.62, 0.027, 1.24, 0.012, 0.055);

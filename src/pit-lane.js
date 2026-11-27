@@ -38,6 +38,11 @@ export function buildPitLane(track) {
     return local >= wallStart && local <= wallEnd;
   };
   const garageAt = station => Math.abs(wrap(station) - box) < 15.1;
+  const pavedAt = (station, offset) => {
+    const local = wrap(station);
+    return local >= entry && local <= exit && side * offset > edge &&
+      Math.abs(offset - offsetAt(local)) <= widthAt(local) + 0.08;
+  };
   const contains = (station, offset) => {
     const local = wrap(station);
     return local > speedLine && local < exit && side * offset > (wallAt(station) ? Math.abs(wallOffset) : edge + 0.10) &&
@@ -50,7 +55,7 @@ export function buildPitLane(track) {
   };
   return { entry, laneStart, box, laneEnd, exit, wallStart, wallEnd, wallOffset, wallWidth, speedLine, speedEnd,
     side, center, stallCenter, fastCenter, halfWidth, garageFace, edge, wrap, offsetAt, widthAt,
-    taper, railAt, wallAt, garageAt, contains, speedLimited };
+    taper, railAt, wallAt, garageAt, pavedAt, contains, speedLimited };
 }
 
 export const pitStall = (lane, index) => lane.box + (index < 0 ? 0 : [-12, -6, 6, 12][index]);

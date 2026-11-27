@@ -242,9 +242,8 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
     if (car.x !== x || car.z !== z) projection = projectCar();
     car.offset = projection.offset;
     pitControl.update(car, projection, dt);
-    car.onRoad = car.pit.lane || projection.distance <= track.event.width / 2 + 0.6;
-    updateTires(car, controls, handling, projection, track.event.width / 2, dt,
-      (station, offset) => track.pit.contains(station, offset));
+    car.onRoad = track.pit.pavedAt(projection.station, projection.offset) || projection.distance <= track.event.width / 2 + 0.6;
+    updateTires(car, controls, handling, projection, track.event.width / 2, dt, track.pit.pavedAt);
     wearTires(car, race.wetness, dt);
     for (let index = 0; index < car.tireLife.length; index++) {
       if (car.tireLife[index] === 0 && puncture(car, index)) wheelIncident(car, index);
@@ -374,7 +373,7 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
       resolvePitWallContact(player, road, track.pit, before);
       road = track.project(player.x, player.z);
       resolveBarrierContact(player, road, track.railAt(road.station, Math.sign(road.offset)));
-      updateTires(player, {}, playerHandling, road, track.event.width / 2, step, track.pit.contains);
+      updateTires(player, {}, playerHandling, road, track.event.width / 2, step, track.pit.pavedAt);
     }
   };
   race.refreshHandling = refreshHandling;

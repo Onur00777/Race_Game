@@ -29,6 +29,9 @@ test('the long pit entrance joins the main road before a dedicated speed-limit l
     const { pit } = createTrack(event);
     assert.ok(pit.speedLine - pit.entry >= 60);
     assert.ok(Math.abs(pit.offsetAt(pit.entry)) < pit.edge);
+    const approach = pit.speedLine - 12;
+    assert.ok(pit.pavedAt(approach, pit.offsetAt(approach)));
+    assert.ok(!pit.speedLimited(approach, pit.offsetAt(approach)));
     assert.ok(!pit.speedLimited(pit.speedLine - 0.1, pit.offsetAt(pit.speedLine - 0.1)));
     assert.ok(pit.speedLimited(pit.speedLine + 0.1, pit.offsetAt(pit.speedLine + 0.1)));
     assert.ok(!pit.speedLimited(pit.speedLine + 0.1, pit.side * (pit.edge - 0.5)));
