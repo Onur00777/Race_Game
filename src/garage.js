@@ -1,4 +1,4 @@
-import { currentTeam, maxUpgrade, money, price, repairQuote, upgrades } from './career.js';
+import { currentTeam, maxUpgrade, money, price, repairQuote, sponsorAvailable, upgrades } from './career.js';
 import { escapeHtml, getLanguage, local, t, translatedField } from './i18n.js';
 import { compounds, decalSlots, sliders, sponsors, vehicleStats, wings } from './setup.js';
 import { damagePerformance, integrity, vehicleCondition } from './vehicle-damage.js';
@@ -121,10 +121,11 @@ const panels = {
   sponsors: career => `
     ${sponsors.map(sponsor => {
       const active = sponsor.id === career.sponsor;
-      const locked = career.completed < sponsor.unlock;
+      const locked = !sponsorAvailable(career, sponsor);
       return `<article class="work-row sponsor-row">
         <div><h3 style="--sponsor:${sponsor.color}">${sponsor.brand}</h3><p>${t('sponsorRate', garageMoney(sponsor.payout))}</p></div>
-        <button type="button" class="secondary" data-sponsor="${sponsor.id}" ${disabled(active || locked)}>${active ? t('sponsorActive') : locked ? t('requiresRaces', sponsor.unlock) : t('signSponsor')}</button>
+        <button type="button" class="secondary" data-sponsor="${sponsor.id}" ${disabled(active || locked)}>${active ? t('sponsorActive') :
+          locked ? (sponsor.season ? t('hardwareMilestone', sponsor.season, sponsor.round) : t('requiresRaces', sponsor.unlock)) : t('signSponsor')}</button>
       </article>`;
     }).join('')}
     <fieldset class="decal-options" ${disabled(!career.sponsor)}><legend>${t('decal')}</legend>

@@ -3,7 +3,7 @@ import { defaultPoints, defaultPrizes, events } from './events.js';
 import { difficulties, difficultyId } from './difficulty.js';
 import { integrity, vehicleCondition } from './vehicle-damage.js';
 import { electronics, normalizeElectronics } from './ecu.js';
-import { aeroAccess, electronicsMilestone, installedModels, milestoneReached, normalizeHardware, partTier, stages } from './hardware.js';
+import { aeroAccess, electronicsMilestone, hardware, installedModels, milestoneReached, normalizeHardware, partTier, stages } from './hardware.js';
 
 export const gameName = 'VIN VIN';
 
@@ -127,8 +127,16 @@ export function saveProfile(career, name, language, team) {
 
 export function acceptSponsor(career, id) {
   const offer = sponsors.find(sponsor => sponsor.id === id);
-  if (!offer || career.completed < offer.unlock) return career;
+  if (!offer || !sponsorAvailable(career, offer)) return career;
   return { ...career, sponsor: id };
+}
+
+export const sponsorAvailable = (career, offer) => offer.season ? milestoneReached(career, offer) : career.completed >= offer.unlock;
+
+export function newHardware(before, after) {
+  const parts = Object.values(hardware).flat().filter(model => !milestoneReached(before, model) && milestoneReached(after, model));
+  const offers = sponsors.filter(sponsor => !sponsorAvailable(before, sponsor) && sponsorAvailable(after, sponsor));
+  return [...parts.map(part => part.name), ...offers.map(sponsor => sponsor.brand)];
 }
 
 export function toggleDecal(career, slot) {

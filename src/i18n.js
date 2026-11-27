@@ -141,6 +141,7 @@ const messages = {
   hardwareModels: ['Parça modelleri', 'Part models'],
   hardwareMilestone: ['Sezon {0} · Etap {1}', 'Season {0} · Round {1}'],
   hardwareLocked: ['Kilitli', 'Locked'],
+  newHardware: ['Yeni donanım açıldı', 'New hardware unlocked'],
   tireCompound: ['Lastik hamuru', 'Tire compound'],
   compoundHint: ['Yumuşak hamur daha iyi tutar, sert hamur yuvarlanma direncini azaltır.', 'Soft tires offer more grip, while hard tires reduce rolling resistance.'],
   wingShape: ['Kanat şekli', 'Wing shape'],

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buyElectronics, buyUpgrade, currentTeam, newCareer, normalizeLoadout } from '../src/career.js';
+import { buyElectronics, buyUpgrade, currentTeam, newCareer, newHardware, normalizeLoadout } from '../src/career.js';
 import { fitPart, stages } from '../src/hardware.js';
 import { vehicleStats } from '../src/setup.js';
 
@@ -38,4 +38,13 @@ test('season two kits alter handling at stage zero and unlock the fifth ECU stag
   const stats = vehicleStats(currentTeam(fitted), loadout.upgrades, loadout.setup, loadout.models);
   assert.equal(loadout.appearance.wing, 'twin');
   assert.ok(stats.load > base.load && stats.braking > base.braking && stats.grip > base.grip);
+});
+
+test('new hardware notifications identify the exact round and season transitions', () => {
+  const career = newCareer();
+  const roundTwo = { ...career, results: [{}] };
+  assert.deepEqual(newHardware(career, roundTwo), ['Clubsport Kit', 'Slotted Performance']);
+  const finish = { ...career, results: Array(6).fill({}) };
+  assert.deepEqual(newHardware(finish, { ...finish, season: 2, results: [] }),
+    ['Hybrid V12 Hyper-Unit', 'Prototype Ground-Effect Kit', 'AURORA']);
 });

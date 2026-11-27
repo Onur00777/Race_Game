@@ -1,4 +1,4 @@
-import { acceptSponsor, buyElectronics, buyUpgrade, changeTeam, currentEvent, currentTeam, events, finishEvent, gameName,
+import { acceptSponsor, buyElectronics, buyUpgrade, changeTeam, currentEvent, currentTeam, events, finishEvent, gameName, newHardware,
   loadCareer, normalizeLoadout, repairVehicle, saveCareer, saveProfile, standings, teamById, teams, toggleDecal } from './career.js';
 import { createRace, createTrack, raceStep } from './race.js';
 import { eventDifficulty, eventForResume, hasSavedRace, raceCheckpoint, restoreRace } from './progress.js';
@@ -623,7 +623,13 @@ function resumeRace() {
   enableAudio();
 }
 
+function unlockCard(names) {
+  if (!names.length) return '';
+  return `<section class="unlock-card"><h3>${t('newHardware')}</h3><ul>${names.map(name => `<li>${escapeHtml(name)}</li>`).join('')}</ul></section>`;
+}
+
 function finishRace() {
+  const before = career;
   const penalty = race.retired ? 0 : race.player.timePenalty ?? 0;
   career = finishEvent(career, race.order, (race.player.finishTime ?? race.elapsed) + penalty, race.player.bestLap, activeLoadout, track.event, {
     difficulty: race.difficulty, retired: race.retired, retiredDrivers: race.retiredDrivers, condition: race.player, timePenalty: penalty,
@@ -655,6 +661,7 @@ function finishRace() {
     ${result.timePenalty ? `<p class="retirement-reason">${t('timePenalty', result.timePenalty)}</p>` : ''}
     <p class="result-condition">${t('bodyCondition')} <b>${condition}%</b></p>
     ${unlocked ? `<p>${t('teamUnlocked', unlocked.name)}</p>` : ''}
+    ${unlockCard(newHardware(before, career))}
     <div class="dialog-actions">
       <button type="button" class="primary" data-action="calendar">${t('backCalendar')}</button>
       <button type="button" class="secondary" data-action="${condition < 100 ? 'service' : 'garage'}">${t(condition < 100 ? 'openService' : 'backGarage')}</button>
@@ -828,9 +835,16 @@ app.addEventListener('click', event => {
       break;
     case 'season':
       if (!currentEvent(career)) {
+        const before = career;
         career = { ...career, season: career.season + 1, results: [], activeRace: null };
         persist();
         showMenu('calendar');
+        const names = newHardware(before, career);
+        if (names.length) {
+          overlay.innerHTML = `<h2>${t('season')} ${career.season}</h2>${unlockCard(names)}
+            <button type="button" class="primary" data-action="calendar">${t('backCalendar')}</button>`;
+          overlay.showModal();
+        }
       }
       break;
   }

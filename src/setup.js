@@ -16,6 +16,8 @@ export const sponsors = [
   { id: 'delta', brand: 'DELTA', color: '#77ecce', unlock: 0, payout: 160 },
   { id: 'vertex', brand: 'VERTEX', color: '#ffe293', unlock: 1, payout: 280 },
   { id: 'nova', brand: 'NOVA FUEL', color: '#ffb0a2', unlock: 2, payout: 420 },
+  { id: 'vortex', brand: 'VORTEX', color: '#d4b0ff', season: 1, round: 5, payout: 650 },
+  { id: 'aurora', brand: 'AURORA', color: '#a7eafa', season: 2, round: 1, payout: 850 },
 ];
 
 export const decalSlots = [

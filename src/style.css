@@ -196,6 +196,9 @@ kbd { padding: 2px 4px; border: 1px solid #fff4; border-radius: 3px; font: 630 .
 .model-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 0; border-top: 1px solid #88a9bc26; }
 .model-row small { display: block; color: #b1c5ce; }
 .model-row:focus-visible, .model-row:hover { background: #90b6cc15; }
+.unlock-card { margin: 10px 0; padding: 8px 12px; border: 1px solid #d7a05480; border-radius: 6px; background: #b0792420; }
+.unlock-card h3 { margin: 0; font: 800 .95rem var(--display); color: #ffcb83; text-transform: uppercase; letter-spacing: .045em; }
+.unlock-card ul { margin: 4px 0 0; padding-inline-start: 18px; }
 .vehicle-console { width: clamp(190px, 20vw, 252px); display: grid; gap: 6px; padding: 8px 10px; pointer-events: auto;
   border: 1px solid #93b2c451; border-radius: 6px; background: linear-gradient(135deg, #16212ae8, #0b1017e0);
   box-shadow: 0 6px 25px #05060877; font: 650 .78rem/1.15 var(--display); color: #e2eef2; }
