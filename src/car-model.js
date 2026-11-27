@@ -3,7 +3,7 @@ import { partTier } from './hardware.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { DecalGeometry } from 'three/addons/geometries/DecalGeometry.js';
 import { sponsors } from './setup.js';
-import { axles, wheelRadius, wheelTrack } from './tires.js';
+import { axles, wheelMounts, wheelRadius, wheelTrack } from './tires.js';
 import { carSurfaceMaps } from './car-materials.js';
 import { compoundId, compounds } from './tire-strategy.js';
 
@@ -503,6 +503,77 @@ export function createRollingWheel(compound) {
   }
   root.traverse(node => { if (node.isMesh) node.castShadow = node.receiveShadow = true; });
   return { root, hub };
+}
+
+export function createTrafficBatch(scene, count, asset) {
+  const batch = (geometry, material, capacity = count) => {
+    const mesh = new T.InstancedMesh(geometry, material, capacity);
+    mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);
+    mesh.frustumCulled = false;
+    mesh.count = 0;
+    scene.add(mesh);
+    return mesh;
+  };
+  const trafficShell = (asset?.body ?? bodyShape).clone();
+  trafficShell.morphAttributes = {};
+  const body = batch(trafficShell,
+    new T.MeshStandardMaterial({ color: '#ffffff', roughness: 0.36, metalness: 0.46 }));
+  const cabin = batch(cabinShape, new T.MeshStandardMaterial({ color: '#273c49', roughness: 0.20, metalness: 0.34 }));
+  const wing = batch(wingShape, carbon);
+  const tyres = batch(tire, rubber, count * 4);
+  const hubs = batch(new T.CylinderGeometry(0.227, 0.227, 0.3, 14).rotateZ(Math.PI / 2), aluminum, count * 4);
+  const tail = batch(box, new T.MeshBasicMaterial(), count * 2);
+  const head = batch(box, headlight, count * 2);
+  const batches = [body, cabin, wing, tyres, hubs, tail, head];
+  const paint = new T.Color();
+  const brakeRed = new T.Color(2.5, 0.17, 0.065);
+  const tailRed = new T.Color(0.78, 0.046, 0.029);
+  const carPose = new T.Object3D();
+  const part = new T.Object3D();
+  const matrix = new T.Matrix4();
+  function add(mesh, x, y, z, sx, sy, sz, ry = 0, rz = 0) {
+    part.position.set(x, y, z);
+    part.scale.set(sx, sy, sz);
+    part.rotation.set(0, ry, rz);
+    part.updateMatrix();
+    const index = mesh.count++;
+    mesh.setMatrixAt(index, matrix.multiplyMatrices(carPose.matrix, part.matrix));
+    return index;
+  }
+  return {
+    begin() { for (const mesh of batches) mesh.count = 0; },
+    add(car, braking) {
+      const lost = car.corners.findIndex(corner => corner.detached);
+      carPose.position.set(car.x, lost >= 0 ? -0.12 : 0, car.z);
+      carPose.rotation.set(lost >= 0 ? (lost % 2 ? 0.06 : -0.06) : 0, car.yaw,
+        lost >= 0 ? (lost >= 2 ? -0.10 : 0.10) : 0, 'YXZ');
+      carPose.updateMatrix();
+      const front = car.frontDamage ?? 0, rear = car.rearDamage ?? 0;
+      body.setColorAt(add(body, 0, -front * 0.05, (rear - front) * 0.1, 1, 1, 1 - (front + rear) * 0.06), paint.set(car.color));
+      add(cabin, 0, 0, 0, 1, 1, 1);
+      const wingDamage = car.wingDamage ?? 0;
+      if (wingDamage < 1) add(wing, 0, 0.745, -1.84, 0.84, 0.6, 0.5, wingDamage * 0.16, wingDamage * 0.24);
+      for (const side of [-1, 1]) {
+        tail.setColorAt(add(tail, side * 0.49, 0.58, -2.12 + rear * 0.25, 0.53, 0.031, 0.025), braking ? brakeRed : tailRed);
+        if (front < 0.83) add(head, side * 0.51, 0.48 - front * 0.1, 2.09 - front * 0.26, 0.38, 0.036, 0.032);
+      }
+      for (const [index, { x, z, front }] of wheelMounts.entries()) {
+        const corner = car.corners[index];
+        if (corner.detached) continue;
+        const y = wheelRadius - (corner.punctured ? 0.08 : 0);
+        const camber = -Math.sign(x) * Math.max(0, corner.damage - 0.30) * 0.72;
+        const steer = front ? -car.steer * 0.3 : 0;
+        add(tyres, x, y, z, 1, corner.punctured ? 0.78 : 1, corner.punctured ? 0.82 : 1, steer, camber);
+        add(hubs, x, y, z, 1, 1, 1, steer, camber);
+      }
+    },
+    end() {
+      for (const mesh of batches) {
+        mesh.instanceMatrix.needsUpdate = true;
+        if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      }
+    },
+  };
 }
 
 function addInterior(shell) {

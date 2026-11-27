@@ -2,7 +2,7 @@ import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { gameName } from './career.js';
 import { addTerrain, addTrees, circuitLamps, lightTrack, loadTrackAssets } from './environment.js';
-import { createCarModel, createRollingWheel, sharedCarResources, updateCarModel } from './car-model.js';
+import { createCarModel, createRollingWheel, createTrafficBatch, sharedCarResources, updateCarModel } from './car-model.js';
 import { createRaceEffects } from './race-effects.js';
 import { renderPose } from './race.js';
 import { createStudio } from './studio.js';
@@ -360,11 +360,12 @@ export async function createView(canvas, quality) {
   const cameraBase = new T.Vector3();
   const cameraTarget = new T.Vector3();
   const target = new T.Vector3();
-  const playerPose = {};
+  const poses = [];
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   let scene;
   let models;
   let rollingWheels;
+  let traffic;
   let updateLight;
   let effects;
   let drawnRace;
@@ -404,6 +405,7 @@ export async function createView(canvas, quality) {
       for (const item of resources) if (!shared.has(item)) item.dispose();
     }
     scene = new T.Scene();
+    traffic = createTrafficBatch(scene, cars.length - 1, carAsset);
     rollingWheels = new Map();
     updateLight = lightTrack(scene, track, assets);
     fitShadowResolution(scene, pipeline.shadowSize());
@@ -418,6 +420,8 @@ export async function createView(canvas, quality) {
     scene.add(racingLine.mesh, skidMarks.mesh);
     models = cars.map(car => {
       const model = createCarModel(car.color, carAsset);
+      model.root.traverse(mesh => { if (mesh.isMesh) mesh.castShadow = false; });
+      model.body.castShadow = true;
       scene.add(model.root);
       return model;
     });
@@ -503,18 +507,25 @@ export async function createView(canvas, quality) {
     setMarshalLights(race.control, race.elapsed, marshalClock, reduceMotion.matches);
     effects.update(dt, driving || mode === 'result' ? race : null, canvas.height, driving, mode === 'result');
     skidMarks.update(race, mode === 'race' && !paused, mode === 'race' || mode === 'result');
-    const player = renderPose(race.player, race.previousPoses[0], fraction, playerPose);
+    const player = renderPose(race.player, race.previousPoses[0], fraction, poses[0] ??= {});
     racingLine.update(race, player, mode === 'race' && guide && !race.player.pit.lane);
     const burstAge = mode === 'race' && !paused && race.backfire ? race.elapsed - race.backfire.time : Infinity;
     const fire = burstAge < 0.15 ? race.backfire.intensity * (1 - burstAge / 0.15) * (0.90 + 0.2 * Math.sin(burstAge * 120)) : 0;
-    for (let i = 0; i < cars.length; i++) {
-      const car = cars[i];
+    const preset = qualityMode(quality);
+    const detailDistance = preset === 'ultra' ? 30 : preset === 'high' ? 13 : 0;
+    traffic.begin();
+    for (let i = 0; i < race.cars.length; i++) {
+      const car = i === 0 ? player : renderPose(race.cars[i], race.previousPoses[i], fraction, poses[i] ??= {});
       const model = models[i];
-      model.root.visible = mode !== 'menu' || i === 0;
       const isBraking = i === 0 ? braking : (model.lastSpeed ?? car.speed) - car.speed > dt * 4;
-      updateCarModel(model, car, dt, isBraking, i === 0 ? fire : 0);
+      const distance = i === 0 ? 0 : Math.hypot(car.x - player.x, car.z - player.z);
+      const detailed = i === 0 || mode !== 'menu' && distance < detailDistance;
+      model.root.visible = model.root.matrixWorldAutoUpdate = detailed;
+      if (detailed) updateCarModel(model, car, dt, isBraking, i === 0 ? fire : 0);
+      else if (mode !== 'menu' && distance < 165) traffic.add(car, isBraking);
       model.lastSpeed = car.speed;
     }
+    traffic.end();
     const { x, z, yaw } = player;
     updateLight(x, z, yaw, models[0].headlightOutput);
     const fx = Math.sin(yaw);
