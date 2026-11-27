@@ -133,8 +133,10 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
   });
   const surfaceGrip = track.event.surfaceGrip;
   const electronics = normalizeElectronics(options.electronics);
-  const playerHandling = { ...vehicleStats(team, upgrades, { ...setup, compound: 'medium' }),
+  const playerHandling = { ...vehicleStats(team, upgrades, { ...setup, compound: 'medium' }, appearance?.models),
     surfaceGrip, ecu: electronics, tcMode: tractionMode(setup?.tcMode) };
+  race.engine = playerHandling.engine;
+  race.redline = playerHandling.redline;
   race.electronics = electronics;
   race.tcMode = tractionMode(options.tcMode ?? setup?.tcMode);
   race.launchHold = 0;
@@ -247,7 +249,7 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
     for (let index = 0; index < car.tireLife.length; index++) {
       if (car.tireLife[index] === 0 && puncture(car, index)) wheelIncident(car, index);
     }
-    updateEngineTemperature(car, controls.draft ?? 0, race.wetness, dt);
+    updateEngineTemperature(car, controls.draft ?? 0, race.wetness, dt, handling.engine, handling.redline);
     const delta = relativeStation(projection.station, car.station);
     const previous = car.station;
     // Reject projection jumps between different sections of a hairpin.

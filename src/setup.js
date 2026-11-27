@@ -1,5 +1,6 @@
 import { tractionMode } from './ecu.js';
 import { compoundId, compoundSpec } from './tire-strategy.js';
+import { partModel, partTier } from './hardware.js';
 export { compounds } from './tire-strategy.js';
 
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
@@ -53,16 +54,19 @@ export function activeWing(setup, level) {
   return wings.find(wing => wing.id === setup.wing && wing.level <= level);
 }
 
-export function vehicleStats(team, parts, input) {
+export function vehicleStats(team, parts, input, models) {
   const setup = normalizeSetup(input, parts.aero);
   const wing = activeWing(setup, parts.aero);
   const compound = compoundSpec(setup.compound);
   const load = wing ? wing.load + setup.downforce * (3.1 + parts.aero * 0.25) + (parts.aero - wing.level) * 7 : 0;
   const drag = wing ? wing.drag + setup.downforce * 0.16 + (parts.aero - wing.level) * 0.20 : 0;
   const rearBalance = 1.18 - Math.abs(setup.rearCamber + 1.5) * 0.43;
+  const engine = partModel('engine', models?.engine);
+  const power = parts.engine + partTier('engine', models?.engine) * 2.1;
   return {
-    topSpeed: 54 + parts.engine * 3.35 + team.power - setup.gearing * 1.75 - drag + compound.rolling,
-    acceleration: 13 + parts.engine * 1.78 + team.power * 0.45 + setup.gearing * 0.68 + rearBalance * 0.29,
+    topSpeed: 54 + power * 3.35 + team.power - setup.gearing * 1.75 - drag + compound.rolling,
+    acceleration: 13 + power * 1.78 + team.power * 0.45 + setup.gearing * 0.68 + rearBalance * 0.29,
+    redline: engine.redline + parts.engine * 75, engine,
     braking: 24 + parts.brakes * 4.5 - Math.abs(setup.brakeBias - 60) * 0.28,
     grip: 8.72 + parts.tires * 0.85 + team.grip + compound.grip + rearBalance * 0.32,
     turn: 1.026 - Math.abs(setup.frontCamber + 2) * 0.040,
@@ -72,8 +76,8 @@ export function vehicleStats(team, parts, input) {
 }
 
 export function carAppearance(loadout) {
-  const { setup, upgrades, sponsor, decals } = loadout;
+  const { setup, upgrades, sponsor, decals, models } = loadout;
   const wing = activeWing(setup, upgrades.aero);
   return { wing: wing?.id ?? 'stock', wingColor: setup.wingColor, wingAngle: setup.downforce,
-    frontCamber: setup.frontCamber, rearCamber: setup.rearCamber, sponsor, decals, parts: upgrades, compound: setup.compound };
+    frontCamber: setup.frontCamber, rearCamber: setup.rearCamber, sponsor, decals, parts: upgrades, models, compound: setup.compound };
 }

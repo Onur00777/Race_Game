@@ -3,6 +3,7 @@ import { escapeHtml, getLanguage, local, t, translatedField } from './i18n.js';
 import { compounds, decalSlots, sliders, sponsors, vehicleStats, wings } from './setup.js';
 import { damagePerformance, integrity, vehicleCondition } from './vehicle-damage.js';
 import { electronics, tractionModes } from './ecu.js';
+import { hardware, installedModels, milestoneReached } from './hardware.js';
 import { estimateStints } from './telemetry.js';
 
 export const garageTabs = { parts: 'parts', tuning: 'tuning', aero: 'aero', sponsors: 'livery', service: 'service', ecu: 'ecuTab' };
@@ -65,12 +66,29 @@ function sliderMarkup(career, id) {
 const panels = {
   parts: career => upgrades.map(part => {
     const level = career.upgrades[part.id];
-    const cost = price(part, level);
+    const cost = price(part, level, career);
     const max = level >= maxUpgrade;
+    const inventory = career.hardware?.[part.id];
+    const models = hardware[part.id];
+    const installed = models?.find(model => model.id === inventory?.installed) ?? models?.[0];
     return `<article class="work-row" data-part="${part.id}">
-      <div><small>${t('upgradeLevel', level, maxUpgrade)}</small><h3>${translatedField(part)}</h3><p>${translatedField(part, 'effect')}</p></div>
+      <div><small>${t('stageLevel', level, maxUpgrade)}</small><h3>${translatedField(part)}</h3><p>${installed?.name ?? translatedField(part, 'effect')}</p></div>
       <button type="button" class="secondary" data-buy="${part.id}" aria-label="${max ? t('maxLevel') : t('partPrice', translatedField(part), garageMoney(cost))}" ${disabled(max || cost > career.cash)}>${max ? t('maxLevel') : garageMoney(cost)}</button>
-    </article>`;
+    </article>${models ? `<details class="part-picker" data-model-group="${part.id}"><summary>${t('hardwareModels')}</summary>
+      ${models.map(model => {
+        const owned = Object.hasOwn(inventory?.owned ?? {}, model.id);
+        const locked = !milestoneReached(career, model);
+        const equipped = model.id === installed.id;
+        const description = locked ? t('hardwareMilestone', model.season, model.round) :
+          t('stageLevel', equipped ? level : inventory?.owned?.[model.id] ?? 0, maxUpgrade);
+        return `<div class="model-row" tabindex="0" data-model-category="${part.id}" data-model-id="${model.id}">
+          <div><strong>${model.name}</strong><small>${description}${model.redline ? ` · ${model.redline} RPM` : ''}</small></div>
+          <button type="button" class="secondary" data-fit-part="${part.id}" data-model="${model.id}"
+            ${disabled(equipped || locked || !owned && model.cost > career.cash)}>${equipped ? t('applied') :
+              locked ? t('hardwareLocked') : owned ? t('apply') : garageMoney(model.cost)}</button>
+        </div>`;
+      }).join('')}
+    </details>` : ''}`;
   }).join(''),
   tuning: career => `
     <label class="tune-field"><strong>${t('tireCompound')}</strong>
@@ -130,7 +148,7 @@ export function garagePanel(career, saved) {
 }
 
 function telemetry(career, condition) {
-  const stats = vehicleStats(currentTeam(career), career.upgrades, career.setup);
+  const stats = vehicleStats(currentTeam(career), career.upgrades, career.setup, installedModels(career.hardware));
   const performance = damagePerformance(condition);
   const topSpeed = stats.topSpeed * performance.speed;
   const handling = { ...stats, surfaceGrip: 1, ecu: career.electronics, tcMode: career.setup.tcMode };

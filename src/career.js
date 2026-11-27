@@ -3,6 +3,7 @@ import { defaultPoints, defaultPrizes, events } from './events.js';
 import { difficulties, difficultyId } from './difficulty.js';
 import { integrity, vehicleCondition } from './vehicle-damage.js';
 import { electronics, normalizeElectronics } from './ecu.js';
+import { installedModels, normalizeHardware, partTier, stages } from './hardware.js';
 
 export const gameName = 'VIN VIN';
 
@@ -31,17 +32,18 @@ export const rivals = [
 // Keep the original key and team ID so that existing careers load after the rename.
 const storageKey = 'apex-circuit-career-v1';
 const positiveMoney = value => Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
-export const maxUpgrade = 3;
+export const maxUpgrade = stages;
 const currencyFormats = { en: new Intl.NumberFormat('en-US'), tr: new Intl.NumberFormat('tr-TR') };
 export const money = (amount, language = 'tr') => '₺' + (currencyFormats[language] ?? currencyFormats.tr).format(amount);
-export const price = (upgrade, level) => upgrade.baseCost * (level + 1);
+export const price = (upgrade, level, career) => Math.round(upgrade.baseCost * (1 + level * 0.72) *
+  (1 + partTier(upgrade.id, career?.hardware?.[upgrade.id]?.installed) * 0.32));
 export const teamById = id => teams.find(team => team.id === id);
 export const currentTeam = career => teamById(career.team);
 export const currentEvent = career => events[career.results.length];
 
 export function newCareer() {
   return {
-    cash: 400, team: teams[0].id, upgrades: { engine: 0, tires: 0, brakes: 0, aero: 0 },
+    cash: 1200, team: teams[0].id, upgrades: { engine: 0, tires: 0, brakes: 0, aero: 0 }, hardware: normalizeHardware(),
     setup: { ...defaultSetup }, sponsor: null, decals: [], completed: 0, season: 1, results: [],
     profile: null, activeRace: null, difficulty: 'medium', screen: 'calendar', garageTab: 'parts',
     condition: vehicleCondition(), repairDebt: 0, electronics: normalizeElectronics(),
@@ -56,7 +58,8 @@ export function normalizeLoadout(data) {
   }));
   const sponsor = sponsors.find(offer => offer.id === data?.sponsor);
   const decals = decalSlots.filter(slot => sponsor && Array.isArray(data?.decals) && data.decals.includes(slot.id)).map(slot => slot.id);
-  const loadout = { team: team.id, upgrades: parts, setup: normalizeSetup(data?.setup, parts.aero),
+  const hardware = normalizeHardware(data?.hardware);
+  const loadout = { team: team.id, upgrades: parts, hardware, models: installedModels(hardware), setup: normalizeSetup(data?.setup, parts.aero),
     electronics: normalizeElectronics(data?.electronics), sponsor: sponsor?.id ?? null, decals };
   return { ...loadout, appearance: carAppearance(loadout) };
 }
@@ -65,8 +68,8 @@ export function loadCareer(storage) {
   try {
     const career = JSON.parse(storage.getItem(storageKey));
     if (career && currentTeam(career) && Array.isArray(career.results) && career.upgrades) {
-      const { team, upgrades: parts, setup, sponsor, decals, electronics: ecu } = normalizeLoadout(career);
-      return { ...newCareer(), ...career, team, upgrades: parts, setup, sponsor, decals, electronics: ecu, difficulty: difficultyId(career.difficulty),
+      const { team, upgrades: parts, hardware, setup, sponsor, decals, electronics: ecu } = normalizeLoadout(career);
+      return { ...newCareer(), ...career, team, upgrades: parts, hardware, setup, sponsor, decals, electronics: ecu, difficulty: difficultyId(career.difficulty),
         condition: vehicleCondition(career.condition), repairDebt: positiveMoney(career.repairDebt) };
     }
   } catch {
@@ -88,9 +91,12 @@ export function buyUpgrade(career, id) {
   const upgrade = upgrades.find(item => item.id === id);
   if (!upgrade) return career;
   const level = career.upgrades[id];
-  const cost = price(upgrade, level);
+  const cost = price(upgrade, level, career);
   if (level >= maxUpgrade || cost > career.cash) return career;
-  return { ...career, cash: career.cash - cost, upgrades: { ...career.upgrades, [id]: level + 1 } };
+  const hardware = normalizeHardware(career.hardware);
+  const equipped = hardware[id];
+  if (equipped) equipped.owned[equipped.installed] = level + 1;
+  return { ...career, hardware, cash: career.cash - cost, upgrades: { ...career.upgrades, [id]: level + 1 } };
 }
 
 export function buyElectronics(career, id) {

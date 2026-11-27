@@ -191,6 +191,11 @@ kbd { padding: 2px 4px; border: 1px solid #fff4; border-radius: 3px; font: 630 .
 .race-instruments { display: flex; align-items: end; justify-self: end; gap: 13px; }
 .fps-counter { position: absolute; top: 64px; right: 0; color: #c8eddf; background: #101d24da;
   border: 1px solid #7ba69c59; border-radius: 4px; padding: 3px 8px; font: 700 .76rem var(--display); font-variant-numeric: tabular-nums; }
+.part-picker { padding: 5px 9px; margin: 0 0 9px; border: 1px solid #91b0c044; border-radius: 5px; }
+.part-picker summary { cursor: pointer; color: #d6e9ed; padding: 5px 0; }
+.model-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 0; border-top: 1px solid #88a9bc26; }
+.model-row small { display: block; color: #b1c5ce; }
+.model-row:focus-visible, .model-row:hover { background: #90b6cc15; }
 .vehicle-console { width: clamp(190px, 20vw, 252px); display: grid; gap: 6px; padding: 8px 10px; pointer-events: auto;
   border: 1px solid #93b2c451; border-radius: 6px; background: linear-gradient(135deg, #16212ae8, #0b1017e0);
   box-shadow: 0 6px 25px #05060877; font: 650 .78rem/1.15 var(--display); color: #e2eef2; }

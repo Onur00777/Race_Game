@@ -8,6 +8,7 @@ import { escapeHtml, getLanguage, setLanguage, t, translatedField, upper } from 
 import { createAudio, updateAudio } from './audio.js';
 import { animateAmount, createWallet } from './wallet.js';
 import { graphicsModes, qualityMode } from './graphics-settings.js';
+import { fitPart } from './hardware.js';
 import { circuitMap, drawBriefingMap } from './circuit-map.js';
 import { legacyEvents } from './events.js';
 import { difficultyId, purseFor } from './difficulty.js';
@@ -706,13 +707,25 @@ app.addEventListener('click', event => {
   if (dataset.buy) {
     const before = career;
     career = buyUpgrade(career, dataset.buy);
-    if (dataset.buy === 'aero' && career.upgrades.aero === 1) career = { ...career, garageTab: 'aero' };
     persist();
     updateGarage();
     aimGarage(['aero', 'engine'].includes(dataset.buy) ? 'rear' : 'side');
     const samePart = byId('garage-panel').querySelector(`[data-buy="${dataset.buy}"]:not(:disabled)`);
     (samePart ?? byId('garage').querySelector('nav [aria-current]'))?.focus();
     if (before !== career) showStats(before, career, true);
+  }
+  if (dataset.fitPart) {
+    const before = career;
+    career = fitPart(career, dataset.fitPart, dataset.model);
+    if (before !== career) {
+      persist();
+      updateGarage();
+      const group = byId('garage-panel').querySelector(`[data-model-group="${dataset.fitPart}"]`);
+      group.open = true;
+      group.querySelector(`[data-model-id="${dataset.model}"]`)?.focus();
+      aimGarage(['engine', 'aero'].includes(dataset.fitPart) ? 'rear' : 'side');
+      showStats(before, career, true);
+    }
   }
   if (dataset.buyEcu) {
     const before = career;
@@ -825,12 +838,14 @@ app.addEventListener('click', event => {
 
 const workbench = byId('garage-panel');
 function previewPartRow(event) {
-  const row = event.target.closest('[data-part],[data-ecu-part]');
+  const row = event.target.closest('[data-part],[data-ecu-part],[data-model-id]');
   if (!row || row.contains(event.relatedTarget)) return;
-  showStats(career, row.dataset.ecuPart ? previewElectronics(career, row.dataset.ecuPart) : previewPart(career, row.dataset.part));
+  const { modelId, modelCategory, ecuPart, part } = row.dataset;
+  showStats(career, modelId ? fitPart(career, modelCategory, modelId, true) :
+    ecuPart ? previewElectronics(career, ecuPart) : previewPart(career, part));
 }
 function clearPartRow(event) {
-  const row = event.target.closest('[data-part],[data-ecu-part]');
+  const row = event.target.closest('[data-part],[data-ecu-part],[data-model-id]');
   if (row && !row.contains(event.relatedTarget)) showStats(career);
 }
 workbench.addEventListener('pointerover', previewPartRow);
