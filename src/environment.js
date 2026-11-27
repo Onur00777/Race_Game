@@ -113,18 +113,18 @@ export function lightTrack(scene, track, assets) {
   sun.shadow.normalBias = 0.028;
   sun.shadow.bias = -0.00008;
   sun.shadow.radius = 2.2;
-  Object.assign(sun.shadow.camera, { left: -36, right: 36, top: 36, bottom: -36, near: 1, far: 130 });
+  const extent = 22;
+  Object.assign(sun.shadow.camera, { left: -extent, right: extent, top: extent, bottom: -extent, near: 19, far: 107 });
   sun.shadow.camera.updateProjectionMatrix();
   scene.add(sun, sun.target, new T.HemisphereLight('#cadcf4', event.weather === 'night' ? '#485160' : '#615940', view.fill));
   const updateNight = event.weather === 'night' ? nightLights(scene, track) : null;
 
   return (x, z, yaw, headlightOutput) => {
-    const size = 72 / sun.shadow.mapSize.x;
+    const size = 2 * extent / sun.shadow.mapSize.x;
     const target = sun.target.position.set(x, 0, z);
-    for (const axis of [right, vertical]) {
-      const coordinate = target.dot(axis);
-      target.addScaledVector(axis, Math.round(coordinate / size) * size - coordinate);
-    }
+    const horizontal = target.dot(right), height = target.dot(vertical);
+    target.addScaledVector(right, Math.round(horizontal / size) * size - horizontal);
+    target.addScaledVector(vertical, Math.round(height / size) * size - height);
     sun.position.copy(sun.target.position).addScaledVector(direction, 66);
     updateNight?.(x, z, yaw, headlightOutput);
   };

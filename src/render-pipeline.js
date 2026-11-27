@@ -11,6 +11,8 @@ export function createRenderPipeline(renderer, mode) {
   const hdr = renderer.extensions.has('EXT_color_buffer_float');
   const gl = renderer.getContext();
   const supportedSamples = hdr ? (gl.getInternalformatParameter(gl.RENDERBUFFER, gl.RGBA16F, gl.SAMPLES) ?? []) : [];
+  renderer.shadowMap.enabled = quality.shadow > 0;
+  renderer.info.autoReset = false;
   let composer;
   let scenePass;
   let bloom;
@@ -42,6 +44,7 @@ export function createRenderPipeline(renderer, mode) {
   }
 
   function render(scene, camera, dt, glow = 1) {
+    renderer.info.reset();
     if (!composer || !quality.bloom || !hdr) {
       renderer.render(scene, camera);
       return;
@@ -54,6 +57,7 @@ export function createRenderPipeline(renderer, mode) {
 
   function setQuality(mode) {
     quality = graphicsModes[qualityMode(mode)];
+    renderer.shadowMap.enabled = quality.shadow > 0;
     if (composer && !quality.bloom) {
       for (const pass of composer.passes) pass.dispose();
       composer.dispose();
@@ -63,7 +67,7 @@ export function createRenderPipeline(renderer, mode) {
 
   return {
     resize, render, setQuality,
-    shadowSize: () => Math.min(quality.shadow, renderer.capabilities.maxTextureSize),
+    shadowSize: () => Math.max(512, Math.min(quality.shadow, renderer.capabilities.maxTextureSize)),
   };
 }
 

@@ -189,6 +189,8 @@ kbd { padding: 2px 4px; border: 1px solid #fff4; border-radius: 3px; font: 630 .
 .speed > span { display: block; margin: 8px 0 0 auto; width: min(164px, 24vw); height: 4px; transform: skewX(-28deg); background: #ffede757; }
 .speed > span i { display: block; height: 100%; background: var(--orange); }
 .race-instruments { display: flex; align-items: end; justify-self: end; gap: 13px; }
+.fps-counter { position: absolute; top: 64px; right: 0; color: #c8eddf; background: #101d24da;
+  border: 1px solid #7ba69c59; border-radius: 4px; padding: 3px 8px; font: 700 .76rem var(--display); font-variant-numeric: tabular-nums; }
 .vehicle-console { width: clamp(190px, 20vw, 252px); display: grid; gap: 6px; padding: 8px 10px; pointer-events: auto;
   border: 1px solid #93b2c451; border-radius: 6px; background: linear-gradient(135deg, #16212ae8, #0b1017e0);
   box-shadow: 0 6px 25px #05060877; font: 650 .78rem/1.15 var(--display); color: #e2eef2; }

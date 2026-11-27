@@ -20,17 +20,16 @@ export const raceStep = 1 / 120;
 
 const visualPose = ({ x, z, yaw, speed, steer, station }) => ({ x, z, yaw, speed, steer, station });
 
-export function renderPose(car, previous, fraction) {
+export function renderPose(car, previous, fraction, result = {}) {
   if (!previous) return car;
-  return {
-    ...car,
+  return Object.assign(result, car, {
     x: previous.x + (car.x - previous.x) * fraction,
     z: previous.z + (car.z - previous.z) * fraction,
     yaw: previous.yaw + angleBetween(previous.yaw, car.yaw) * fraction,
     speed: previous.speed + (car.speed - previous.speed) * fraction,
     steer: previous.steer + (car.steer - previous.steer) * fraction,
     station: previous.station + (car.station - previous.station) * fraction,
-  };
+  });
 }
 
 export function createTrack(event) {

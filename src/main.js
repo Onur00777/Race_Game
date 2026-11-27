@@ -79,6 +79,7 @@ app.innerHTML = `
         <label><span data-text="pitRepair"></span><input id="pit-repair" type="checkbox" data-pit-repair></label>
         <small data-text="pitStopHint"></small></div>
       <div id="pit-status" class="pit-status" hidden></div>
+      <output id="fps-counter" class="fps-counter" hidden></output>
       <div id="race-control-flag" class="race-control-flag" hidden role="status"><strong></strong><span></span></div>
       <div id="hit-vignette" class="hit-vignette" aria-hidden="true"></div>
       <div id="countdown" class="countdown" aria-live="polite"></div>
@@ -113,6 +114,9 @@ const mapBackgroundContext = mapBackground.getContext('2d');
 const speedText = byId('speed');
 const speedBar = byId('speed-bar');
 const clock = byId('clock');
+const fpsCounter = byId('fps-counter');
+let fpsSample = 0;
+let fpsFrames = 0;
 const garagePreview = byId('garage-preview');
 const updateWallet = createWallet(byId('wallet'), garageMoney);
 const keys = new Set();
@@ -413,6 +417,7 @@ function startRace(restart = false) {
   hudFlash?.cancel();
   byId('menu').hidden = byId('garage').hidden = byId('topbar').hidden = true;
   byId('hud').hidden = false;
+  fpsCounter.hidden = !career.showFps;
   setPitMenu(false);
   document.body.classList.remove('in-garage');
   document.body.classList.add('driving');
@@ -583,6 +588,7 @@ function renderPause(saved) {
   delete overlay.dataset.kind;
   overlay.innerHTML = `<h2>${t('paused')}</h2><p>${t(saved ? 'pauseSaved' : 'pauseUnsaved')}</p>
     <label class="pause-setting"><span>${t('graphics')}</span><select data-graphics>${graphicsOptions()}</select></label>
+    <label class="pause-setting"><span>${t('fpsCounter')}</span><input type="checkbox" data-fps ${career.showFps ? 'checked' : ''}></label>
     <label class="pause-setting"><span>${t('racingLine')} <kbd>L</kbd></span><input type="checkbox" data-racing-line ${career.racingLine !== false ? 'checked' : ''}></label>
     <div class="dialog-actions">
       <button type="button" class="primary" data-action="resume">${t('resumeRace')}</button>
@@ -864,6 +870,13 @@ app.addEventListener('change', event => {
     view?.setQuality(career.graphics);
     persist();
   }
+  if (field.hasAttribute('data-fps')) {
+    career = { ...career, showFps: field.checked };
+    fpsCounter.hidden = !field.checked;
+    fpsFrames = 0;
+    fpsSample = 0;
+    persist();
+  }
   if (field.form?.id === 'driver-form') {
     if (field.name === 'team') {
       draft.team = field.value;
@@ -997,6 +1010,16 @@ function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.25, Math.max(0, (now - (previousFrame ?? now)) / 1000));
   previousFrame = now;
+  if (mode === 'race' && career.showFps) {
+    if (!fpsSample) fpsSample = now;
+    const elapsed = now - fpsSample;
+    if (elapsed >= 650) {
+      fpsCounter.textContent = `${Math.round(fpsFrames * 1000 / elapsed)} FPS`;
+      fpsFrames = 0;
+      fpsSample = now;
+    }
+    fpsFrames++;
+  }
   if (mode === 'menu' && screen === 'garage') {
     view.drawGarage(garageCar, orbit, dt);
     return;

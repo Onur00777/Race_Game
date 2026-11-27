@@ -287,6 +287,7 @@ export async function createView(canvas, quality) {
   const cameraBase = new T.Vector3();
   const cameraTarget = new T.Vector3();
   const target = new T.Vector3();
+  const playerPose = {};
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   let scene;
   let models;
@@ -429,8 +430,8 @@ export async function createView(canvas, quality) {
     setMarshalLights(race.control, race.elapsed, marshalClock, reduceMotion.matches);
     effects.update(dt, driving || mode === 'result' ? race : null, canvas.height, driving, mode === 'result');
     skidMarks.update(race, mode === 'race' && !paused, mode === 'race' || mode === 'result');
-    const cars = race.cars.map((car, index) => renderPose(car, race.previousPoses[index], fraction));
-    racingLine.update(race, cars[0], mode === 'race' && guide && !race.player.pit.lane);
+    const player = renderPose(race.player, race.previousPoses[0], fraction, playerPose);
+    racingLine.update(race, player, mode === 'race' && guide && !race.player.pit.lane);
     const burstAge = mode === 'race' && !paused && race.backfire ? race.elapsed - race.backfire.time : Infinity;
     const fire = burstAge < 0.15 ? race.backfire.intensity * (1 - burstAge / 0.15) * (0.90 + 0.2 * Math.sin(burstAge * 120)) : 0;
     for (let i = 0; i < cars.length; i++) {
@@ -441,7 +442,7 @@ export async function createView(canvas, quality) {
       updateCarModel(model, car, dt, isBraking, i === 0 ? fire : 0);
       model.lastSpeed = car.speed;
     }
-    const { x, z, yaw } = cars[0];
+    const { x, z, yaw } = player;
     updateLight(x, z, yaw, models[0].headlightOutput);
     const fx = Math.sin(yaw);
     const fz = Math.cos(yaw);
