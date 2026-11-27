@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { events, currentTeam, newCareer } from '../src/career.js';
 import { createRace, createTrack, raceStep } from '../src/race.js';
 import { brakingRisk, makeRacingLine } from '../src/racing-line.js';
+import { createRacingLineView } from '../src/racing-line-view.js';
 
 test('the recommended line stays on track, wraps and brakes in advance of tight corners', () => {
   for (const event of events) {
@@ -32,6 +33,24 @@ test('driver speed changes the same upcoming corner from green to lift to hard b
   assert.equal(high, 1);
   assert(brakingRisk(27, 22, 35, 54) < brakingRisk(27, 22, 5, 54));
   assert.equal(brakingRisk(54, 54, 2, 54), 0);
+});
+
+test('the rendered guide remains continuous across the start line late in a race', () => {
+  const career = newCareer();
+  const track = createTrack(events[2]);
+  const race = createRace(track, currentTeam(career), career.upgrades);
+  const view = createRacingLineView();
+  const { position, color } = view.mesh.geometry.attributes;
+  for (const station of [-0.25, 0.25, 5 * track.length - 0.25, 5 * track.length + 0.25]) {
+    view.update(race, { station, speed: 42 }, true);
+    assert.ok(view.mesh.visible);
+    assert.ok(position.array.every(Number.isFinite) && color.array.every(Number.isFinite));
+    for (let i = 2; i < position.count; i += 2) {
+      assert.ok(Math.hypot(position.getX(i) - position.getX(i - 2), position.getZ(i) - position.getZ(i - 2)) < 3);
+    }
+  }
+  view.update(race, race.player, false);
+  assert.equal(view.mesh.visible, false);
 });
 
 test('backfire is generated when an upgraded engine lifts at speed and stays quiet in a stock car', () => {
