@@ -24,6 +24,17 @@ test('a stopped car and two passing car widths fit across the new pit bays', () 
   }
 });
 
+test('the long pit entrance joins the main road before a dedicated speed-limit line', () => {
+  for (const event of [events[0], events.at(-1)]) {
+    const { pit } = createTrack(event);
+    assert.ok(pit.speedLine - pit.entry >= 60);
+    assert.ok(Math.abs(pit.offsetAt(pit.entry)) < pit.edge);
+    assert.ok(!pit.speedLimited(pit.speedLine - 0.1, pit.offsetAt(pit.speedLine - 0.1)));
+    assert.ok(pit.speedLimited(pit.speedLine + 0.1, pit.offsetAt(pit.speedLine + 0.1)));
+    assert.ok(!pit.speedLimited(pit.speedLine + 0.1, pit.side * (pit.edge - 0.5)));
+  }
+});
+
 test('the continuous pit wall keeps a car on its original side and produces a concrete impact', () => {
   const track = createTrack(events[0]);
   const race = createRace(track, currentTeam(career), career.upgrades, career.setup);

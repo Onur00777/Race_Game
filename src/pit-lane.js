@@ -8,9 +8,9 @@ const smooth = value => { const x = clamp(value, 0, 1); return x * x * (3 - 2 * 
 
 export function buildPitLane(track) {
   const wide = Boolean(track.event.trackLayout);
-  const entry = -88, laneStart = -33, box = 19;
+  const entry = wide ? -134 : -88, laneStart = -33, box = 19;
   const laneEnd = wide ? 114 : 68, exit = wide ? 174 : 113;
-  const wallStart = -24, wallEnd = wide ? laneEnd : 59, speedLine = -50;
+  const wallStart = -24, wallEnd = wide ? laneEnd : 59, speedLine = wide ? -71 : -50;
   const speedEnd = wide ? wallEnd : exit;
   const side = track.event.pitSide ?? -1;
   const edge = track.event.width / 2;
@@ -133,7 +133,9 @@ export function createPitControl(race, plan) {
     const heading = angleBetween(car.yaw, yaw);
     const deceleration = 1.12 + Math.min(1.35, (car.tireGrip ?? 1) * track.event.surfaceGrip);
     const stop = stillNeedsBox ? Math.sqrt(Math.max(0, distance - 0.58) * 2 * deceleration) : pitSpeed;
-    let pace = Math.min(pitSpeed, stop);
+    const entryPace = track.event.trackLayout
+      ? Math.sqrt(pitSpeed ** 2 + 2 * deceleration * Math.max(0, lane.speedLine - local)) : pitSpeed;
+    let pace = stillNeedsBox ? Math.min(entryPace, stop) : pitSpeed;
     for (const other of cars) {
       if (other === car || (!other.pit.lane && other.pit.routeLap !== lap)) continue;
       const gap = other.station - car.station;

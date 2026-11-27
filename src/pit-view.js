@@ -117,18 +117,25 @@ export function addPitView(scene, track, assets, label, cars) {
   }
   const outside = station => lane.offsetAt(station) + lane.side * (lane.widthAt(station) - 0.04);
   const inside = station => lane.offsetAt(station) - lane.side * (lane.widthAt(station) - 0.04);
+  const signShoulder = station => lane.side * Math.max(lane.edge + 1.56, Math.abs(outside(station)) + 0.28);
   scene.add(ribbon(track, lane.entry, lane.exit, lane.offsetAt, station => lane.widthAt(station) * 2, 0.010, pavement));
   scene.add(ribbon(track, lane.box - 15.1, lane.box + 15.1, () => lane.garageFace + lane.side * 1.60, 6.0, 0.013, concrete));
-  scene.add(ribbon(track, lane.entry, lane.exit, outside, 0.115, 0.021, blue));
+  scene.add(ribbon(track, lane.entry, lane.speedLine, outside, 0.25, 0.021, blue));
+  scene.add(ribbon(track, lane.speedLine, lane.exit, outside, 0.115, 0.021, blue));
   scene.add(ribbon(track, lane.laneEnd, lane.exit + 9, inside, 0.13, 0.023, white));
   for (let s = lane.entry + 4; s < lane.wallStart - 4; s += 4.9) {
-    const stripeOffset = inside(s) - lane.side * 0.43;
-    block(white, s, stripeOffset, 0.022, 0.10, 0.016, 2.25, lane.side * 0.55);
-    block(white, s + 0.9, stripeOffset + lane.side * 0.80, 0.022, 0.10, 0.016, 2.25, -lane.side * 0.55);
-    if (s < lane.speedLine) block(post, s, outside(s) + lane.side * 0.18, 0.31, 0.105, 0.61, 0.13);
+    const stripeOffset = lane.offsetAt(s);
+    if (Math.abs(stripeOffset) > lane.edge + 0.65 && s < lane.laneStart) {
+      for (const wing of [-1, 1]) {
+        block(white, s, stripeOffset + wing * 0.47, 0.022, 0.12, 0.015, 1.57, -wing * 0.64);
+      }
+    }
+    if (s < lane.speedLine) block(post, s, signShoulder(s), 0.31, 0.105, 0.61, 0.13);
   }
-  const divider = () => (lane.fastCenter + lane.stallCenter) / 2;
-  for (let s = lane.laneStart; s < lane.laneEnd - 1; s += 5) scene.add(ribbon(track, s, s + 2.1, divider, 0.12, 0.022, white));
+  const divider = (lane.fastCenter + lane.stallCenter) / 2;
+  for (let s = lane.laneStart; s < lane.laneEnd - 1; s += 5) {
+    block(white, s, divider, 0.022, 0.12, 0.005, 2.1);
+  }
   scene.add(ribbon(track, lane.speedLine, lane.speedLine + 0.26, lane.offsetAt, s => lane.widthAt(s) * 2, 0.023, white));
   if (lane.speedEnd < lane.exit) {
     scene.add(ribbon(track, lane.speedEnd - 0.2, lane.speedEnd, lane.offsetAt, lane.halfWidth * 2, 0.024, green));
@@ -147,8 +154,10 @@ export function addPitView(scene, track, assets, label, cars) {
   wallAndFence(scene, track, block, steel);
   addPitGarages(scene, track, bays, { block, part, label });
   const updateCrew = addPitCrew(scene, track, bays);
-  pitSign(scene, track, lane.entry + 3, outside(lane.entry + 3) + lane.side * 0.25, label('pitEntry'), '#66e0ee');
-  pitSign(scene, track, lane.speedLine, outside(lane.speedLine) + lane.side * 0.38, '80 km/h', '#66e0ee');
+  const entrySign = lane.entry - 8;
+  block(steel, entrySign + 0.11, signShoulder(entrySign), 0.70, 0.085, 1.42, 0.095);
+  pitSign(scene, track, entrySign, signShoulder(entrySign), label('pitEntry') + (lane.side > 0 ? ' ›' : ' ‹'), '#66e0ee');
+  pitSign(scene, track, lane.speedLine, signShoulder(lane.speedLine), '80 km/h', '#66e0ee');
   const serviceSign = lane.box + 2.65;
   const signOffset = outside(serviceSign) + lane.side * 0.41;
   block(steel, serviceSign + 0.075, signOffset, 1.13, 0.08, 2.26, 0.095);
