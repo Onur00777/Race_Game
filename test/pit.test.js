@@ -6,12 +6,23 @@ import { raceCheckpoint, restoreRace } from '../src/progress.js';
 import { createRace, createTrack, raceStep } from '../src/race.js';
 import { tireHealth } from '../src/tire-strategy.js';
 import { originalEvents } from '../src/events.js';
+import { carWidth } from '../src/contact.js';
 
 const career = newCareer();
 const loadout = normalizeLoadout(career);
 const tick = (race, seconds, input = { gas: 0, brake: 0, steering: 0 }) => {
   for (let step = 0; step < seconds / raceStep; step++) race.update(raceStep, input);
 };
+
+test('a stopped car and two passing car widths fit across the new pit bays', () => {
+  for (const event of [events[0], events.at(-1)]) {
+    const { pit } = createTrack(event);
+    assert.ok(Math.abs(pit.stallCenter - pit.fastCenter) > carWidth * 2);
+    for (const offset of [pit.stallCenter, pit.fastCenter, (pit.stallCenter + pit.fastCenter) / 2]) {
+      assert.ok(pit.contains(pit.box, offset));
+    }
+  }
+});
 
 test('the continuous pit wall keeps a car on its original side and produces a concrete impact', () => {
   const track = createTrack(events[0]);
@@ -46,13 +57,13 @@ test('limiter activates on pit pavement and a saved pit stop restores tires and 
   const track = createTrack(events[0]);
   const race = createRace(track, currentTeam(career), career.upgrades, career.setup);
   race.countdown = 0;
-  const { center, box } = track.pit;
+  const { center, box, stallCenter } = track.pit;
   Object.assign(race.player, track.at(box - 17, center), { station: box - 17, speed: 35 });
   tick(race, 0.55, { gas: 1, brake: 0, steering: 0 });
   assert.ok(race.player.pit.lane);
   assert.ok(race.player.speed <= pitSpeed + 0.1);
   race.pit.plan = { compound: 'hard', repair: true };
-  Object.assign(race.player, track.at(box, center), { station: box, speed: 0, tireLife: [0.22, 0.25, 0.24, 0.22],
+  Object.assign(race.player, track.at(box, stallCenter), { station: box, speed: 0, tireLife: [0.22, 0.25, 0.24, 0.22],
     damage: 34, frontDamage: 0.8 });
   tick(race, 1);
   assert.ok(race.player.pit.remaining > 2);

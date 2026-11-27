@@ -95,13 +95,15 @@ export function addPitCrew(scene, track, bays) {
   };
   const uniform = new T.MeshStandardMaterial({ roughness: 0.78 });
   const shell = new T.MeshStandardMaterial({ roughness: 0.34, metalness: 0.15 });
+  const apron = lane.side * lane.garageFace - lane.edge;
+  const stall = lane.side * lane.stallCenter - lane.edge;
   const crew = bays.flatMap((bay, index) => {
     const accent = bay.color;
     const engineerSide = index % 2 ? -1 : 1;
     return [
-      { bay, rig: createRig(parts, accent, false), berth: -1, offset: 11.70, shift: -1.04 },
-      { bay, rig: createRig(parts, accent, false), berth: 1, offset: 11.70, shift: 1.04 },
-      { bay, rig: createRig(parts, accent, true), berth: 0, offset: 11.36, shift: engineerSide * 2.22 },
+      { bay, rig: createRig(parts, accent, false), berth: -1, offset: apron + 0.30, shift: -1.04 },
+      { bay, rig: createRig(parts, accent, false), berth: 1, offset: apron + 0.30, shift: 1.04 },
+      { bay, rig: createRig(parts, accent, true), berth: 0, offset: apron - 0.04, shift: engineerSide * 2.22 },
     ];
   });
   const batches = Object.entries(parts).map(([shape, { geometry, pieces }]) => {
@@ -129,7 +131,7 @@ export function addPitCrew(scene, track, bays) {
       if (working > 0) {
         const alignment = clamp(lane.wrap(car.station) - bay.station, -0.70, 0.70);
         station = lerp(station, bay.station + alignment + berth * 1.25, working);
-        distance = lerp(offset, clamp(lane.side * car.offset - lane.edge + 1.59, 8.90, 10.16), working);
+        distance = lerp(offset, clamp(lane.side * car.offset - lane.edge + 1.59, stall + 0.96, stall + 2.22), working);
       }
       const point = track.at(station, lane.side * (lane.edge + distance));
       const facing = lerp(berth * 0.43, berth * 0.15, working);

@@ -117,7 +117,7 @@ export function addPitView(scene, track, assets, label, cars) {
   const outside = station => lane.offsetAt(station) + lane.side * (lane.widthAt(station) - 0.04);
   const inside = station => lane.offsetAt(station) - lane.side * (lane.widthAt(station) - 0.04);
   scene.add(ribbon(track, lane.entry, lane.exit, lane.offsetAt, station => lane.widthAt(station) * 2, 0.010, pavement));
-  scene.add(ribbon(track, lane.box - 15.1, lane.box + 15.1, () => lane.side * (lane.edge + 13.0), 6.0, 0.013, concrete));
+  scene.add(ribbon(track, lane.box - 15.1, lane.box + 15.1, () => lane.garageFace + lane.side * 1.60, 6.0, 0.013, concrete));
   scene.add(ribbon(track, lane.entry, lane.exit, outside, 0.115, 0.021, blue));
   scene.add(ribbon(track, lane.laneEnd, lane.exit + 9, inside, 0.13, 0.023, white));
   for (let s = lane.entry + 4; s < lane.wallStart - 4; s += 4.9) {

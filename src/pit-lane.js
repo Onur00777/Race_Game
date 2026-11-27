@@ -11,10 +11,12 @@ export function buildPitLane(track) {
   const wallStart = -24, wallEnd = 59, speedLine = -50;
   const side = track.event.pitSide ?? -1;
   const edge = track.event.width / 2;
-  const center = side * (edge + 6.15);
-  const stallCenter = side * (edge + 7.23);
-  const fastCenter = side * (edge + 3.55);
-  const halfWidth = 4.15;
+  const wide = Boolean(track.event.trackLayout);
+  const center = side * (edge + (wide ? 8.15 : 6.15));
+  const stallCenter = side * (edge + (wide ? 10.40 : 7.23));
+  const fastCenter = side * (edge + (wide ? 5.30 : 3.55));
+  const halfWidth = wide ? 6.15 : 4.15;
+  const garageFace = center + side * (halfWidth + 1.10);
   const wallOffset = side * (edge + 1.9);
   const wallWidth = 0.48;
   const wrap = station => ((station + track.length * 0.5) % track.length + track.length) % track.length - track.length * 0.5;
@@ -26,7 +28,7 @@ export function buildPitLane(track) {
   const railAt = station => {
     const local = wrap(station);
     const verge = smooth((local - entry + 18) / 38) * smooth((exit + 13 - local) / 28);
-    return track.railOffset + (edge + 11 - track.railOffset) * verge;
+    return track.railOffset + (Math.abs(garageFace) - 0.40 - track.railOffset) * verge;
   };
   const wallAt = station => {
     const local = wrap(station);
@@ -39,7 +41,7 @@ export function buildPitLane(track) {
       Math.abs(offset - offsetAt(local)) < widthAt(local) + 0.18;
   };
   return { entry, laneStart, box, laneEnd, exit, wallStart, wallEnd, wallOffset, wallWidth, speedLine,
-    side, center, stallCenter, fastCenter, halfWidth, edge, wrap, offsetAt, widthAt, taper, railAt, wallAt, garageAt, contains };
+    side, center, stallCenter, fastCenter, halfWidth, garageFace, edge, wrap, offsetAt, widthAt, taper, railAt, wallAt, garageAt, contains };
 }
 
 export const pitStall = (lane, index) => lane.box + (index < 0 ? 0 : [-12, -6, 6, 12][index]);

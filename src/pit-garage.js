@@ -51,7 +51,7 @@ function baySigns(scene, track, bays, face, label) {
 }
 
 function addGarageLighting(scene, track, bays) {
-  const { side, edge } = track.pit;
+  const { side, garageFace } = track.pit;
   const night = track.event.weather === 'night';
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = 128;
@@ -69,7 +69,7 @@ function addGarageLighting(scene, track, bays) {
       blending: T.AdditiveBlending, depthWrite: false }), bays.length);
   const pose = new T.Object3D();
   bays.forEach(({ station, player }, index) => {
-    const point = track.at(station, side * (edge + 11.8));
+    const point = track.at(station, garageFace + side * 0.4);
     pose.position.set(point.x, 0.032, point.z);
     pose.rotation.y = point.yaw;
     pose.updateMatrix();
@@ -84,8 +84,7 @@ function addGarageLighting(scene, track, bays) {
 }
 
 export function addPitGarages(scene, track, bays, { block, part, label }) {
-  const { side, edge } = track.pit;
-  const face = side * (edge + 11.4);
+  const { side, garageFace: face } = track.pit;
   const panel = surface('#677580', 0.59, 0.35);
   const joint = surface('#303b44', 0.65, 0.35);
   const frame = surface('#28343e', 0.5, 0.54);
