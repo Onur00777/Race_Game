@@ -95,6 +95,8 @@ const messages = {
   backCalendar: ['Takvime dön', 'Back to calendar'],
   backGarage: ['Garaja git', 'Go to garage'],
   raceResult: ['{0}. sırada bitirdin', 'You finished P{0}'],
+  finishCrossed: ['Damalı bayrak', 'Chequered flag'],
+  classifyingRace: ['Ceza süresi uygulanıyor · {0} sn', 'Applying time penalty · {0}s'],
   prize: ['Ödül', 'Prize money'],
   seasonPoints: ['Sezon puanı', 'Season points'],
   totalTime: ['Toplam süre', 'Total time'],

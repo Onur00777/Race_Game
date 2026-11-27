@@ -98,7 +98,8 @@ export function restoreRace(career, track) {
     if (save.pitLayout !== pitLayoutVersion && car.pit.lane) migratePitPosition(track, car, i);
     if (i === 0) {
       const finished = Number.isFinite(state.finishTime) && state.finishTime <= save.elapsed;
-      if (!Number.isInteger(state.lap) || state.lap < 0 || state.lap > track.event.laps || (state.lap === track.event.laps && !finished) ||
+      if (!Number.isInteger(state.lap) || state.lap < 0 || state.lap > track.event.laps ||
+          (state.lap === track.event.laps && !finished && car.station < track.length * track.event.laps) ||
           !Number.isFinite(state.lapStarted) || !(state.bestLap === null || Number.isFinite(state.bestLap))) return null;
       Object.assign(car, { lap: state.lap, lapStarted: state.lapStarted, bestLap: state.bestLap,
         invalidatedLap: Number.isInteger(state.invalidatedLap) ? state.invalidatedLap : undefined });

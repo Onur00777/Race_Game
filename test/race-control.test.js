@@ -86,3 +86,31 @@ test('race classification waits for rivals to finish within a yellow flag penalt
   for (let tick = 0; tick < 4 / raceStep && !race.order; tick++) race.update(raceStep, inputs);
   assert.ok(race.order.indexOf('deniz') < race.order.indexOf('player'));
 });
+
+test('Summit classifies at the sixth crossing, including from a saved final lap', () => {
+  const track = createTrack(events[2]);
+  const race = createRace(track, currentTeam(career), career.upgrades, career.setup);
+  race.countdown = 0;
+  race.elapsed = 240;
+  race.player.lap = 5;
+  race.player.lapStarted = 200;
+  put(race, race.player, track.length * 6 - 0.25, 2.5, 34);
+  const summitCareer = { ...career, results: [{}, {}] };
+  summitCareer.activeRace = raceCheckpoint(summitCareer, race, loadout, false);
+  const restored = restoreRace(summitCareer, track).race;
+  restored.update(raceStep, inputs);
+  assert.equal(restored.player.lap, 6);
+  assert.ok(restored.player.finishTime > 240 && restored.player.finishTime < 240 + raceStep);
+  assert.equal(restored.order[0], 'player');
+});
+
+test('a checkpoint exactly on the finish line still classifies at zero speed', () => {
+  const race = atSpeed();
+  race.player.lap = 2;
+  put(race, race.player, race.track.length * 2, 0, 0);
+  const activeRace = raceCheckpoint(career, race, loadout, false);
+  const restored = restoreRace({ ...career, activeRace }, race.track).race;
+  restored.update(raceStep, inputs);
+  assert.ok(Number.isFinite(restored.player.finishTime));
+  assert.ok(restored.order);
+});

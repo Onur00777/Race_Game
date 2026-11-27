@@ -420,8 +420,9 @@ function startRace(restart = false) {
 function updateHud() {
   const player = race.player;
   const speed = Math.round(Math.abs(player.speed) * 3.6);
-  byId('laps').textContent = `${upper(t('lap'))} ${Math.min(player.lap + 1, track.event.laps)} / ${track.event.laps}`;
-  byId('clock').textContent = formatTime(race.elapsed);
+  const finished = player.finishTime != null;
+  byId('laps').textContent = finished ? upper(t('finishCrossed')) : `${upper(t('lap'))} ${Math.min(player.lap + 1, track.event.laps)} / ${track.event.laps}`;
+  byId('clock').textContent = formatTime(player.finishTime ?? race.elapsed);
   byId('position').textContent = race.position();
   byId('speed').textContent = speed;
   byId('speed-bar').style.width = Math.min(100, speed / 2.35) + '%';
@@ -448,7 +449,9 @@ function updateHud() {
     !recent ? (flat >= 0 ? t('limpToPit', wheelLabel(flat)) : player.onRoad ? '' : t('offTrack')) : impact.loss >= 1
     ? t('zoneImpact', t(impactZones[impact.zone]), Math.round(impact.loss)) : t(impact.kind === 'rail' ? 'railHit' : 'carHit');
   if (byId('road-warning').textContent !== message) byId('road-warning').textContent = message;
-  byId('best-lap').textContent = player.bestLap ? `${upper(t('bestLap'))}  ${formatTime(player.bestLap)}` : '';
+  const classificationWait = finished && !race.order ? Math.ceil(player.finishTime + (player.timePenalty ?? 0) - race.elapsed) : 0;
+  byId('best-lap').textContent = classificationWait > 0 ? t('classifyingRace', classificationWait) :
+    player.bestLap ? `${upper(t('bestLap'))}  ${formatTime(player.bestLap)}` : '';
   const startMessage = race.countdown > 0 ? String(Math.ceil(race.countdown)) : race.elapsed < 0.8 ? t('go') : '';
   if (byId('countdown').textContent !== startMessage) byId('countdown').textContent = startMessage;
   mapContext.clearRect(0, 0, map.width, map.height);

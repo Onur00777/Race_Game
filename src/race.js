@@ -63,13 +63,18 @@ export function createTrack(event) {
     };
   }
 
-  function project(x, z) {
+  function project(x, z, reference) {
     let nearest = Infinity;
     let station = 0;
     let offset = 0;
     let dx = 0;
     let dz = 0;
-    for (let index = 0; index < count; index++) {
+    const center = Math.floor(wrap(reference ?? 0, length) / spacing);
+    const radius = Math.ceil(6 / spacing);
+    const start = reference === undefined ? 0 : center - radius;
+    const end = reference === undefined ? count : center + radius + 1;
+    for (let segment = start; segment < end; segment++) {
+      const index = (segment + count) % count;
       const a = samples[index];
       const b = samples[(index + 1) % count];
       const sx = b.x - a.x;
@@ -213,7 +218,12 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
   }
 
   function trackProgress(car, controls, handling, dt) {
-    let projection = track.project(car.x, car.z);
+    const projectCar = () => {
+      const closest = track.project(car.x, car.z);
+      return Math.abs(relativeStation(closest.station, car.station)) < 6
+        ? closest : track.project(car.x, car.z, car.station);
+    };
+    let projection = projectCar();
     const rail = track.railAt(projection.station, Math.sign(projection.offset));
     if (projection.distance > rail + 8) {
       rejoin(car);
@@ -222,9 +232,9 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
     const { x, z } = car;
     const wall = resolvePitWallContact(car, projection, track.pit, race.previousPoses[cars.indexOf(car)]);
     if (wall) reportImpact({ ...wall, surface: 'concrete' }, car);
-    if (car.x !== x || car.z !== z) projection = track.project(car.x, car.z);
+    if (car.x !== x || car.z !== z) projection = projectCar();
     reportImpact(resolveBarrierContact(car, projection, rail), car);
-    if (car.x !== x || car.z !== z) projection = track.project(car.x, car.z);
+    if (car.x !== x || car.z !== z) projection = projectCar();
     car.offset = projection.offset;
     pitControl.update(car, projection, dt);
     car.onRoad = car.pit.lane || projection.distance <= track.event.width / 2 + 0.6;
@@ -240,8 +250,10 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
     // Reject projection jumps between different sections of a hairpin.
     const advance = Math.abs(delta) < 6 ? delta : 0;
     car.station += advance;
-    if (car.finishTime == null && car.damage < 100 && car.station >= finish) car.finishTime = race.elapsed - dt + dt * (finish - previous) / advance;
-    if (car === player) updateLap(previous);
+    const crossingTime = station => advance > 0
+      ? race.elapsed - dt + dt * clamp((station - previous) / advance, 0, 1) : race.elapsed;
+    if (car.finishTime == null && car.damage < 100 && car.station >= finish) car.finishTime = crossingTime(finish);
+    if (car === player) updateLap(previous, crossingTime);
     else if (car.finishTime == null && car.damage < 100) {
       car.stuck = advance < dt * 0.25 && !car.pit.remaining ? car.stuck + dt : 0;
       if (car.stuck > 5.5) {
@@ -251,15 +263,16 @@ export function createRace(track, team, upgrades, setup, appearance, options = {
     }
   }
 
-  function updateLap(previous) {
+  function updateLap(previous, crossingTime) {
     const lap = Math.floor(player.station / track.length);
     if (lap < player.lap || player.station < 0 || (previous >= 0 && lap <= player.lap)) return;
+    const crossedAt = crossingTime(lap * track.length);
     if (lap > player.lap && player.invalidatedLap !== player.lap) {
-      const lapTime = (player.finishTime ?? race.elapsed) - player.lapStarted;
+      const lapTime = crossedAt - player.lapStarted;
       player.bestLap = Math.min(player.bestLap ?? Infinity, lapTime);
     }
     player.lap = lap;
-    player.lapStarted = race.elapsed;
+    player.lapStarted = crossedAt;
   }
 
   function classify(retired = false) {
