@@ -37,6 +37,11 @@ export function updateTires(car, controls, handling, road, halfWidth, dt, pitSur
     wheel.vx = fx * longitudinal + fz * sideways;
     wheel.vz = fz * longitudinal - fx * sideways;
     wheel.speed = Math.hypot(longitudinal, sideways);
+    const corner = car.corners?.[index];
+    if (corner?.detached) {
+      wheel.rolling = wheel.ratio = wheel.angle = wheel.slip = 0;
+      continue;
+    }
     const angle = mount.front ? -car.steer * 0.30 : 0;
     const across = sideways * Math.cos(angle) - longitudinal * Math.sin(angle);
     const along = longitudinal * Math.cos(angle) + sideways * Math.sin(angle);

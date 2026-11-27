@@ -807,7 +807,10 @@ export function updateCarModel(model, car, dt, braking, fire = 0) {
     holder.rotation.z = -side * (T.MathUtils.degToRad(camber) - bent * 0.72);
     holder.rotation.y = (steering ? -car.steer * 0.30 : 0) - side * bent * 0.15;
     holder.position.y = wheelRadius - (flat ? 0.083 : 0) - bent * 0.025;
-    tyre.scale.y = tyre.scale.z = flat ? 0.79 : 1;
+    const rollingPhase = wheel.rotation.x;
+    const wobble = flat && !model.reducedMotion.matches ? Math.sin(rollingPhase) * 0.026 : 0;
+    tyre.scale.y = flat ? 0.77 + wobble : 1;
+    tyre.scale.z = flat ? 0.85 - wobble : 1;
     tyre.visible = !flat || (corner?.damage ?? 0) < 0.83;
     print.visible = !flat && (model.appearance.parts?.tires ?? 0) > 0;
     compoundRing.visible = !flat;

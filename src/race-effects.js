@@ -177,7 +177,7 @@ export function createRaceEffects(scene) {
     rimTimers.set(car.id, timer);
     for (const [i, corner] of car.corners.entries()) {
       const wheel = car.wheels[i];
-      if (!corner.punctured || !wheel.onRoad && !corner.detached || wheel.speed < 2.5) { timer[i] = 0; continue; }
+      if (!corner.punctured || !wheel.onRoad || wheel.speed < 2.5) { timer[i] = 0; continue; }
       timer[i] += dt * Math.min(46, wheel.speed * (corner.detached ? 3.1 : 1.75));
       while (timer[i] >= 1 && sparks.length < maxSparks) {
         timer[i]--;

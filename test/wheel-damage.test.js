@@ -71,6 +71,8 @@ test('a high-energy pit wall strike detaches a wheel, causes DNF and leaves a bo
   assert.equal(race.wheelEvents[0].type, 'detached');
   const corner = race.wheelEvents[0].index;
   assert.equal(race.player.corners[corner].detached, true);
+  assert.equal(race.player.wheels[corner].rolling, 0);
+  assert.equal(race.player.wheels[corner].slip, 0);
   assert.equal(race.player.damage, 100);
   const wheel = race.looseWheels[0];
   const initial = { x: wheel.x, y: wheel.y, z: wheel.z };
