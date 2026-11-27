@@ -11,6 +11,7 @@ export function vehicleCondition(value) {
     damage: portion(value?.damage, 100),
     ...Object.fromEntries(damageZones.map(zone => [zone, portion(value?.[zone], 1)])),
     hoodDamage: portion(value?.hoodDamage ?? (value?.frontDamage ?? 0) * 0.53, 1),
+    hoodBias: Number.isFinite(value?.hoodBias) ? clamp(value.hoodBias, -1, 1) : 0,
     splitterDamage: portion(value?.splitterDamage, 1),
     wingDamage: portion(value?.wingDamage, 1),
     corners: normalizeCorners(value?.corners),
@@ -41,12 +42,16 @@ export function applyImpact(car, impact, flipped = false, anotherCar = false) {
   const energy = (impact.normalSpeed - 3.7) ** 2 * (anotherCar ? 0.040 : 0.057);
   const amount = Math.min(100 - car.damage, energy * (0.64 + alignment * 0.36) * exposure[zone]);
   if (amount < 0.12) return null;
+  const beforeFront = car.frontDamage ?? 0;
   car.damage += amount;
   car[zone] = Math.min(1, (car[zone] ?? 0) + amount * (1 - secondary * 0.30) / 48);
   car[adjacent] = Math.min(1, (car[adjacent] ?? 0) + amount * secondary * 0.32 / 55);
   const parts = [];
   if (zone === 'frontDamage') {
-    car.hoodDamage = Math.min(1, (car.hoodDamage ?? 0) + amount * 0.024);
+    const priorHood = car.hoodDamage ?? 0;
+    const crumple = amount * 0.024;
+    car.hoodDamage = Math.min(1, priorHood + crumple);
+    car.hoodBias = ((car.hoodBias ?? 0) * priorHood + clamp(side, -1, 1) * crumple) / (priorHood + crumple);
     const prior = car.splitterDamage ?? 0;
     car.splitterDamage = Math.min(1, prior + amount * (0.012 + alignment * 0.015));
     if (prior < 1 && car.splitterDamage === 1) parts.push('splitter');
@@ -55,6 +60,7 @@ export function applyImpact(car, impact, flipped = false, anotherCar = false) {
     car.wingDamage = Math.min(1, prior + amount * (0.008 + alignment * 0.024));
     if (prior < 1 && car.wingDamage === 1) parts.push('wing');
   }
+  if (beforeFront < 0.51 && car.frontDamage >= 0.51) parts.push('headlight');
   return { zone, amount, alignment, parts };
 }
 

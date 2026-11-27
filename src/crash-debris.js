@@ -15,28 +15,40 @@ export function createCrashDebris(scene) {
   const transform = new T.Object3D();
   const color = new T.Color();
 
+  function spawn(impact, energy, type, scale) {
+    const size = rnd(0.035, 0.13) * scale;
+    const sideways = rnd(-1, 1) * (2 + energy * 0.47) + (impact.sliding ?? 0) * 0.15;
+    const recoil = rnd(0.5, 1) * (2 + energy * 0.49);
+    if (fragments.length >= maxFragments) fragments.shift();
+    fragments.push({
+      x: impact.x, y: impact.y ?? (type === 'rubber' ? 0.19 : rnd(0.34, 0.63)), z: impact.z,
+      vx: (impact.vx ?? 0) * 0.48 - impact.nx * recoil + impact.nz * sideways,
+      vz: (impact.vz ?? 0) * 0.48 - impact.nz * recoil - impact.nx * sideways,
+      vy: rnd(1.1, 2.9) + energy * rnd(0.02, 0.12),
+      rx: rnd(0, 7), ry: rnd(0, 7), rz: rnd(0, 7),
+      spinX: rnd(-14, 14), spinY: rnd(-15, 15), spinZ: rnd(-12, 12),
+      life: rnd(1.4, 3.45) + (type === 'aero' ? 1 : 0), size, thickness: type === 'glass' ? 0.15 : 0.33,
+      length: type === 'aero' ? 1.8 : type === 'rubber' ? 1.3 : 0.76,
+      restitution: type === 'rubber' ? 0.47 : 0.34,
+      color: type === 'glass' ? '#b5def1' : type === 'paint' ? (impact.color ?? '#bb3529') :
+        type === 'rubber' ? '#24292c' : '#323d45',
+    });
+  }
+
   function burst(impact, rubber = false) {
     if (!rubber && impact.normalSpeed < 10.5 && !impact.parts?.length) return;
     const energy = Math.max(4, impact.normalSpeed ?? 0);
     const count = rubber ? 14 : Math.min(28, Math.round(energy * 0.71) + (impact.parts?.length ?? 0) * 5);
     for (let i = 0; i < count; i++) {
-      const type = rubber ? 'rubber' : i % 3 === 0 ? 'glass' : i % 3 === 1 ? 'carbon' : 'paint';
-      const size = rnd(0.035, 0.13) * (impact.parts?.length && i < 2 ? 2.1 : 1);
-      const sideways = rnd(-1, 1) * (2 + energy * 0.47) + (impact.sliding ?? 0) * 0.15;
-      const recoil = rnd(0.5, 1) * (2 + energy * 0.49);
-      if (fragments.length >= maxFragments) fragments.shift();
-      fragments.push({
-        x: impact.x, y: rubber ? 0.19 : rnd(0.34, 0.63), z: impact.z,
-        vx: (impact.vx ?? 0) * 0.48 - impact.nx * recoil + impact.nz * sideways,
-        vz: (impact.vz ?? 0) * 0.48 - impact.nz * recoil - impact.nx * sideways,
-        vy: rnd(1.1, 2.9) + energy * rnd(0.02, 0.12),
-        rx: rnd(0, 7), ry: rnd(0, 7), rz: rnd(0, 7),
-        spinX: rnd(-14, 14), spinY: rnd(-15, 15), spinZ: rnd(-12, 12),
-        life: rnd(1.4, 3.45), size, thickness: type === 'glass' ? 0.15 : 0.33,
-        restitution: type === 'rubber' ? 0.47 : 0.34,
-        color: type === 'glass' ? '#a8c6c5' : type === 'paint' ? (impact.color ?? '#bb3529') :
-          type === 'carbon' ? '#323d45' : '#1c2428',
-      });
+      const glass = impact.parts?.includes('headlight') && i % 3 === 0;
+      const type = rubber ? 'rubber' : glass ? 'glass' : i % 2 ? 'carbon' : 'paint';
+      spawn(impact, energy, type, 1);
+    }
+    if (rubber) return;
+    for (const part of impact.parts ?? []) {
+      if (part === 'wing' || part === 'splitter') {
+        spawn({ ...impact, y: part === 'wing' ? 1.1 : 0.23 }, energy, 'aero', part === 'wing' ? 4.2 : 3.3);
+      }
     }
   }
 
@@ -66,7 +78,7 @@ export function createCrashDebris(scene) {
       transform.position.set(piece.x, piece.y, piece.z);
       transform.rotation.set(piece.rx, piece.ry, piece.rz);
       const size = piece.size * Math.min(1, piece.life * 4);
-      transform.scale.set(size, size * piece.thickness, size * 0.76);
+      transform.scale.set(size, size * piece.thickness, size * piece.length);
       transform.updateMatrix();
       mesh.setMatrixAt(live, transform.matrix);
       mesh.setColorAt(live, color.set(piece.color));

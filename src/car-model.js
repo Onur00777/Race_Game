@@ -685,7 +685,7 @@ function applyAppearance(model, appearance) {
   }
 }
 
-function deformSurface(geometry, original, front, rear, left, right, hood) {
+function deformSurface(geometry, original, front, rear, left, right, hood, hoodBias) {
   const mesh = geometry.attributes.position;
   for (let i = 0, j = 0; i < mesh.count; i++, j += 3) {
     const x = original[j], y = original[j + 1], z = original[j + 2];
@@ -695,10 +695,11 @@ function deformSurface(geometry, original, front, rear, left, right, hood) {
       (1 - T.MathUtils.smoothstep(Math.abs(z), 0.57, 1.66)) * (0.82 + 0.18 * Math.sin(z * 10));
     const bonnet = hood * T.MathUtils.smoothstep(z, 0.79, 1.22) * (1 - T.MathUtils.smoothstep(z, 1.96, 2.14)) *
       T.MathUtils.smoothstep(y, 0.46, 0.61) * (1 - T.MathUtils.smoothstep(Math.abs(x), 0.53, 0.86));
-    const crease = Math.exp(-(((z - 1.58 - x * 0.19) / 0.147) ** 2)) -
+    const crease = Math.exp(-(((z - 1.58 - x * 0.19 + hoodBias * 0.08) / 0.147) ** 2)) -
       0.54 * Math.exp(-(((z - 1.85 + x * 0.19) / 0.12) ** 2));
+    const twist = hoodBias * x * 0.19;
     mesh.setXYZ(i, x * (1 - (noseWeight + tailWeight) * 0.075 - flank * 0.16),
-      y - (noseWeight * 0.13 + tailWeight * 0.105 + flank * 0.044) * (0.5 + y * 0.5) + bonnet * (0.105 + crease * 0.235),
+      y - (noseWeight * 0.13 + tailWeight * 0.105 + flank * 0.044) * (0.5 + y * 0.5) + bonnet * (0.105 + crease * 0.235 + twist),
       z - noseWeight * 0.29 + tailWeight * (0.23 + Math.sin(x * 8) * 0.055) - bonnet * 0.08);
   }
   mesh.needsUpdate = true;
@@ -706,24 +707,26 @@ function deformSurface(geometry, original, front, rear, left, right, hood) {
 
 function deformBody(model, car) {
   const damage = [car.frontDamage ?? 0, car.rearDamage ?? 0, car.leftDamage ?? 0, car.rightDamage ?? 0,
-    car.damage ?? 0, car.hoodDamage ?? 0];
+    car.hoodDamage ?? 0, car.hoodBias ?? 0, car.damage ?? 0];
   if (damage.every((value, index) => value === model.damage[index])) return;
   model.damage = damage;
-  const [front, rear, left, right, total, hood] = damage;
-  deformSurface(model.body.geometry, model.bodyTemplate.attributes.position.array, front, rear, left, right, hood);
+  const [front, rear, left, right, hood, hoodBias, total] = damage;
+  const panels = [front, rear, left, right, hood, hoodBias];
+  deformSurface(model.body.geometry, model.bodyTemplate.attributes.position.array, ...panels);
   model.body.geometry.computeVertexNormals();
-  for (const { mesh, base } of model.decals) deformSurface(mesh.geometry, base, front, rear, left, right, hood);
+  for (const { mesh, base } of model.decals) deformSurface(mesh.geometry, base, ...panels);
   for (const { zone, mesh, base } of model.scuffs) {
     const opacity = Math.min(1, (car[zone] ?? 0) * 1.35 + Math.max(0, total - 28) * 0.003);
     mesh.visible = opacity > 0.025;
     if (mesh.visible) {
       mesh.material.opacity = opacity;
-      deformSurface(mesh.geometry, base, front, rear, left, right, hood);
+      deformSurface(mesh.geometry, base, ...panels);
     }
   }
   model.nose.position.copy(model.noseBase);
   model.nose.position.y -= front * 0.115;
   model.nose.position.z -= front * 0.28;
+  model.nose.rotation.z = front * hoodBias * 0.12;
   model.rear.position.copy(model.rearBase);
   model.rear.position.y -= rear * 0.072;
   model.rear.position.z += rear * 0.22;

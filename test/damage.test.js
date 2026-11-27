@@ -18,6 +18,19 @@ test('collision velocity and contact point distinguish a direct hit from a sides
   assert.ok(front.amount > left.amount * 10);
 });
 
+test('opposite nose impacts bend the hood in opposite directions and shatter each light state once', () => {
+  for (const side of [-1, 1]) {
+    const body = car();
+    const impact = { x: side * 0.72, z: 2, nx: 0, nz: 1, normalSpeed: 32, relativeSpeed: 32 };
+    const first = applyImpact(body, impact);
+    assert.equal(first.zone, 'frontDamage');
+    assert.ok(body.hoodBias * side > 0.5);
+    assert.ok(first.parts.includes('headlight'));
+    assert.equal(vehicleCondition(body).hoodBias, body.hoodBias);
+    assert.ok(!applyImpact(body, impact).parts.includes('headlight'));
+  }
+});
+
 test('moderate wear reduces speed and downforce before critical wear cuts power and pulls sideways', () => {
   const fresh = damagePerformance({ damage: 0 });
   assert.deepEqual(damagePerformance({ damage: 30 }), fresh);
