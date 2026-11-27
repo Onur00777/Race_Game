@@ -3,7 +3,7 @@ import { escapeHtml, getLanguage, local, t, translatedField } from './i18n.js';
 import { compounds, decalSlots, sliders, sponsors, vehicleStats, wings } from './setup.js';
 import { damagePerformance, integrity, vehicleCondition } from './vehicle-damage.js';
 import { electronics, tractionModes } from './ecu.js';
-import { hardware, installedModels, milestoneReached } from './hardware.js';
+import { aeroAccess, electronicsMilestone, hardware, installedModels, milestoneReached } from './hardware.js';
 import { estimateStints } from './telemetry.js';
 
 export const garageTabs = { parts: 'parts', tuning: 'tuning', aero: 'aero', sponsors: 'livery', service: 'service', ecu: 'ecuTab' };
@@ -102,11 +102,12 @@ const panels = {
     ${sliders.filter(slider => slider.id !== 'downforce').map(spec => sliderMarkup(career, spec.id)).join('')}
   `,
   aero: career => {
-    if (!career.upgrades.aero) return `<p class="garage-empty">${t('wingMissing')}</p><button type="button" class="secondary" data-garage-tab="parts">${t('parts')}</button>`;
+    const access = aeroAccess(career.upgrades.aero, career.hardware?.aero?.installed);
+    if (!access) return `<p class="garage-empty">${t('wingMissing')}</p><button type="button" class="secondary" data-garage-tab="parts">${t('parts')}</button>`;
     return `
       <fieldset class="wing-options"><legend>${t('wingShape')}</legend>
         ${wings.map(wing => {
-          const locked = career.upgrades.aero < wing.level;
+          const locked = access < wing.level;
           const active = career.setup.wing === wing.id;
           return `<button type="button" class="wing-option" data-wing="${wing.id}" aria-pressed="${active}" ${disabled(locked)}>
             <span class="wing-diagram wing-${wing.id}" aria-hidden="true"></span>
@@ -135,10 +136,12 @@ const panels = {
     const level = career.electronics[spec.id];
     const cost = spec.cost * (level + 1);
     const max = level >= maxUpgrade;
+    const unlock = electronicsMilestone(level + 1);
+    const locked = !milestoneReached(career, unlock);
     return `<article class="work-row" data-ecu-part="${spec.id}">
       <div><small>${t('upgradeLevel', level, maxUpgrade)}</small><h3>${t(spec.label)}</h3><p>${t(spec.detail)}</p></div>
-      <button type="button" class="secondary" data-buy-ecu="${spec.id}" aria-label="${max ? t('maxLevel') : t('partPrice', t(spec.label), garageMoney(cost))}" ${disabled(max || cost > career.cash)}>
-        ${max ? t('maxLevel') : garageMoney(cost)}</button></article>`;
+      <button type="button" class="secondary" data-buy-ecu="${spec.id}" ${disabled(max || locked || cost > career.cash)}>
+        ${max ? t('maxLevel') : locked ? t('hardwareMilestone', unlock.season, unlock.round) : garageMoney(cost)}</button></article>`;
   }).join(''),
 };
 

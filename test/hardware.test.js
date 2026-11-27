@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buyUpgrade, currentTeam, newCareer, normalizeLoadout } from '../src/career.js';
+import { buyElectronics, buyUpgrade, currentTeam, newCareer, normalizeLoadout } from '../src/career.js';
 import { fitPart, stages } from '../src/hardware.js';
 import { vehicleStats } from '../src/setup.js';
 
@@ -23,4 +23,19 @@ test('engine models unlock by round and keep independent five-stage tuning', () 
   const loadout = normalizeLoadout(refitted);
   const tunedV6 = vehicleStats(currentTeam(refitted), loadout.upgrades, loadout.setup, loadout.models);
   assert.ok(tunedV6.topSpeed > stock.topSpeed && tunedV6.redline > stock.redline);
+});
+
+test('season two kits alter handling at stage zero and unlock the fifth ECU stage', () => {
+  const first = { ...newCareer(), cash: 50000, electronics: { launch: 4 } };
+  assert.equal(buyElectronics(first, 'launch'), first);
+  assert.equal(fitPart(first, 'aero', 'prototype'), first);
+  const second = { ...first, season: 2, results: [{}, {}] };
+  const tuned = buyElectronics(second, 'launch');
+  assert.equal(normalizeLoadout(tuned).electronics.launch, 5);
+  const fitted = fitPart(fitPart(fitPart(second, 'aero', 'prototype'), 'brakes', 'carbon'), 'tires', 'endurance');
+  const base = vehicleStats(currentTeam(first), first.upgrades, first.setup);
+  const loadout = normalizeLoadout(fitted);
+  const stats = vehicleStats(currentTeam(fitted), loadout.upgrades, loadout.setup, loadout.models);
+  assert.equal(loadout.appearance.wing, 'twin');
+  assert.ok(stats.load > base.load && stats.braking > base.braking && stats.grip > base.grip);
 });

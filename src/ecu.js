@@ -1,3 +1,5 @@
+import { stages } from './hardware.js';
+
 export const electronics = [
   { id: 'launch', cost: 680, label: 'launchControl', detail: 'launchDetail' },
   { id: 'traction', cost: 820, label: 'tractionControl', detail: 'tractionDetail' },
@@ -6,7 +8,7 @@ export const electronics = [
 ];
 export const tractionModes = ['off', 'low', 'medium', 'high'];
 export const normalizeElectronics = input => Object.fromEntries(electronics.map(({ id }) =>
-  [id, Number.isInteger(input?.[id]) ? Math.max(0, Math.min(3, input[id])) : 0]));
+  [id, Number.isInteger(input?.[id]) ? Math.max(0, Math.min(stages, input[id])) : 0]));
 export const tractionMode = value => tractionModes.includes(value) ? value : 'medium';
 
 const bound = (value, min, max) => Math.min(max, Math.max(min, value));

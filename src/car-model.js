@@ -1,4 +1,5 @@
 import * as T from 'three';
+import { partTier } from './hardware.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { DecalGeometry } from 'three/addons/geometries/DecalGeometry.js';
 import { sponsors } from './setup.js';
@@ -653,7 +654,13 @@ export function createCarModel(color, asset) {
 function applyAppearance(model, appearance) {
   if (model.appearance === appearance) return;
   model.appearance = appearance;
-  const { aero, engine, tires, brakes } = appearance.parts ?? stockParts;
+  const parts = appearance.parts ?? stockParts;
+  const aeroTier = partTier('aero', appearance.models?.aero);
+  const aero = parts.aero * 0.72 + aeroTier * 1.1;
+  const engine = parts.engine * 0.74 + partTier('engine', appearance.models?.engine) * 0.65;
+  const tires = parts.tires * 0.7 + partTier('tires', appearance.models?.tires) * 0.65;
+  const brakeTier = partTier('brakes', appearance.models?.brakes);
+  const brakes = parts.brakes * 0.64 + brakeTier * 0.84;
   model.wing.paint.color.set(appearance.wingColor);
   for (const [id, { frame, blade }] of Object.entries(model.wing.options)) {
     frame.visible = appearance.wing === id;
@@ -679,7 +686,7 @@ function applyAppearance(model, appearance) {
     print.visible = tires > 0;
     disk.scale.set(1, 0.87 + brakes * 0.076, 0.87 + brakes * 0.076);
     face.scale.setScalar(0.87 + brakes * 0.076);
-    calliper.material.color.set(['#5e6870', '#e23c29', '#fbb63e', '#ffc750'][brakes]);
+    calliper.material.color.set(['#5e6870', '#e23c29', '#fbb63e', '#ffe894'][Math.max(brakeTier, Math.min(3, parts.brakes))]);
     calliper.position.z = -0.137 - brakes * 0.013;
     calliper.scale.y = 0.093 + brakes * 0.018;
   }
@@ -812,7 +819,7 @@ export function updateCarModel(model, car, dt, braking, fire = 0) {
     tyre.scale.y = flat ? 0.77 + wobble : 1;
     tyre.scale.z = flat ? 0.85 - wobble : 1;
     tyre.visible = !flat || (corner?.damage ?? 0) < 0.83;
-    print.visible = !flat && (model.appearance.parts?.tires ?? 0) > 0;
+    print.visible = !flat && ((model.appearance.parts?.tires ?? 0) > 0 || partTier('tires', model.appearance.models?.tires) > 0);
     compoundRing.visible = !flat;
     wheel.rotation.x -= (car.wheels?.[index].rolling ?? car.speed) * dt / wheelRadius;
     face.material.emissiveIntensity = glow * (steering ? 1 : 0.68);

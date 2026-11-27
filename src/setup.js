@@ -1,6 +1,6 @@
 import { tractionMode } from './ecu.js';
 import { compoundId, compoundSpec } from './tire-strategy.js';
-import { partModel, partTier } from './hardware.js';
+import { aeroAccess, partModel, partTier } from './hardware.js';
 export { compounds } from './tire-strategy.js';
 
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
@@ -55,21 +55,24 @@ export function activeWing(setup, level) {
 }
 
 export function vehicleStats(team, parts, input, models) {
-  const setup = normalizeSetup(input, parts.aero);
-  const wing = activeWing(setup, parts.aero);
+  const aeroTier = partTier('aero', models?.aero);
+  const aeroLevel = aeroAccess(parts.aero, models?.aero);
+  const setup = normalizeSetup(input, aeroLevel);
+  const wing = activeWing(setup, aeroLevel);
   const compound = compoundSpec(setup.compound);
-  const load = wing ? wing.load + setup.downforce * (3.1 + parts.aero * 0.25) + (parts.aero - wing.level) * 7 : 0;
-  const drag = wing ? wing.drag + setup.downforce * 0.16 + (parts.aero - wing.level) * 0.20 : 0;
+  const load = wing ? wing.load + setup.downforce * (3.1 + aeroLevel * 0.25) + (aeroLevel - wing.level) * 7 + aeroTier * 16 : 0;
+  const drag = wing ? wing.drag + setup.downforce * 0.16 + (aeroLevel - wing.level) * 0.20 + aeroTier * 0.26 : 0;
   const rearBalance = 1.18 - Math.abs(setup.rearCamber + 1.5) * 0.43;
   const engine = partModel('engine', models?.engine);
   const power = parts.engine + partTier('engine', models?.engine) * 2.1;
+  const chassis = partTier('tires', models?.tires);
   return {
     topSpeed: 54 + power * 3.35 + team.power - setup.gearing * 1.75 - drag + compound.rolling,
     acceleration: 13 + power * 1.78 + team.power * 0.45 + setup.gearing * 0.68 + rearBalance * 0.29,
     redline: engine.redline + parts.engine * 75, engine,
-    braking: 24 + parts.brakes * 4.5 - Math.abs(setup.brakeBias - 60) * 0.28,
-    grip: 8.72 + parts.tires * 0.85 + team.grip + compound.grip + rearBalance * 0.32,
-    turn: 1.026 - Math.abs(setup.frontCamber + 2) * 0.040,
+    braking: 24 + parts.brakes * 4.5 + partTier('brakes', models?.brakes) * 6 - Math.abs(setup.brakeBias - 60) * 0.28,
+    grip: 8.72 + parts.tires * 0.85 + chassis * 1.05 + team.grip + compound.grip + rearBalance * 0.32,
+    turn: 1.026 + chassis * 0.018 - Math.abs(setup.frontCamber + 2) * 0.040,
     brakeStability: (setup.brakeBias - 60) * 0.09,
     load,
   };
@@ -77,7 +80,7 @@ export function vehicleStats(team, parts, input, models) {
 
 export function carAppearance(loadout) {
   const { setup, upgrades, sponsor, decals, models } = loadout;
-  const wing = activeWing(setup, upgrades.aero);
+  const wing = activeWing(setup, aeroAccess(upgrades.aero, models?.aero));
   return { wing: wing?.id ?? 'stock', wingColor: setup.wingColor, wingAngle: setup.downforce,
     frontCamber: setup.frontCamber, rearCamber: setup.rearCamber, sponsor, decals, parts: upgrades, models, compound: setup.compound };
 }

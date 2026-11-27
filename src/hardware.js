@@ -8,7 +8,28 @@ export const hardware = {
     { id: 'v10', name: '5.2L V10 GT Prototype', cost: 9200, season: 1, round: 6, redline: 9800, voice: 1.32, heat: 5 },
     { id: 'v12', name: 'Hybrid V12 Hyper-Unit', cost: 14500, season: 2, round: 1, redline: 10300, voice: 1.43, heat: -3 },
   ],
+  aero: [
+    { id: 'street', name: 'Street Aero', cost: 0 },
+    { id: 'club', name: 'Clubsport Kit', cost: 2200, season: 1, round: 2 },
+    { id: 'gt3', name: 'GT3 Carbon Package', cost: 4900, season: 1, round: 4 },
+    { id: 'prototype', name: 'Prototype Ground-Effect Kit', cost: 9800, season: 2, round: 1 },
+  ],
+  brakes: [
+    { id: 'steel', name: 'Vented Steel', cost: 0 },
+    { id: 'slotted', name: 'Slotted Performance', cost: 1750, season: 1, round: 2 },
+    { id: 'ceramic', name: 'Carbon-Ceramic', cost: 4300, season: 1, round: 4 },
+    { id: 'carbon', name: 'F1 Carbon-Carbon', cost: 9200, season: 2, round: 2 },
+  ],
+  tires: [
+    { id: 'sport', name: 'Sport', cost: 0 },
+    { id: 'semi', name: 'Semi-Slick Race', cost: 1900, season: 1, round: 3 },
+    { id: 'pro', name: 'Pro Motorsport Spec', cost: 4500, season: 1, round: 5 },
+    { id: 'endurance', name: 'Endurance Factory Spec', cost: 8900, season: 2, round: 3 },
+  ],
 };
+
+export const electronicsMilestone = stage => stage <= 1 ? { season: 1, round: 1 } :
+  stage === 5 ? { season: 2, round: 1 } : { season: 1, round: stage + 1 };
 
 export function milestoneReached(career, { season = 1, round = 1 }) {
   return career.season > season || career.season === season && career.results.length + 1 >= round;
@@ -39,6 +60,8 @@ export function installedModels(inventory) {
   return Object.fromEntries(Object.entries(inventory ?? {}).map(([category, state]) => [category, state.installed]));
 }
 
+export const aeroAccess = (level, model) => Math.max(level, partTier('aero', model));
+
 export function fitPart(career, category, id, preview = false) {
   const model = hardware[category]?.find(item => item.id === id);
   if (!model) return career;
@@ -51,6 +74,8 @@ export function fitPart(career, category, id, preview = false) {
   current.owned[current.installed] = career.upgrades[category] ?? current.owned[current.installed];
   current.installed = id;
   current.owned[id] ??= 0;
+  const wing = ['touring', 'touring', 'swan', 'twin'][partTier('aero', id)];
   return { ...career, hardware: inventory, cash: career.cash - (preview ? 0 : cost),
+    setup: category === 'aero' ? { ...career.setup, wing } : career.setup,
     upgrades: { ...career.upgrades, [category]: current.owned[id] } };
 }

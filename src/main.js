@@ -8,7 +8,7 @@ import { escapeHtml, getLanguage, setLanguage, t, translatedField, upper } from 
 import { createAudio, updateAudio } from './audio.js';
 import { animateAmount, createWallet } from './wallet.js';
 import { graphicsModes, qualityMode } from './graphics-settings.js';
-import { fitPart } from './hardware.js';
+import { aeroAccess, fitPart } from './hardware.js';
 import { circuitMap, drawBriefingMap } from './circuit-map.js';
 import { legacyEvents } from './events.js';
 import { difficultyId, purseFor } from './difficulty.js';
@@ -686,7 +686,7 @@ function setShowroom(open) {
 }
 
 function tune(key, value) {
-  career = { ...career, setup: normalizeSetup({ ...career.setup, [key]: value }, career.upgrades.aero) };
+  career = { ...career, setup: normalizeSetup({ ...career.setup, [key]: value }, aeroAccess(career.upgrades.aero, career.hardware?.aero?.installed)) };
   pendingTuning = true;
   updateGaragePreview();
   const output = byId('garage-panel').querySelector(`[data-value="${key}"]`);
@@ -870,7 +870,7 @@ app.addEventListener('change', event => {
     saveActiveRace(true);
   }
   if (field.hasAttribute('data-race-compound') && !hasSavedRace(career)) {
-    career = { ...career, setup: normalizeSetup({ ...career.setup, compound: field.value }, career.upgrades.aero) };
+    career = { ...career, setup: normalizeSetup({ ...career.setup, compound: field.value }, aeroAccess(career.upgrades.aero, career.hardware?.aero?.installed)) };
     persist();
   }
   if (field.hasAttribute('data-difficulty') && !hasSavedRace(career)) {

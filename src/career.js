@@ -3,7 +3,7 @@ import { defaultPoints, defaultPrizes, events } from './events.js';
 import { difficulties, difficultyId } from './difficulty.js';
 import { integrity, vehicleCondition } from './vehicle-damage.js';
 import { electronics, normalizeElectronics } from './ecu.js';
-import { installedModels, normalizeHardware, partTier, stages } from './hardware.js';
+import { aeroAccess, electronicsMilestone, installedModels, milestoneReached, normalizeHardware, partTier, stages } from './hardware.js';
 
 export const gameName = 'VIN VIN';
 
@@ -59,7 +59,8 @@ export function normalizeLoadout(data) {
   const sponsor = sponsors.find(offer => offer.id === data?.sponsor);
   const decals = decalSlots.filter(slot => sponsor && Array.isArray(data?.decals) && data.decals.includes(slot.id)).map(slot => slot.id);
   const hardware = normalizeHardware(data?.hardware);
-  const loadout = { team: team.id, upgrades: parts, hardware, models: installedModels(hardware), setup: normalizeSetup(data?.setup, parts.aero),
+  const models = installedModels(hardware);
+  const loadout = { team: team.id, upgrades: parts, hardware, models, setup: normalizeSetup(data?.setup, aeroAccess(parts.aero, models.aero)),
     electronics: normalizeElectronics(data?.electronics), sponsor: sponsor?.id ?? null, decals };
   return { ...loadout, appearance: carAppearance(loadout) };
 }
@@ -104,7 +105,7 @@ export function buyElectronics(career, id) {
   if (!spec) return career;
   const level = career.electronics[id];
   const cost = spec.cost * (level + 1);
-  if (level >= maxUpgrade || cost > career.cash) return career;
+  if (level >= maxUpgrade || cost > career.cash || !milestoneReached(career, electronicsMilestone(level + 1))) return career;
   return { ...career, cash: career.cash - cost, electronics: { ...career.electronics, [id]: level + 1 } };
 }
 
