@@ -96,7 +96,7 @@ export function lightTrack(scene, track, assets) {
   const view = lighting[event.weather];
   scene.background = new T.Color(view.colors[0]);
   scene.backgroundIntensity = event.weather === 'night' ? 0.50 : 1;
-  scene.fog = new T.FogExp2(view.colors[1], view.fog);
+  scene.fog = new T.FogExp2(view.colors[1], view.fog * 0.88);
   scene.backgroundRotation.y = event.skyYaw;
   scene.environmentRotation.y = event.skyYaw;
   scene.environmentIntensity = view.reflections;

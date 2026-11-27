@@ -153,6 +153,15 @@ function addGrandstand(scene, track, metal) {
   const transform = new T.Matrix4();
   const color = new T.Color();
   const plastic = ['#854139', '#a3463b', '#b85547', '#9c9488', '#aba295'];
+  const figures = [
+    new T.CylinderGeometry(0.155, 0.18, 0.38, 6).translate(0, 0.43, 0.04),
+    new T.BoxGeometry(0.25, 0.13, 0.36).translate(0, 0.24, 0.13),
+    new T.SphereGeometry(0.091, 6, 4).translate(0, 0.69, 0.052),
+  ];
+  const crowd = new T.InstancedMesh(mergeGeometries(figures), standard('#ffffff', 0.93), seats.count);
+  crowd.count = 0;
+  figures.forEach(part => part.dispose());
+  const jerseys = ['#8ab4b4', '#e2ba70', '#777981', '#a74455', '#536a9b', '#c5c8bb', '#78a061'];
   let i = 0;
   for (let row = 0; row < rows; row++) {
     const height = 0.32 + row * 0.44;
@@ -166,11 +175,15 @@ function addGrandstand(scene, track, metal) {
         transform.makeTranslation(center + (column - (columns - 1) / 2) * 0.51, height - 0.006, z);
         seats.setMatrixAt(i, transform);
         seats.setColorAt(i++, color.set(plastic[(column * 29 + row * 13 + section * 17) % plastic.length]));
+        if ((column * 13 + row * 19 + section * 31) % 10 < 7) {
+          crowd.setMatrixAt(crowd.count, transform);
+          crowd.setColorAt(crowd.count++, color.set(jerseys[(row * 13 + column * 31 + section) % jerseys.length]));
+        }
       }
     }
   }
   seats.receiveShadow = true;
-  stand.add(seats);
+  stand.add(seats, crowd);
 
   const roof = box(stand, metal, 31, 0.14, 8.0, 0, 4.93, -2.85);
   roof.castShadow = true;
@@ -182,6 +195,57 @@ function addGrandstand(scene, track, metal) {
     box(stand, steel, 0.16, 0.27, 7.43, x, 4.72, -2.58).rotation.x = -0.10;
     box(stand, steel, 0.10, 0.13, 2.45, x, 4.15, -5.20).rotation.x = -0.46;
   }
+}
+
+function addTimingTower(scene, track, metal, dark) {
+  const side = -track.pit.side;
+  const point = track.at(16, side * (track.railAt(16, side) + 2.2));
+  const tower = new T.Group();
+  tower.position.set(point.x, 0, point.z);
+  tower.rotation.y = point.yaw + Math.PI;
+  scene.add(tower);
+  box(tower, metal, 2.8, 0.18, 1.45, 0, 0.09, 0);
+  box(tower, dark, 0.66, 7.2, 0.65, 0, 3.62, 0);
+  box(tower, dark, 2.12, 4.05, 0.45, 0, 5.3, 0);
+  const canvas = document.createElement('canvas');
+  canvas.width = 208;
+  canvas.height = 400;
+  const ctx = canvas.getContext('2d');
+  const map = new T.CanvasTexture(canvas);
+  map.colorSpace = T.SRGBColorSpace;
+  const face = new T.Mesh(new T.PlaneGeometry(1.92, 3.84), new T.MeshBasicMaterial({ map }));
+  face.position.set(0, 5.29, 0.23);
+  tower.add(face);
+  let signature = '';
+  return race => {
+    const order = [...race.cars].sort((a, b) => b.station - a.station);
+    const lap = Math.min(race.player.lap + 1, track.event.laps);
+    const status = race.control.flag;
+    const next = order.map(car => car.id).join('|') + lap + status;
+    if (signature === next) return;
+    signature = next;
+    ctx.fillStyle = '#101820';
+    ctx.fillRect(0, 0, 208, 400);
+    ctx.fillStyle = status === 'red' ? '#fa685f' : status === 'yellow' ? '#ffd66d' : '#9de2d0';
+    ctx.fillRect(0, 0, 208, 9);
+    ctx.font = 'bold 29px monospace';
+    ctx.fillText('VIN VIN', 15, 45);
+    ctx.fillStyle = '#e7edf1';
+    ctx.font = 'bold 19px monospace';
+    ctx.fillText(`${lap} / ${track.event.laps}`, 15, 78);
+    order.forEach((car, index) => {
+      const y = 97 + index * 58;
+      ctx.fillStyle = index % 2 ? '#263341' : '#1b2936';
+      ctx.fillRect(8, y, 192, 54);
+      ctx.fillStyle = car.color;
+      ctx.fillRect(8, y, 7, 54);
+      ctx.font = 'bold 30px monospace';
+      ctx.fillText(String(index + 1), 22, y + 37);
+      ctx.fillStyle = '#e7edf1';
+      ctx.fillText(car.id === 'player' ? 'P1' : car.name.slice(0, 3).toUpperCase(), 76, y + 37);
+    });
+    map.needsUpdate = true;
+  };
 }
 
 function addTrack(scene, track, assets, label) {
@@ -264,8 +328,17 @@ function addTrack(scene, track, assets, label) {
 
   addGuardrails(scene, track, metal);
   addGrandstand(scene, track, metal);
+  const updateTower = addTimingTower(scene, track, metal, dark);
   addStaticBoxes(scene, boxGeometry);
-  return wetness => {
+  let lastTowerUpdate = -Infinity;
+  let lastRace;
+  return race => {
+    const wetness = race.wetness;
+    if (race !== lastRace || race.elapsed - lastTowerUpdate >= 0.5) {
+      updateTower(race);
+      lastTowerUpdate = race.elapsed;
+      lastRace = race;
+    }
     asphalt.color.setRGB(0.36 - wetness * 0.20, 0.37 - wetness * 0.197, 0.39 - wetness * 0.183);
     asphalt.roughness = 0.94 - wetness * 0.70;
     asphalt.normalScale.setScalar(0.56 - wetness * 0.36);
@@ -384,7 +457,7 @@ export async function createView(canvas, quality) {
 
   function draw(race, mode, dt, braking, alternateCamera, paused, fraction = 1, guide = false) {
     if (!resize()) return;
-    setWetAsphalt(race.wetness);
+    setWetAsphalt(race);
     updatePitView(race, reduceMotion.matches);
     if (drawnRace !== race) {
       drawnRace = race;
