@@ -2,6 +2,7 @@ import { difficulties } from './difficulty.js';
 import { makeRacingLine } from './racing-line.js';
 import { vehicleStats } from './setup.js';
 import { angleBetween, approach, clamp } from './vehicle-physics.js';
+import { suspensionEffects } from './wheel-damage.js';
 
 const rivalParts = { engine: 0, brakes: 0, tires: 0, aero: 0 };
 const privateer = { power: 0, grip: 0 };
@@ -106,7 +107,8 @@ export function createRaceIntel(track, difficulty, rivals, gapBetween) {
     const point = track.at(car.station + look, car.aiOffset);
     const desiredYaw = Math.atan2(point.x - car.x, point.z - car.z);
     const headingError = -angleBetween(car.yaw, desiredYaw) + Math.atan2(car.lateral, Math.max(10, speed)) * 0.34;
-    const steering = clamp(headingError * (3.85 + settings.apex * 0.45), -1, 1);
+    const pull = suspensionEffects(car.corners).pull * clamp(speed / 16, 0, 1) * 0.65;
+    const steering = clamp(headingError * (3.85 + settings.apex * 0.45) - pull, -1, 1);
     const recovering = Math.abs(headingError) > 0.74;
     const draft = !closing && settings.draft ? wakeFactor(track, car, cars, gapBetween) : 0;
     const wetGrip = clamp(Math.sqrt(car.tireGrip ?? 1), 0.65, 1.07);

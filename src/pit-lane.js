@@ -1,6 +1,7 @@
 import { angleBetween, clamp } from './vehicle-physics.js';
 import { compoundId, recommendedCompound, tireHealth } from './tire-strategy.js';
 import { vehicleCondition } from './vehicle-damage.js';
+import { suspensionEffects } from './wheel-damage.js';
 
 export const pitSpeed = 80 / 3.6;
 export const pitLayoutVersion = 2;
@@ -125,31 +126,38 @@ export function createPitControl(race, plan) {
     if (state.routeLap !== lap) return controls;
     const distance = boxFor(car) - local;
     const outsideStall = Math.abs(car.offset - lane.stallCenter) > 1.2;
-    if (distance < -2.7 || (distance < 0.73 && outsideStall)) state.plan = null;
+    if (distance < -2.7 || (distance < -0.75 && outsideStall)) state.plan = null;
     const stillNeedsBox = Boolean(state.plan) && state.servicedLap !== lap;
     const look = Math.min(stillNeedsBox ? Math.max(2, distance + 1) : 13, 4 + Math.max(0, car.speed) * 0.40);
     const ahead = local + look;
     const baseOffset = lane.offsetAt(ahead);
     const laneBlend = lane.taper(ahead);
-    const moveToStall = stillNeedsBox ? smooth((24 - distance + look) / 19) : 0;
+    const moveToStall = stillNeedsBox ? smooth((27 - distance + look) / 18) :
+      state.servicedLap === lap ? 1 - smooth((-distance + look + 1) / 16) : 0;
     const targetOffset = baseOffset + (lane.fastCenter - lane.center + (lane.stallCenter - lane.fastCenter) * moveToStall) * laneBlend;
     const target = track.at(car.station + look, targetOffset);
     const yaw = Math.atan2(target.x - car.x, target.z - car.z);
     const heading = angleBetween(car.yaw, yaw);
     const deceleration = 1.12 + Math.min(1.35, (car.tireGrip ?? 1) * track.event.surfaceGrip);
-    const stop = stillNeedsBox ? Math.sqrt(Math.max(0, distance - 0.58) * 2 * deceleration) : pitSpeed;
+    const stop = stillNeedsBox ? Math.min(Math.sqrt(Math.max(0, distance - 1.12) * 2 * deceleration),
+      Math.max(0, (distance - 0.85) * 1.18)) : pitSpeed;
     const entryPace = track.event.trackLayout
       ? Math.sqrt(pitSpeed ** 2 + 2 * deceleration * Math.max(0, lane.speedLine - local)) : pitSpeed;
     let pace = stillNeedsBox ? Math.min(entryPace, stop) : pitSpeed;
     for (const other of cars) {
       if (other === car || (!other.pit.lane && other.pit.routeLap !== lap)) continue;
       const gap = other.station - car.station;
-      if (gap <= 0 || gap > 28 || Math.abs(other.offset - car.offset) > 2.04) continue;
+      const busyLane = Math.min(Math.abs(other.offset - car.offset), Math.abs(other.offset - targetOffset)) <= 2.25;
+      if (gap <= 0 || gap > 28 || !busyLane) continue;
       pace = Math.min(pace, Math.sqrt(Math.max(0, other.speed) ** 2 + 2 * deceleration * Math.max(0, gap - 5.1)));
     }
     const thresholdBrake = clamp((car.tireGrip ?? 1) * track.event.surfaceGrip * 0.80, 0.26, 0.81);
-    return { ...controls, steering: local < lane.entry - 30 ? controls.steering : -clamp(heading * 4.25, -1, 1),
-      gas: clamp((pace - car.speed) * 0.37, 0, 1), brake: clamp((car.speed - pace) * 0.78, 0, thresholdBrake), draft: 0 };
+    const drift = Math.atan2(car.lateral, Math.max(5, car.speed)) * 0.34;
+    const pull = suspensionEffects(car.corners).pull * clamp(car.speed / 16, 0, 1) * 0.65;
+    return { ...controls, steering: local < lane.entry - 30 ? controls.steering : clamp(-heading * 4.25 + drift - pull, -1, 1),
+      speedLimit: stillNeedsBox && distance < 8 ? Math.max(0.55, pace + 0.45) : controls.speedLimit,
+      gas: clamp((pace - car.speed) * 0.37, 0, 1),
+      brake: clamp((car.speed - pace) * (stillNeedsBox && distance < 8 ? 1.14 : 0.78), 0, thresholdBrake), draft: 0 };
   }
 
   function controlsFor(car, controls) {
@@ -157,7 +165,7 @@ export function createPitControl(race, plan) {
     const selected = aiRoute(car, controls);
     if (state.remaining > 0) return { ...selected, gas: 0, brake: 1, steering: 0, holdPosition: true, speedLimit: 0, draft: 0 };
     if (!lane.speedLimited(car.station, car.offset)) return selected;
-    return { ...selected, speedLimit: pitSpeed, draft: 0 };
+    return { ...selected, speedLimit: Math.min(selected.speedLimit ?? Infinity, pitSpeed), draft: 0 };
   }
 
   function update(car, projection, dt) {

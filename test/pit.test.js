@@ -127,17 +127,21 @@ test('the Summit pack calls at least one pit stop per car when rain arrives', ()
 });
 
 test('Legend rivals complete the long wet-to-dry stint without getting stuck in the pit lane', () => {
-  const track = createTrack(originalEvents.find(event => event.id === 'strait'));
-  assert.equal(track.event.laps, 15);
-  const race = createRace(track, currentTeam(career), career.upgrades, career.setup, undefined, { difficulty: 'legend' });
-  const outside = track.pit.side * (track.railOffset - 1.34);
-  Object.assign(race.player, track.at(125, outside), { station: 125, offset: outside, onRoad: false });
-  for (let step = 0; step < 560 / raceStep && race.opponents.some(car => car.finishTime == null); step++) {
-    race.update(raceStep, { gas: 0, brake: 0, steering: 0 });
-  }
-  assert.equal(race.control.flag, 'green');
-  for (const car of race.opponents) {
-    assert.ok(car.pit.stops >= 2, car.id);
-    assert.ok(Number.isFinite(car.finishTime) && !car.rejoins, car.id);
+  for (const event of [originalEvents.at(-1), events.at(-1)]) {
+    const track = createTrack(event);
+    assert.equal(track.event.laps, 15);
+    const race = createRace(track, currentTeam(career), career.upgrades, career.setup, undefined, { difficulty: 'legend' });
+    const station = event.trackLayout ? 235 : 125;
+    const outside = track.pit.side * (track.railOffset - 1.34) * (event.trackLayout ? -1 : 1);
+    const limit = event.trackLayout ? 760 : 560;
+    Object.assign(race.player, track.at(station, outside), { station, offset: outside, onRoad: false });
+    for (let step = 0; step < limit / raceStep && race.opponents.some(car => car.finishTime == null); step++) {
+      race.update(raceStep, { gas: 0, brake: 0, steering: 0 });
+    }
+    assert.equal(race.control.flag, 'green');
+    for (const car of race.opponents) {
+      assert.ok(car.pit.stops >= 2, car.id);
+      assert.ok(Number.isFinite(car.finishTime) && !car.rejoins, car.id);
+    }
   }
 });
