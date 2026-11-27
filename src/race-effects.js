@@ -69,6 +69,7 @@ export function createRaceEffects(scene) {
   dustGeometry.setAttribute('seed', new T.BufferAttribute(dustSeeds, 1).setUsage(T.DynamicDrawUsage));
   dustGeometry.setDrawRange(0, 0);
   const clouds = new T.Points(dustGeometry, dustMaterial);
+  clouds.name = 'Race smoke and steam';
   clouds.frustumCulled = false;
   scene.add(clouds);
   let dustTimer = 0;
@@ -152,18 +153,21 @@ export function createRaceEffects(scene) {
   function spawnEngineSmoke(car, dt) {
     const temperature = car.engineTemperature ?? 86;
     const steam = temperature > engineWarning;
-    if (car.damage <= 65 && !steam) return;
+    if (car.damage <= 65 && !steam) { engineTimers.delete(car.id); return; }
     const severity = Math.max(0, (car.damage - 65) / 35, Math.min(1, (temperature - engineWarning) / 25));
     let pending = (engineTimers.get(car.id) ?? 0) + dt * (4 + severity * 16);
     const forward = Math.sin(car.yaw), across = Math.cos(car.yaw);
+    const speed = Math.max(0, car.speed);
     while (pending >= 1 && dust.length < maxDust) {
       pending--;
+      const leak = (car.hoodBias ?? 0) * 0.25 + (Math.random() - 0.5) * 0.26;
       dust.push({
-        x: car.x + forward * 1.22 + across * (Math.random() - 0.5) * 0.35,
-        z: car.z + across * 1.22 + forward * (Math.random() - 0.5) * 0.35,
-        y: 0.67,
-        vx: forward * car.speed * 0.12 + (Math.random() - 0.5) * 0.7,
-        vz: across * car.speed * 0.12 + (Math.random() - 0.5) * 0.7,
+        x: car.x + forward * 1.34 + across * leak,
+        z: car.z + across * 1.34 - forward * leak,
+        y: 0.63 + (car.hoodDamage ?? 0) * 0.15,
+        vx: forward * speed * 0.09 + (Math.random() - 0.5) * 0.7,
+        vz: across * speed * 0.09 + (Math.random() - 0.5) * 0.7,
+        rise: 1.28 + severity * 0.43 - Math.min(0.44, speed * 0.011),
         lifetime: 0.8 + severity * 0.55 + Math.random() * 0.36,
         age: 0, kind: steam && car.damage < 82 ? 4 : 2, seed: Math.random() * 14,
       });
@@ -228,8 +232,8 @@ export function createRaceEffects(scene) {
       cloud.x += cloud.vx * dt;
       cloud.vx *= Math.exp(-dt * 1.15);
       cloud.vz *= Math.exp(-dt * 1.15);
-      cloud.y += dt * (cloud.kind === 4 ? 1.53 : cloud.kind === 2 ? 1.16 :
-        cloud.kind === 3 ? 1.34 * (1 - cloud.age / cloud.lifetime) : cloud.kind === 1 ? 0.60 : 0.39);
+      cloud.y += dt * (cloud.rise ??
+        (cloud.kind === 3 ? 1.34 * (1 - cloud.age / cloud.lifetime) : cloud.kind === 1 ? 0.60 : 0.39));
       cloud.z += cloud.vz * dt;
       dust[i] = cloud;
       dustPositions.set([cloud.x, cloud.y, cloud.z], i * 3);

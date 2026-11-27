@@ -81,30 +81,43 @@ function updateScreech(audio, race, audible, time) {
   audio.skidGain.gain.setTargetAtTime(strain ** 1.35 * 0.13, time, strain > 0 ? 0.068 : 0.045);
 }
 
-function oneShot(audio, buffer, volume, band, pitch) {
+function oneShot(audio, buffer, volume, band, pitch, pan) {
   const { context } = audio;
   const source = context.createBufferSource();
   const filter = context.createBiquadFilter();
   const gain = context.createGain();
+  const balance = context.createStereoPanner();
   filter.type = 'lowpass';
   filter.frequency.value = band;
   gain.gain.value = volume;
   source.buffer = buffer;
   source.playbackRate.value = pitch;
-  source.connect(filter).connect(gain).connect(context.destination);
+  balance.pan.value = pan;
+  source.connect(filter).connect(gain).connect(balance).connect(context.destination);
   source.onended = () => {
     source.disconnect();
     filter.disconnect();
     gain.disconnect();
+    balance.disconnect();
   };
   source.start();
 }
 
-function crashSound(impact, audio) {
+function contactPan(contact, player) {
+  const across = (contact.x - player.x) * Math.cos(player.yaw) - (contact.z - player.z) * Math.sin(player.yaw);
+  return Math.max(-0.76, Math.min(0.76, -across * 0.53));
+}
+
+function crashSound(impact, audio, player) {
   const concrete = impact.surface === 'concrete';
   const sharpness = impact.kind === 'rail' ? (concrete ? 1560 : 2300) : 1170;
+  const pan = contactPan(impact, player);
   oneShot(audio, audio.crash, Math.min(0.46, impact.impulse * 0.011 + impact.normalSpeed * 0.003), sharpness,
-    concrete ? 0.77 : impact.kind === 'rail' ? 1.04 : 0.86);
+    concrete ? 0.77 : impact.kind === 'rail' ? 1.04 : 0.86, pan);
+  if (impact.normalSpeed > 13) {
+    const thump = Math.min(0.26, (impact.normalSpeed - 13) * 0.016);
+    oneShot(audio, audio.crash, thump, 370, 0.62, pan * 0.45);
+  }
 }
 
 function updateWheelSound(audio, race, allowed) {
@@ -118,7 +131,7 @@ function updateWheelSound(audio, race, allowed) {
     const distance = Math.hypot(event.x - race.player.x, event.z - race.player.z);
     const proximity = event.carId === race.player.id ? 1 : Math.max(0, 1 - distance / 29) ** 2 * 0.76;
     if (allowed && proximity > 0.05) oneShot(audio, audio.blowout, proximity * 0.81, 3570,
-      event.type === 'detached' ? 0.76 : 0.94);
+      event.type === 'detached' ? 0.76 : 0.94, contactPan(event, race.player));
   }
 }
 
@@ -140,7 +153,7 @@ export function updateAudio(audio, race, playing, allowImpact = playing) {
   updateWheelSound(audio, race, allowImpact);
   if (race?.impact && race.impact !== audio.lastImpact) {
     audio.lastImpact = race.impact;
-    if (allowImpact) crashSound(race.impact, audio);
+    if (allowImpact) crashSound(race.impact, audio, race.player);
   }
   if (race?.backfire && race.backfire !== audio.lastFire) {
     audio.lastFire = race.backfire;
