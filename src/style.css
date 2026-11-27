@@ -209,6 +209,9 @@ kbd { padding: 2px 4px; border: 1px solid #fff4; border-radius: 3px; font: 630 .
 .car-schematic g { cursor: pointer; outline: 0; }
 .car-schematic g :is(rect, path) { fill: var(--state, #98b7ae); fill-opacity: .38; stroke: var(--state, #98b7ae); stroke-width: 1; }
 .car-schematic g:is(:hover, :focus-visible, [aria-pressed="true"]) :is(rect, path) { fill-opacity: .8; stroke: #edf9ff; stroke-width: 1.65; }
+.car-schematic g .wheel-missing { display: none; fill: none; stroke: #ff756f; }
+.car-schematic g[data-missing] rect { fill-opacity: .12; stroke-dasharray: 2 2; }
+.car-schematic g[data-missing] .wheel-missing { display: initial; }
 .vehicle-readings { display: grid; gap: 4px; min-width: 0; }
 .engine-reading { display: grid; grid-template-columns: auto 1fr; align-items: center; column-gap: 5px; padding: 0 0 3px; border-bottom: 1px solid #9cb9c748; }
 .engine-reading b { justify-self: end; color: var(--temp, #e4edf3); }
@@ -220,9 +223,13 @@ kbd { padding: 2px 4px; border: 1px solid #fff4; border-radius: 3px; font: 630 .
 .wheel-reading b { color: var(--state); }
 .wheel-reading [data-life] { text-align: right; }
 .wheel-reading [data-temp] { grid-column: 1/-1; color: var(--temp, #e4edf3); }
+.tire-life-bar { --fill: var(--tire-life, 100%); grid-column: 1/-1; height: 2px; margin-top: 2px;
+  background: linear-gradient(to right, var(--state, #87d6ac) var(--fill), #c6d7e037 var(--fill)); }
+.wheel-reading:focus-visible { outline: 1px solid #e7fbff; outline-offset: 1px; }
 .wheel-reading[aria-pressed="true"] { border-color: #d2eaf2; background: #b2d1e51c; }
 .vehicle-console-foot { min-height: 13px; border-top: 1px solid #97b8c744; padding-top: 4px; color: #c7d8df; }
 .vehicle-console-foot [data-detail] { text-align: right; }
+.vehicle-console-foot [data-detail].telemetry-critical { color: #ff8981; }
 @media (prefers-reduced-motion: no-preference) {
   .car-schematic [data-health="critical"], .engine-reading[data-heat="critical"] b { animation: telemetry-alert 1.05s ease-in-out infinite alternate; }
   @keyframes telemetry-alert { to { opacity: .60; } }
