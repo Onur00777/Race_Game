@@ -5,6 +5,7 @@ import { difficulties, purseFor } from '../src/difficulty.js';
 import { eventDifficulty, raceCheckpoint, restoreRace } from '../src/progress.js';
 import { createRace, createTrack, raceStep } from '../src/race.js';
 import { createRaceIntel, wakeFactor } from '../src/race-ai.js';
+import { originalEvents } from '../src/events.js';
 
 const order = ['player', 'deniz', 'selin', 'ece', 'mert'];
 
@@ -58,7 +59,7 @@ test('drafting depends on the physical wake and never on race position', () => {
 });
 
 test('traffic changes the passing lane and only Legend covers an approaching challenger', () => {
-  const track = createTrack(events[0]);
+  const track = createTrack(originalEvents[0]);
   const driver = (id, station, offset, speed) => ({ id, ...track.at(station, offset), station, offset, speed,
     lateral: 0, lane: 0, onRoad: true, pace: 1 });
   const behind = driver('player', 26, 0.8, 34);

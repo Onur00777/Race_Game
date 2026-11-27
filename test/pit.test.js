@@ -5,6 +5,7 @@ import { pitSpeed } from '../src/pit-lane.js';
 import { raceCheckpoint, restoreRace } from '../src/progress.js';
 import { createRace, createTrack, raceStep } from '../src/race.js';
 import { tireHealth } from '../src/tire-strategy.js';
+import { originalEvents } from '../src/events.js';
 
 const career = newCareer();
 const loadout = normalizeLoadout(career);
@@ -69,7 +70,7 @@ test('the Summit pack calls at least one pit stop per car when rain arrives', ()
   const track = createTrack(events[2]);
   const race = createRace(track, currentTeam(career), career.upgrades, career.setup, undefined, { difficulty: 'hard' });
   Object.assign(race.player, track.at(120, track.railOffset - 1.4), { station: 120, offset: track.railOffset - 1.4, onRoad: false });
-  for (let step = 0; step < 230 / raceStep && race.opponents.some(car => car.finishTime == null); step++) {
+  for (let step = 0; step < 320 / raceStep && race.opponents.some(car => car.finishTime == null); step++) {
     race.update(raceStep, { gas: 0, brake: 0, steering: 0 });
   }
   for (const car of race.opponents) {
@@ -79,7 +80,7 @@ test('the Summit pack calls at least one pit stop per car when rain arrives', ()
 });
 
 test('Legend rivals complete the long wet-to-dry stint without getting stuck in the pit lane', () => {
-  const track = createTrack(events.find(event => event.id === 'strait'));
+  const track = createTrack(originalEvents.find(event => event.id === 'strait'));
   assert.equal(track.event.laps, 15);
   const race = createRace(track, currentTeam(career), career.upgrades, career.setup, undefined, { difficulty: 'legend' });
   const outside = track.pit.side * (track.railOffset - 1.34);

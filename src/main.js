@@ -380,8 +380,9 @@ function updateGarage() {
 function startRace(restart = false) {
   const event = eventForResume(career);
   if (!view || !event || mode !== 'menu' || !career.profile) return;
-  const next = trackFor(event);
-  const restored = restoreRace(career, next);
+  const savedTrack = trackFor(event);
+  const restored = restoreRace(career, savedTrack);
+  const next = restart ? trackFor(eventForResume(career, true)) : savedTrack;
   if (hasSavedRace(career) && !restored) notify(t('invalidRace'));
   if (!restored && integrity(career.condition) === 0) return openService();
   if (!restart) {

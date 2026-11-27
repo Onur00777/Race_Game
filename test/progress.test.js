@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { acceptSponsor, buyUpgrade, currentEvent, currentTeam, events, finishEvent, loadCareer, newCareer, normalizeLoadout, saveCareer, saveProfile, toggleDecal } from '../src/career.js';
 import { eventForResume, raceCheckpoint, restoreRace } from '../src/progress.js';
-import { legacyEvents } from '../src/events.js';
+import { legacyEvents, originalEvents } from '../src/events.js';
 import { createRace, createTrack, raceStep, renderPose } from '../src/race.js';
 import { vehicleStats } from '../src/setup.js';
 
@@ -69,6 +69,27 @@ test('previous Bay Curves snapshots retain their scheduled two laps and original
   assert.equal(finishEvent(olderCareer, order, 70, 31, resumed.loadout, event).results.at(-1).prize, 1800);
 });
 
+test('saved races keep their original straight and a fresh attempt uses the extended track', () => {
+  const career = newCareer();
+  const track = createTrack(originalEvents[0]);
+  const race = createRace(track, currentTeam(career), career.upgrades, career.setup);
+  Object.assign(race.player, track.at(track.length + 72), { lap: 1, station: track.length + 72 });
+  const activeRace = raceCheckpoint(career, race, normalizeLoadout(career), false);
+  delete activeRace.trackLayout;
+  const saved = { ...career, activeRace };
+  const resumed = restoreRace(saved, createTrack(eventForResume(saved))).race;
+  assert.equal(resumed.player.x, race.player.x);
+  assert.equal(resumed.player.station, race.player.station);
+  assert.equal(eventForResume(saved, true), events[0]);
+  for (const event of events) {
+    const next = createTrack(event);
+    const heading = next.at(0).yaw;
+    for (let station = -115; station <= 165; station += 5) {
+      assert.ok(Math.abs(Math.sin(next.at(station).yaw - heading)) < 0.17, event.id + ' at ' + station);
+    }
+  }
+});
+
 test('purchased aero trades top speed for downforce and clamps unavailable wing shapes', () => {
   let career = { ...newCareer(), cash: 3000 };
   const stock = vehicleStats(currentTeam(career), career.upgrades, career.setup);
@@ -99,7 +120,7 @@ test('opponents clear the Bay Curves hairpin instead of blocking the second lap'
   const track = createTrack(events[1]);
   const race = createRace(track, currentTeam(career), career.upgrades, career.setup);
   const angle = n => Math.atan2(Math.sin(n), Math.cos(n));
-  for (let tick = 0; tick < 170 * 120 && !race.order; tick++) {
+  for (let tick = 0; tick < 250 * 120 && !race.order; tick++) {
     const car = race.player;
     const look = 6 + Math.abs(car.speed) * 0.55;
     const target = track.at(car.station + look, Math.sin(car.station * 0.011) * 1.4);

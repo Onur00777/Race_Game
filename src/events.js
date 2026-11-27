@@ -1,7 +1,7 @@
 export const defaultPoints = [25, 18, 15, 12, 10];
 export const defaultPrizes = [1800, 1350, 1100, 950, 850];
 
-export const events = [
+export const originalEvents = [
   {
     id: 'cedar', name: 'Sedir Pisti', nameEn: 'Cedar Circuit', date: '12 NİS', dateEn: '12 APR',
     format: 'sprint', weather: 'sunset', time: '19:20', laps: 2, width: 15,
@@ -49,7 +49,25 @@ export const events = [
   },
 ];
 
-export const legacyEvents = events.slice(0, 3).map((event, index) => ({
+export const trackLayoutVersion = 1;
+export const events = originalEvents.map(event => {
+  const [[x, start], [, turn], ...rest] = event.points;
+  const straightEnd = start - 192;
+  const south = straightEnd - turn;
+  const north = 142;
+  const returnLeg = rest.map(([px, z], index) => {
+    const blend = Math.max(0, Math.min(1, (index - 1) / (rest.length - 3)));
+    return [px, z + south + (north - south) * blend];
+  });
+  return {
+    ...event,
+    trackLayout: trackLayoutVersion,
+    points: [[x, start], [x, start - 64], [x, start - 128], [x, straightEnd],
+      ...returnLeg, [x, start + 142], [x, start + 71]],
+  };
+});
+
+export const legacyEvents = originalEvents.slice(0, 3).map((event, index) => ({
   ...event, laps: [2, 2, 3][index], prizes: defaultPrizes, pointsByPlace: defaultPoints,
   format: index ? 'standardGp' : 'sprint', weather: 'sunset', time: '19:20',
   skyYaw: [2.64, 2.07, 3.16][index], surfaceGrip: 1, legacy: true,

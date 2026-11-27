@@ -1,6 +1,6 @@
 import { currentEvent, normalizeLoadout, teamById } from './career.js';
 import { createRace } from './race.js';
-import { legacyEvents } from './events.js';
+import { legacyEvents, originalEvents, trackLayoutVersion } from './events.js';
 import { difficultyId } from './difficulty.js';
 import { vehicleCondition } from './vehicle-damage.js';
 import { applyTireGrip, fitTires } from './tire-strategy.js';
@@ -17,6 +17,7 @@ export function raceCheckpoint(career, race, loadout, alternateCamera) {
     event: race.track.event.id,
     runId: race.runId,
     legacy: race.track.event.legacy === true,
+    trackLayout: race.track.event.trackLayout ?? 0,
     season: career.season,
     round: career.results.length,
     difficulty: race.difficulty,
@@ -60,17 +61,18 @@ export function eventDifficulty(career) {
   return hasSavedRace(career) ? difficultyId(career.activeRace.difficulty, 'easy') : difficultyId(career.difficulty);
 }
 
-export function eventForResume(career) {
+export function eventForResume(career, restart = false) {
   if (!hasSavedRace(career)) return currentEvent(career);
   const save = career.activeRace;
-  return (save.version === 1 || save.legacy ? legacyEvents[save.round] : null) ?? currentEvent(career);
+  if (save.version === 1 || save.legacy) return legacyEvents[save.round] ?? currentEvent(career);
+  return restart || save.trackLayout === trackLayoutVersion ? currentEvent(career) : originalEvents[save.round];
 }
 
 export function restoreRace(career, track) {
   if (!hasSavedRace(career)) return null;
   const save = career.activeRace;
   const event = eventForResume(career);
-  if (track.event.id !== event.id || track.event.laps !== event.laps) return null;
+  if (track.event.id !== event.id || track.event.laps !== event.laps || track.event.trackLayout !== event.trackLayout) return null;
   const loadout = normalizeLoadout(save.loadout);
   const race = createRace(track, teamById(loadout.team), loadout.upgrades, loadout.setup, loadout.appearance,
     { difficulty: eventDifficulty(career), runId: typeof save.runId === 'string' ? save.runId : undefined,
