@@ -106,6 +106,13 @@ const overlay = byId('overlay');
 const map = byId('map');
 const updateVehicleStatus = createVehicleHud(app.querySelector('.vehicle-console'));
 const mapContext = map.getContext('2d');
+const mapBackground = document.createElement('canvas');
+mapBackground.width = map.width;
+mapBackground.height = map.height;
+const mapBackgroundContext = mapBackground.getContext('2d');
+const speedText = byId('speed');
+const speedBar = byId('speed-bar');
+const clock = byId('clock');
 const garagePreview = byId('garage-preview');
 const updateWallet = createWallet(byId('wallet'), garageMoney);
 const keys = new Set();
@@ -411,6 +418,13 @@ function startRace(restart = false) {
   document.body.classList.add('driving');
   byId('race-title').textContent = translatedField(event);
   mapShape = circuitMap(track, map.width, map.height);
+  mapBackgroundContext.clearRect(0, 0, map.width, map.height);
+  mapBackgroundContext.lineWidth = 8;
+  mapBackgroundContext.strokeStyle = '#121619';
+  mapBackgroundContext.stroke(mapShape.path);
+  mapBackgroundContext.lineWidth = 3;
+  mapBackgroundContext.strokeStyle = '#a7a9a8';
+  mapBackgroundContext.stroke(mapShape.path);
   updateHud();
   saveActiveRace();
   syncRaceControl();
@@ -418,15 +432,22 @@ function startRace(restart = false) {
   circuit.focus({ preventScroll: true });
 }
 
+function updateInstruments() {
+  const speed = String(Math.round(Math.abs(race.player.speed) * 3.6));
+  if (speedText.textContent !== speed) {
+    speedText.textContent = speed;
+    speedBar.style.width = Math.min(100, Number(speed) / 2.35) + '%';
+  }
+  const time = formatTime(race.player.finishTime ?? race.elapsed);
+  if (clock.textContent !== time) clock.textContent = time;
+}
+
 function updateHud() {
   const player = race.player;
-  const speed = Math.round(Math.abs(player.speed) * 3.6);
   const finished = player.finishTime != null;
   byId('laps').textContent = finished ? upper(t('finishCrossed')) : `${upper(t('lap'))} ${Math.min(player.lap + 1, track.event.laps)} / ${track.event.laps}`;
-  byId('clock').textContent = formatTime(player.finishTime ?? race.elapsed);
+  updateInstruments();
   byId('position').textContent = race.position();
-  byId('speed').textContent = speed;
-  byId('speed-bar').style.width = Math.min(100, speed / 2.35) + '%';
   updateVehicleStatus(player);
   updatePitStatus(player);
   updateFlagBanner();
@@ -456,12 +477,7 @@ function updateHud() {
   const startMessage = race.countdown > 0 ? String(Math.ceil(race.countdown)) : race.elapsed < 0.8 ? t('go') : '';
   if (byId('countdown').textContent !== startMessage) byId('countdown').textContent = startMessage;
   mapContext.clearRect(0, 0, map.width, map.height);
-  mapContext.lineWidth = 8;
-  mapContext.strokeStyle = '#121619';
-  mapContext.stroke(mapShape.path);
-  mapContext.lineWidth = 3;
-  mapContext.strokeStyle = '#a7a9a8';
-  mapContext.stroke(mapShape.path);
+  mapContext.drawImage(mapBackground, 0, 0);
   for (const car of [...race.opponents, player]) {
     mapContext.fillStyle = car.color;
     mapContext.beginPath();
@@ -1005,10 +1021,10 @@ function frame(now) {
       saveActiveRace(true);
       lastCheckpoint = now;
     }
-    if (now - lastHudUpdate > 44 || mode === 'result') {
+    if (now - lastHudUpdate >= 83 || mode === 'result') {
       updateHud();
       lastHudUpdate = now;
-    }
+    } else updateInstruments();
     playAudio();
   }
   if (mode !== 'menu' || now - lastMenuDraw >= 100) {
